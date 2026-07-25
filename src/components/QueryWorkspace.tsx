@@ -1,4 +1,4 @@
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   CirclePlus,
@@ -7,12 +7,23 @@ import {
   Table2,
   X,
 } from "lucide-react";
+import {
+  buildCompletionSchema,
+  defaultSchemaFor,
+  hasCompletionData,
+} from "../lib/completionSchema";
 import { getSchemaCache } from "../lib/schemaCache";
 import { buildTableQuery } from "../lib/sql";
 import { ConnectionProfile } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
-import { TABLES_GROUP, TableNode, tableFromObject } from "../types/schema";
+import {
+  SchemaNode,
+  TABLES_GROUP,
+  TableNode,
+  tableFromObject,
+} from "../types/schema";
 import { ResultGrid } from "./ResultGrid";
+import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
 
 const STARTER_QUERY = `SELECT *
@@ -49,6 +60,8 @@ interface QueryWorkspaceProps {
   busy: "connect" | "query" | "schema" | null;
   result: QueryResult | null;
   error: string;
+  /** Cached metadata for the active connection, used for autocompletion. */
+  schemas: SchemaNode[];
   openRequest: WorkspaceOpen;
   onRun: (sql: string) => void;
   onExecute: (sql: string) => Promise<QueryResult>;
@@ -72,6 +85,7 @@ export function QueryWorkspace({
   busy,
   result,
   error,
+  schemas,
   openRequest,
   onRun,
   onExecute,
@@ -80,8 +94,21 @@ export function QueryWorkspace({
     { id: "query-1", kind: "query", title: "Query 1", sql: STARTER_QUERY },
   ]);
   const [activeId, setActiveId] = useState("query-1");
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
+
+  const completionSchema = useMemo(
+    () => buildCompletionSchema(schemas),
+    [schemas],
+  );
+  const defaultSchema = useMemo(
+    () => (selected ? defaultSchemaFor(selected, schemas) : undefined),
+    [selected, schemas],
+  );
+  const completionReady = useMemo(
+    () => hasCompletionData(schemas),
+    [schemas],
+  );
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
   const query =
@@ -156,19 +183,7 @@ export function QueryWorkspace({
 
   function run() {
     if (!active || active.kind !== "query") return;
-    const editor = editorRef.current;
-    const selectedSql =
-      editor && editor.selectionStart !== editor.selectionEnd
-        ? query.slice(editor.selectionStart, editor.selectionEnd)
-        : query;
-    onRun(selectedSql);
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      run();
-    }
+    onRun(editorRef.current?.getSqlToRun() ?? query);
   }
 
   function addQueryTab() {
@@ -275,20 +290,22 @@ export function QueryWorkspace({
               </button>
               <span className="toolbar-separator" />
               <span className="query-hint">Run selection or current query</span>
+              <span className="completion-hint">
+                {completionReady
+                  ? "⌃Space for tables and columns"
+                  : "Expand a schema to enable completions"}
+              </span>
             </div>
             <div className="editor-wrap">
-              <div className="line-numbers" aria-hidden="true">
-                {query.split("\n").map((_, index) => (
-                  <span key={index}>{index + 1}</span>
-                ))}
-              </div>
-              <textarea
+              <SqlEditor
+                key={active?.id ?? "query"}
                 ref={editorRef}
                 value={query}
-                spellCheck={false}
-                aria-label="SQL query editor"
-                onChange={(event) => setQuerySql(event.target.value)}
-                onKeyDown={handleKeyDown}
+                driver={selected?.driver ?? "postgres"}
+                completionSchema={completionSchema}
+                defaultSchema={defaultSchema}
+                onChange={setQuerySql}
+                onRun={onRun}
               />
             </div>
           </section>

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { databaseApi } from "../api/database";
 import { errorMessage } from "../lib/format";
 import {
@@ -47,6 +47,9 @@ export function useDatabaseSession() {
   const [activeId, setActiveId] = useState<string | null>(null);
   /** Connection with a live DB pool. */
   const [liveId, setLiveId] = useState<string | null>(null);
+  /** Mirrors liveId so long-running background work can observe disconnects. */
+  const liveIdRef = useRef(liveId);
+  liveIdRef.current = liveId;
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo | null>(
     null,
   );
@@ -162,6 +165,50 @@ export function useDatabaseSession() {
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * Fill in object metadata for SQL autocompletion. Best-effort: it never
+   * opens a pool, never blocks the UI, and stays quiet about failures.
+   */
+  async function prefetchObjects(
+    profile: ConnectionProfile,
+    groups: string[],
+    schemaLimit = 25,
+  ) {
+    if (liveIdRef.current !== profile.id || groups.length === 0) return;
+    const cache = getSchemaCache(profile.id);
+    if (!cache) return;
+
+    const pending: Array<{ schema: string; group: string }> = [];
+    const candidates = cache.schemas
+      .filter((schema) => !schema.isSystem)
+      .slice(0, schemaLimit);
+    for (const schema of candidates) {
+      for (const group of groups) {
+        if (!hasSchemaObjects(profile.id, schema.name, group)) {
+          pending.push({ schema: schema.name, group });
+        }
+      }
+    }
+    if (pending.length === 0) return;
+
+    let loaded = false;
+    for (const item of pending) {
+      if (liveIdRef.current !== profile.id) break;
+      try {
+        const objects = await databaseApi.listObjects(
+          profile.id,
+          item.schema,
+          item.group,
+        );
+        setSchemaObjects(profile.id, item.schema, item.group, objects);
+        loaded = true;
+      } catch {
+        // Completion data is optional; a failed group just stays unlisted.
+      }
+    }
+    if (loaded) syncFromCache(profile.id);
   }
 
   async function refreshDatabase(profile: ConnectionProfile) {
@@ -319,6 +366,7 @@ export function useDatabaseSession() {
     refreshDatabase,
     refreshSchema,
     refreshGroup,
+    prefetchObjects,
     runQuery,
     executeSql,
     onDeleted,

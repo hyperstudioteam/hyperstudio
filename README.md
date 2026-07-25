@@ -79,7 +79,9 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Run the whole buffer or just the selected text
 - [x] Result grid with a 1,000-row safety cap and truncation notice
 - [x] DDL and DML support with affected-row counts and timings
-- [ ] SQL syntax highlighting, formatting, and autocompletion
+- [x] SQL syntax highlighting with per-dialect parsing (CodeMirror 6)
+- [x] Schema-aware autocompletion for schemas, tables, views, and columns
+- [ ] SQL formatting
 - [ ] Query history and saved queries
 - [ ] Explicit transaction control and query cancellation
 - [ ] Multi-statement scripts and per-statement results
@@ -263,7 +265,8 @@ Key modules worth knowing:
 
 ### v0.3 — Write SQL comfortably
 
-- [ ] Syntax highlighting, autocompletion, and formatting in the editor
+- [x] Syntax highlighting and schema-aware autocompletion in the editor
+- [ ] SQL formatting
 - [ ] Query history with search, plus saved queries
 - [ ] Multi-statement scripts with per-statement results
 - [ ] Table DDL viewer, indexes, and foreign keys in the browser

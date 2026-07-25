@@ -17,6 +17,7 @@ import {
   VaultLockedError,
   VaultMissingError,
 } from "./lib/passwords";
+import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
 import { getVaultSecret, isVaultUnlocked } from "./lib/vault";
@@ -47,6 +48,7 @@ function App() {
   );
   const [pluginsOpen, setPluginsOpen] = useState(false);
   const vaultRetry = useRef<(() => void) | null>(null);
+  const completionPrefetched = useRef<string | null>(null);
 
   const refreshDrivers = () => {
     void databaseApi
@@ -76,6 +78,17 @@ function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree.selected?.id]);
+
+  // Once a pool is open anyway, quietly top up metadata so SQL completion
+  // knows about tables the user has not expanded in the tree.
+  useEffect(() => {
+    const profile = tree.selected;
+    if (!profile || session.liveId !== profile.id) return;
+    if (completionPrefetched.current === profile.id) return;
+    completionPrefetched.current = profile.id;
+    void session.prefetchObjects(profile, completionGroupsFor(profile.driver));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.liveId, tree.selected?.id]);
 
   function openNewConnection(folderId: string | null) {
     setModalProfile(tree.createBlank());
@@ -234,6 +247,7 @@ function App() {
           busy={session.busy}
           result={session.result}
           error={session.error}
+          schemas={session.schemas}
           openRequest={openRequest}
           onRun={(sql) => {
             if (!tree.selected) {

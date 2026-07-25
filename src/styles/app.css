@@ -167,9 +167,9 @@ button.tree-row:hover { background: var(--panel-soft); color: var(--text); }
 kbd { padding: 1px 4px; border: 1px solid #403a67; border-radius: 3px; color: #857cad; background: rgba(0,0,0,.15); font: 8px ui-monospace, monospace; }
 .toolbar-separator { width: 1px; height: 16px; background: var(--border); }
 .query-hint { color: var(--subtle); font-size: 9px; }
-.editor-wrap { min-height: 0; flex: 1; display: flex; padding: 11px 0; overflow: hidden; background: #111318; }
-.line-numbers { width: 41px; flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; padding-right: 10px; color: #454d5a; font: 12px/22px "SFMono-Regular", Consolas, monospace; user-select: none; border-right: 1px solid #1d2129; }
-.editor-wrap textarea { flex: 1; min-width: 0; resize: none; padding: 0 14px; border: 0; outline: 0; color: #d8dce5; caret-color: var(--accent-bright); background: transparent; font: 12px/22px "SFMono-Regular", Consolas, monospace; tab-size: 2; }
+.completion-hint { margin-left: auto; padding-right: 4px; color: var(--subtle); font-size: 9px; }
+.editor-wrap { min-height: 0; flex: 1; display: flex; overflow: hidden; background: #111318; }
+.sql-editor { flex: 1; min-width: 0; overflow: hidden; }
 
 .results-pane { min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .results-header { height: 36px; flex: 0 0 auto; display: flex; align-items: stretch; justify-content: space-between; border-bottom: 1px solid var(--border); background: #14171b; }
