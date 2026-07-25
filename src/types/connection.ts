@@ -1,9 +1,68 @@
-export type Driver = "postgres" | "mysql";
+import { ObjectGroupDef } from "./schema";
+
+export type Driver = string;
 
 export type SslMode = "prefer" | "require" | "disable";
 
 /** How the DB password is persisted. */
 export type PasswordStorage = "none" | "raw" | "vault";
+
+export interface DriverCapabilities {
+  schemas: boolean;
+  views: boolean;
+  fileBased: boolean;
+  folderBased: boolean;
+  noConnectionRequired: boolean;
+  readonly: boolean;
+  identifierQuote: string;
+}
+
+export interface ColumnTypeDeclaration {
+  typeNames: string[];
+  matchPrefix?: boolean;
+  align?: string;
+  className?: string;
+  /** Viewer id to open by default (e.g. "builtin.json"). */
+  viewer?: string;
+  priority?: number;
+}
+
+export interface ConnectionFieldDef {
+  /** Maps to ConnectionProfile: host | port | database | username | password | sslMode */
+  key: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  secret?: boolean;
+  options?: string[];
+  description?: string;
+  /** "half" or "full" */
+  width?: string;
+}
+
+export interface DriverInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  builtin: boolean;
+  defaultPort: number | null;
+  capabilities: DriverCapabilities;
+  columnTypes?: ColumnTypeDeclaration[];
+  /** When set, connection modal uses these instead of the SQL defaults. */
+  connectionFields?: ConnectionFieldDef[];
+  /** Object categories the schema tree should show under each schema. */
+  objectGroups?: ObjectGroupDef[];
+}
+
+export interface InstalledPluginInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  enabled: boolean;
+  path: string;
+}
 
 export interface ConnectionProfile {
   id: string;
@@ -45,13 +104,44 @@ export function blankProfile(driver: Driver = "postgres"): ConnectionProfile {
     name: "",
     driver,
     host: "localhost",
-    port: driver === "postgres" ? 5432 : 3306,
+    port: driver === "postgres" ? 5432 : driver === "mysql" ? 3306 : 0,
     database: "",
-    username: driver === "postgres" ? "postgres" : "root",
+    username: driver === "postgres" ? "postgres" : driver === "mysql" ? "root" : "",
     password: "",
     passwordStorage: "none",
     sslMode: "prefer",
     allSchemas: true,
     schemas: [],
   };
+}
+
+export function blankProfileFromDriver(driver: DriverInfo): ConnectionProfile {
+  const profile = blankProfile(driver.id);
+  profile.port = driver.defaultPort ?? 0;
+  const fields = driver.connectionFields ?? [];
+  if (fields.length > 0) {
+    const keys = new Set(fields.map((field) => field.key));
+    if (!keys.has("username")) profile.username = "";
+    if (!keys.has("database")) {
+      profile.database = "";
+    } else {
+      const dbField = fields.find((field) => field.key === "database");
+      profile.database = dbField?.options?.[0] ?? "";
+    }
+    if (!keys.has("password")) profile.password = "";
+    if (!keys.has("host")) profile.host = "";
+    return profile;
+  }
+  if (driver.capabilities.fileBased || driver.capabilities.folderBased) {
+    profile.host = "";
+    profile.username = "";
+    profile.port = 0;
+  }
+  if (driver.capabilities.noConnectionRequired) {
+    profile.host = "";
+    profile.port = 0;
+    profile.database = driver.id;
+    profile.username = "";
+  }
+  return profile;
 }

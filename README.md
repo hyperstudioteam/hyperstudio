@@ -50,6 +50,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Test a connection and load its schema list before saving
 - [x] Per-connection schema filters (all schemas, or an explicit allowlist)
 - [x] Lazy connect — cached connections open a pool only when you run something
+- [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
 - [ ] SSH tunnels
 - [ ] Connection color coding and read-only / production guards
 
@@ -91,9 +92,10 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Inline cell editing with dirty-state highlighting
 - [x] Insert and delete rows, then submit or revert as a batch
 - [x] Primary-key-aware `UPDATE` / `DELETE` statement generation
+- [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
+- [x] Pluggable column types and data viewers via the contribution registry
 - [ ] Transactional commit mode (currently auto-commit per statement)
 - [ ] Column sorting and per-column filters from the grid header
-- [ ] Large object / JSON cell viewer and editor
 
 ### Selection, copy, and paste
 
@@ -207,20 +209,28 @@ to disk, and secrets are only held in memory while the vault is unlocked.
 ## Architecture
 
 The frontend never talks to a database directly. Every operation crosses a typed Tauri
-command boundary into Rust, which owns the connection pools.
+command boundary into Rust. Built-in Postgres and MySQL use in-process `sqlx` pools.
+Additional engines load as **external plugins** (JSON-RPC over stdin/stdout), inspired by
+[Tabularis](https://tabularis.dev/plugins).
 
 ```
 src/
   api/         Typed wrappers around Tauri commands
-  components/  UI: sidebar, schema browser, workspace, grids, modals
+  components/  UI: sidebar, schema browser, workspace, grids, modals, plugins
   hooks/       useConnectionTree, useDatabaseSession
   lib/         Storage, schema cache, vault crypto, SQL builders, extractors
   types/       Shared DTOs mirroring the Rust models
 
 src-tauri/src/
   commands/    Tauri command handlers
-  db/          Pools, schema introspection, query execution, value mapping
+  db/          Native pool helpers, schema introspection, query execution
+  drivers/     DatabaseDriver trait + native Postgres/MySQL + registry
+  plugins/     Manifest, JSON-RPC process actor, install/discover
   models/      Serde DTOs shared with the frontend
+
+plugins/
+  PLUGIN_GUIDE.md   How to write a driver plugin
+  skeleton/         Minimal Rust reference plugin
 ```
 
 Key modules worth knowing:
@@ -228,7 +238,19 @@ Key modules worth knowing:
 - `lib/vault.ts` — Web Crypto vault (PBKDF2 + AES-GCM), lock/unlock lifecycle
 - `lib/sql.ts` — identifier quoting, literals, and `SELECT` / `INSERT` / `UPDATE` / `DELETE` builders
 - `lib/extractors.ts` — clipboard formats, selection maths, and paste planning
+- `drivers/` — unified driver trait; commands never match on engine strings
+- `plugins/` — external process host; plugins cannot shadow `postgres` / `mysql`
 - `db/schema.rs` — Postgres and MySQL introspection, including primary-key detection
+
+### Plugins
+
+- Install from the puzzle / settings icon → **Plugins** (local folder or `.zip`).
+- **Drivers** run as external processes (JSON-RPC over stdin/stdout).
+- **Column types & data viewers** extend how cells render and inspect. Built-ins register
+  through the same public contribution API, so the core is just another plugin. Driver
+  plugins can declare column types in their manifest (`contributes.column_types`).
+- See [`plugins/PLUGIN_GUIDE.md`](plugins/PLUGIN_GUIDE.md) for the RPC surface, manifest, and contributions.
+- Trust model: plugins run as your user (fault isolation, not a sandbox). No signing in v1.
 
 ## Roadmap
 
@@ -248,7 +270,8 @@ Key modules worth knowing:
 
 ### v0.4 — Connect to anything
 
-- [ ] SQLite and Microsoft SQL Server drivers
+- [x] Plugin driver host (JSON-RPC over stdin/stdout) with local install
+- [ ] SQLite / DuckDB / other engines as community plugins
 - [ ] SSH tunnel support
 - [ ] Client certificate and full SSL configuration
 - [ ] Read-only and production connection guards
@@ -260,12 +283,13 @@ Key modules worth knowing:
 - [ ] Auto-updates
 - [ ] Automated test suite and CI on every pull request
 - [ ] Stable, versioned local storage with migrations
+- [ ] Plugin signing / registry
 
 ### Later
 
 - ER diagrams and schema comparison
 - Import from CSV
-- Plugin or scripted extractor system
+- Scripted extractor plugins and UI slots
 - Themes and layout customization
 
 ## Contributing
@@ -275,12 +299,15 @@ introspection quirks vary a lot between servers and versions.
 
 1. Fork the repository and create a branch off `main`.
 2. Make your change. Keep the existing module boundaries: UI in `src/components`, logic in
-   `src/lib` or `src/hooks`, database work in `src-tauri/src/db`.
+   `src/lib` or `src/hooks`, native DB work in `src-tauri/src/db`, driver trait in
+   `src-tauri/src/drivers`, and external plugins in `src-tauri/src/plugins` /
+   `plugins/`.
 3. Verify it compiles:
 
 ```bash
 pnpm build
 cd src-tauri && cargo check
+cd ../plugins/skeleton && cargo build --release
 ```
 
 4. Open a pull request describing what changed and how you tested it. Screenshots help for

@@ -11,7 +11,7 @@ import { getSchemaCache } from "../lib/schemaCache";
 import { buildTableQuery } from "../lib/sql";
 import { ConnectionProfile } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
-import { TableNode } from "../types/schema";
+import { TABLES_GROUP, TableNode, tableFromObject } from "../types/schema";
 import { ResultGrid } from "./ResultGrid";
 import { TableDataEditor } from "./TableDataEditor";
 
@@ -60,8 +60,9 @@ function findTableMeta(
   table: string,
 ): TableNode | null {
   const cache = getSchemaCache(connectionId);
-  const tables = cache?.tablesBySchema[schema];
-  return tables?.find((item) => item.name === table) ?? null;
+  const tables = cache?.objectsBySchema[schema]?.[TABLES_GROUP];
+  const match = tables?.find((item) => item.name === table);
+  return match ? tableFromObject(match) : null;
 }
 
 export function QueryWorkspace({

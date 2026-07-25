@@ -34,6 +34,11 @@ interface ConnectionSidebarProps {
   onConnect: (profile: ConnectionProfile) => void;
   onRefreshDatabase: (profile: ConnectionProfile) => void;
   onRefreshSchema: (profile: ConnectionProfile, schema: string) => void;
+  onRefreshGroup: (
+    profile: ConnectionProfile,
+    schema: string,
+    group: string,
+  ) => void;
   onMove: (dragId: string, targetId: string, position: DropPosition) => void;
   onNewConnection: (folderId: string | null) => void;
   onEditConnection: (profile: ConnectionProfile) => void;
@@ -147,6 +152,9 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
           onRefreshDatabase={() => props.onRefreshDatabase(props.selected!)}
           onRefreshSchema={(schema) =>
             props.onRefreshSchema(props.selected!, schema)
+          }
+          onRefreshGroup={(schema, group) =>
+            props.onRefreshGroup(props.selected!, schema, group)
           }
           onEdit={() => props.onEditConnection(props.selected!)}
           onToggle={props.onToggleSchema}

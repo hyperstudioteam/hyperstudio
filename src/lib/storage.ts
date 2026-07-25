@@ -42,7 +42,11 @@ function normalizeLoadedProfile(
 ): ConnectionProfile {
   const passwordStorage = normalizeStorage(profile.passwordStorage);
   return {
-    ...blankProfile(profile.driver === "mysql" ? "mysql" : "postgres"),
+    ...blankProfile(
+      typeof profile.driver === "string" && profile.driver
+        ? profile.driver
+        : "postgres",
+    ),
     ...profile,
     passwordStorage,
     password: passwordStorage === "raw" ? (profile.password ?? "") : "",

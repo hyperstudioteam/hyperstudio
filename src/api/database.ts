@@ -1,7 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
-import { ConnectionProfile } from "../types/connection";
+import {
+  ConnectionProfile,
+  DriverInfo,
+  InstalledPluginInfo,
+} from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
-import { SchemaInfo, SchemaNode, TableNode } from "../types/schema";
+import {
+  ObjectGroupDef,
+  ObjectNode,
+  SchemaInfo,
+  SchemaNode,
+  TableNode,
+} from "../types/schema";
 
 export function toConfig(profile: ConnectionProfile) {
   return {
@@ -20,6 +30,9 @@ export function toConfig(profile: ConnectionProfile) {
 }
 
 export const databaseApi = {
+  listDrivers() {
+    return invoke<DriverInfo[]>("list_drivers");
+  },
   testConnection(profile: ConnectionProfile) {
     return invoke<ConnectionInfo>("test_connection", {
       config: toConfig(profile),
@@ -46,7 +59,35 @@ export const databaseApi = {
   listTables(connectionId: string, schema: string) {
     return invoke<TableNode[]>("list_tables", { connectionId, schema });
   },
+  listObjectGroups(connectionId: string) {
+    return invoke<ObjectGroupDef[]>("list_object_groups", { connectionId });
+  },
+  listObjects(connectionId: string, schema: string, group: string) {
+    return invoke<ObjectNode[]>("list_objects", {
+      connectionId,
+      schema,
+      group,
+    });
+  },
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
+  },
+};
+
+export const pluginsApi = {
+  list() {
+    return invoke<InstalledPluginInfo[]>("list_plugins");
+  },
+  install(sourcePath: string) {
+    return invoke<InstalledPluginInfo>("install_plugin", { sourcePath });
+  },
+  uninstall(pluginId: string) {
+    return invoke<void>("uninstall_plugin", { pluginId });
+  },
+  setEnabled(pluginId: string, enabled: boolean) {
+    return invoke<void>("set_plugin_enabled", { pluginId, enabled });
+  },
+  reload() {
+    return invoke<string[]>("reload_plugins");
   },
 };

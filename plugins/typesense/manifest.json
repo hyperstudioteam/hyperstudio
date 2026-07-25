@@ -1,0 +1,102 @@
+{
+  "id": "typesense",
+  "name": "Typesense",
+  "version": "0.1.0",
+  "description": "Typesense search engine — browse collections and run SEARCH / SELECT queries",
+  "default_port": 8108,
+  "executable": "hypergrid-typesense",
+  "capabilities": {
+    "schemas": true,
+    "views": false,
+    "file_based": false,
+    "folder_based": false,
+    "no_connection_required": false,
+    "readonly": false,
+    "identifier_quote": "\""
+  },
+  "connectionFields": [
+    {
+      "key": "host",
+      "label": "Host",
+      "placeholder": "localhost or xxx.a1.typesense.net",
+      "required": true,
+      "width": "half"
+    },
+    {
+      "key": "port",
+      "label": "Port",
+      "placeholder": "8108",
+      "required": true,
+      "width": "half"
+    },
+    {
+      "key": "password",
+      "label": "API Key",
+      "placeholder": "Typesense API key",
+      "required": true,
+      "secret": true,
+      "width": "full",
+      "description": "Sent as the X-TYPESENSE-API-KEY header."
+    },
+    {
+      "key": "database",
+      "label": "Protocol",
+      "placeholder": "http",
+      "required": false,
+      "width": "full",
+      "options": ["http", "https"],
+      "description": "Use https for Typesense Cloud (port 443). Leave as http for local."
+    }
+  ],
+  "contributes": {
+    "objectGroups": [
+      {
+        "id": "tables",
+        "label": "Collections",
+        "icon": "layers",
+        "childLabel": "Fields",
+        "actions": ["viewData", "editData"],
+        "defaultOpen": true
+      },
+      {
+        "id": "aliases",
+        "label": "Aliases",
+        "icon": "eye",
+        "actions": [],
+        "defaultOpen": false
+      },
+      {
+        "id": "synonyms",
+        "label": "Synonyms",
+        "icon": "function",
+        "actions": [],
+        "defaultOpen": false
+      },
+      {
+        "id": "keys",
+        "label": "API Keys",
+        "icon": "key",
+        "actions": [],
+        "defaultOpen": false
+      }
+    ],
+    "columnTypes": [
+      {
+        "typeNames": ["object", "object[]", "auto", "geopoint", "geopoint[]"],
+        "matchPrefix": false,
+        "align": "left",
+        "className": "cell-json",
+        "viewer": "builtin.json",
+        "priority": 8
+      },
+      {
+        "typeNames": ["string[]", "int32[]", "int64[]", "float[]", "bool[]"],
+        "matchPrefix": false,
+        "align": "left",
+        "className": "cell-json",
+        "viewer": "builtin.json",
+        "priority": 5
+      }
+    ]
+  }
+}

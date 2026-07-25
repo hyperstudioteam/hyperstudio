@@ -8,13 +8,15 @@ import {
 } from "../lib/passwords";
 import {
   clearConnectionCache,
-  clearSchemaTables,
+  clearSchemaObjects,
   filterSchemasForProfile,
   getSchemaCache,
+  hasSchemaObjects,
   setSchemaList,
-  setSchemaTables,
+  setSchemaObjects,
   toSchemaNodes,
 } from "../lib/schemaCache";
+import { objectGroupsFor } from "../lib/driverGroups";
 import { ConnectionProfile } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
 import { SchemaInfo, SchemaNode } from "../types/schema";
@@ -23,8 +25,22 @@ export type SessionBusy =
   | { kind: "connect" }
   | { kind: "query" }
   | { kind: "schemas" }
-  | { kind: "tables"; schema: string }
+  | { kind: "objects"; schema: string; group: string }
   | null;
+
+/** Tree keys are stable strings so expansion state survives re-renders. */
+export const treeKeys = {
+  schema: (schema: string) => `schema:${schema}`,
+  group: (schema: string, group: string) => `group:${schema}\u0000${group}`,
+  object: (schema: string, group: string, name: string) =>
+    `object:${schema}\u0000${group}\u0000${name}`,
+};
+
+function parseGroupKey(key: string): { schema: string; group: string } | null {
+  if (!key.startsWith("group:")) return null;
+  const [schema, group] = key.slice("group:".length).split("\u0000");
+  return schema && group ? { schema, group } : null;
+}
 
 export function useDatabaseSession() {
   /** Currently selected connection in the UI. */
@@ -106,7 +122,7 @@ export function useDatabaseSession() {
       const listed = await databaseApi.listSchemas(profile.id);
       const filtered = filterSchemasForProfile(listed, profile);
       if (options.force) {
-        clearSchemaTables(profile.id);
+        clearSchemaObjects(profile.id);
       }
       setSchemaList(profile.id, filtered);
       setAvailableSchemas(listed);
@@ -122,27 +138,23 @@ export function useDatabaseSession() {
     }
   }
 
-  async function loadSchemaTables(
+  async function loadSchemaObjects(
     profile: ConnectionProfile,
     schema: string,
+    group: string,
     options: { force?: boolean } = {},
   ) {
-    const cached = getSchemaCache(profile.id);
-    if (
-      !options.force &&
-      cached &&
-      Object.prototype.hasOwnProperty.call(cached.tablesBySchema, schema)
-    ) {
+    if (!options.force && hasSchemaObjects(profile.id, schema, group)) {
       syncFromCache(profile.id);
       return;
     }
 
-    setBusy({ kind: "tables", schema });
+    setBusy({ kind: "objects", schema, group });
     setError("");
     try {
       await ensureLive(profile);
-      const tables = await databaseApi.listTables(profile.id, schema);
-      setSchemaTables(profile.id, schema, tables);
+      const objects = await databaseApi.listObjects(profile.id, schema, group);
+      setSchemaObjects(profile.id, schema, group, objects);
       syncFromCache(profile.id);
     } catch (nextError) {
       if (isVaultAuthError(nextError)) throw nextError;
@@ -157,9 +169,24 @@ export function useDatabaseSession() {
   }
 
   async function refreshSchema(profile: ConnectionProfile, schema: string) {
-    clearSchemaTables(profile.id, schema);
+    clearSchemaObjects(profile.id, schema);
     syncFromCache(profile.id);
-    await loadSchemaTables(profile, schema, { force: true });
+    const groups = objectGroupsFor(profile.driver);
+    await Promise.all(
+      groups.map((group) =>
+        loadSchemaObjects(profile, schema, group.id, { force: true }),
+      ),
+    );
+  }
+
+  async function refreshGroup(
+    profile: ConnectionProfile,
+    schema: string,
+    group: string,
+  ) {
+    clearSchemaObjects(profile.id, schema, group);
+    syncFromCache(profile.id);
+    await loadSchemaObjects(profile, schema, group, { force: true });
   }
 
   /** First-time fetch when there is no schema cache yet. */
@@ -213,8 +240,6 @@ export function useDatabaseSession() {
     profile: ConnectionProfile,
     key: string,
   ) {
-    const isSchema = key.startsWith("schema:");
-    const schemaName = isSchema ? key.slice("schema:".length) : null;
     const opening = !schemaExpanded.has(key);
 
     setSchemaExpanded((current) => {
@@ -224,14 +249,38 @@ export function useDatabaseSession() {
       return next;
     });
 
-    if (opening && schemaName) {
-      const cached = getSchemaCache(profile.id);
-      const hasTables =
-        cached &&
-        Object.prototype.hasOwnProperty.call(cached.tablesBySchema, schemaName);
-      if (!hasTables) {
-        await loadSchemaTables(profile, schemaName);
+    if (!opening) return;
+
+    const schemaKey = key.startsWith("schema:")
+      ? key.slice("schema:".length)
+      : null;
+    if (schemaKey) {
+      // Opening a schema auto-loads and expands groups marked defaultOpen.
+      const groups = objectGroupsFor(profile.driver).filter(
+        (group) => group.defaultOpen,
+      );
+      if (groups.length > 0) {
+        setSchemaExpanded((current) => {
+          const next = new Set(current);
+          for (const group of groups) {
+            next.add(treeKeys.group(schemaKey, group.id));
+          }
+          return next;
+        });
       }
+      await Promise.all(
+        groups.map(async (group) => {
+          if (!hasSchemaObjects(profile.id, schemaKey, group.id)) {
+            await loadSchemaObjects(profile, schemaKey, group.id);
+          }
+        }),
+      );
+      return;
+    }
+
+    const parsed = parseGroupKey(key);
+    if (parsed && !hasSchemaObjects(profile.id, parsed.schema, parsed.group)) {
+      await loadSchemaObjects(profile, parsed.schema, parsed.group);
     }
   }
 
@@ -245,7 +294,7 @@ export function useDatabaseSession() {
       ? "connect"
       : busy?.kind === "query"
         ? "query"
-        : busy?.kind === "schemas" || busy?.kind === "tables"
+        : busy?.kind === "schemas" || busy?.kind === "objects"
           ? "schema"
           : null;
 
@@ -269,6 +318,7 @@ export function useDatabaseSession() {
     connect,
     refreshDatabase,
     refreshSchema,
+    refreshGroup,
     runQuery,
     executeSql,
     onDeleted,

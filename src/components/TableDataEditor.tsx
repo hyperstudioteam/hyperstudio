@@ -22,7 +22,9 @@ import {
 } from "lucide-react";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu } from "./ContextMenu";
+import { CellViewer } from "./CellViewer";
 import { errorMessage } from "../lib/format";
+import { presentCell } from "../plugins/contributions";
 import {
   CellRange,
   ExtractorId,
@@ -117,6 +119,10 @@ export function TableDataEditor({
     y: number;
   } | null>(null);
   const [copyAsOpen, setCopyAsOpen] = useState(false);
+  const [viewerCell, setViewerCell] = useState<{
+    rowId: string;
+    col: number;
+  } | null>(null);
   const dragging = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -748,16 +754,25 @@ export function TableDataEditor({
                       colIndex,
                       cellRange,
                     );
+                    const cell = presentCell({
+                      value,
+                      typeName: columnMeta[colIndex]?.dataType,
+                      columnName: columns[colIndex],
+                      driver: profile.driver,
+                    });
                     return (
                       <td
                         key={colIndex}
                         className={[
                           value === null ? "null-value" : "",
+                          cell.className,
+                          `align-${cell.align}`,
                           dirty ? "dirty-cell" : "",
                           inSelection ? "cell-selected" : "",
                         ]
                           .filter(Boolean)
                           .join(" ")}
+                        title={cell.text}
                         onMouseDown={(event) => {
                           if (event.button !== 0) return;
                           event.preventDefault();
@@ -803,7 +818,7 @@ export function TableDataEditor({
                             }}
                           />
                         ) : (
-                          cellDisplay(value)
+                          cell.text
                         )}
                       </td>
                     );
@@ -833,6 +848,24 @@ export function TableDataEditor({
 
       {contextMenu && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y}>
+          <button
+            type="button"
+            disabled={!cellRange}
+            onClick={() => {
+              if (cellRange) {
+                const focusRow = visibleRows[cellRange.focus.row];
+                if (focusRow) {
+                  setViewerCell({
+                    rowId: focusRow.id,
+                    col: cellRange.focus.col,
+                  });
+                }
+              }
+              setContextMenu(null);
+            }}
+          >
+            View value…
+          </button>
           <button
             type="button"
             disabled={!cellRange}
@@ -875,6 +908,25 @@ export function TableDataEditor({
         onIncludeHeaderChange={setIncludeHeader}
         onClose={() => setCopyAsOpen(false)}
       />
+      {viewerCell &&
+        (() => {
+          const row = rows.find((item) => item.id === viewerCell.rowId);
+          if (!row) return null;
+          const value = row.values[viewerCell.col];
+          const ctx = {
+            value,
+            typeName: columnMeta[viewerCell.col]?.dataType,
+            columnName: columns[viewerCell.col],
+            driver: profile.driver,
+          };
+          return (
+            <CellViewer
+              context={ctx}
+              preferredViewer={presentCell(ctx).defaultViewer}
+              onClose={() => setViewerCell(null)}
+            />
+          );
+        })()}
     </section>
   );
 }

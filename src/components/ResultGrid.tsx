@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu } from "./ContextMenu";
-import { displayValue, errorMessage } from "../lib/format";
+import { CellViewer } from "./CellViewer";
+import { errorMessage } from "../lib/format";
+import { presentCell } from "../plugins/contributions";
 import {
   CellRange,
   ExtractorId,
@@ -14,14 +16,21 @@ import { QueryResult } from "../types/query";
 interface ResultGridProps {
   result: QueryResult | null;
   error: string;
-  driver?: "postgres" | "mysql";
+  driver?: string;
+  /** Optional SQL type name per result column, aligned to `result.columns`. */
+  columnTypes?: (string | undefined)[];
 }
 
 export function ResultGrid({
   result,
   error,
   driver = "postgres",
+  columnTypes,
 }: ResultGridProps) {
+  const [viewerCell, setViewerCell] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
   const [cellRange, setCellRange] = useState<CellRange | null>(null);
   const [extractor, setExtractor] = useState<ExtractorId>("tsv");
   const [includeHeader, setIncludeHeader] = useState(false);
@@ -193,39 +202,52 @@ export function ResultGrid({
             {result.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td className="row-number">{rowIndex + 1}</td>
-                {row.map((value, columnIndex) => (
-                  <td
-                    className={[
-                      value === null ? "null-value" : "",
-                      isCellInRange(rowIndex, columnIndex, cellRange)
-                        ? "cell-selected"
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    key={columnIndex}
-                    title={displayValue(value)}
-                    onMouseDown={(event) => {
-                      if (event.button !== 0) return;
-                      event.preventDefault();
-                      beginSelect(rowIndex, columnIndex, event.shiftKey);
-                    }}
-                    onMouseEnter={() => extendSelect(rowIndex, columnIndex)}
-                    onContextMenu={(event) => {
-                      event.preventDefault();
-                      if (!isCellInRange(rowIndex, columnIndex, cellRange)) {
-                        beginSelect(rowIndex, columnIndex, false);
+                {row.map((value, columnIndex) => {
+                  const cell = presentCell({
+                    value,
+                    typeName: columnTypes?.[columnIndex],
+                    columnName: result.columns[columnIndex],
+                    driver,
+                  });
+                  return (
+                    <td
+                      className={[
+                        value === null ? "null-value" : "",
+                        cell.className,
+                        `align-${cell.align}`,
+                        isCellInRange(rowIndex, columnIndex, cellRange)
+                          ? "cell-selected"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      key={columnIndex}
+                      title={cell.text}
+                      onMouseDown={(event) => {
+                        if (event.button !== 0) return;
+                        event.preventDefault();
+                        beginSelect(rowIndex, columnIndex, event.shiftKey);
+                      }}
+                      onMouseEnter={() => extendSelect(rowIndex, columnIndex)}
+                      onDoubleClick={() =>
+                        setViewerCell({ row: rowIndex, col: columnIndex })
                       }
-                      setContextMenu({
-                        x: event.clientX,
-                        y: event.clientY,
-                      });
-                      setCopyAsOpen(false);
-                    }}
-                  >
-                    {displayValue(value)}
-                  </td>
-                ))}
+                      onContextMenu={(event) => {
+                        event.preventDefault();
+                        if (!isCellInRange(rowIndex, columnIndex, cellRange)) {
+                          beginSelect(rowIndex, columnIndex, false);
+                        }
+                        setContextMenu({
+                          x: event.clientX,
+                          y: event.clientY,
+                        });
+                        setCopyAsOpen(false);
+                      }}
+                    >
+                      {cell.text}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>
@@ -234,6 +256,21 @@ export function ResultGrid({
 
       {contextMenu && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y}>
+          <button
+            type="button"
+            disabled={!cellRange}
+            onClick={() => {
+              if (cellRange) {
+                setViewerCell({
+                  row: cellRange.focus.row,
+                  col: cellRange.focus.col,
+                });
+              }
+              setContextMenu(null);
+            }}
+          >
+            View value…
+          </button>
           <button
             type="button"
             disabled={!cellRange}
@@ -266,6 +303,25 @@ export function ResultGrid({
         onIncludeHeaderChange={setIncludeHeader}
         onClose={() => setCopyAsOpen(false)}
       />
+      {viewerCell && result && (
+        <CellViewer
+          context={{
+            value: result.rows[viewerCell.row]?.[viewerCell.col],
+            typeName: columnTypes?.[viewerCell.col],
+            columnName: result.columns[viewerCell.col],
+            driver,
+          }}
+          preferredViewer={
+            presentCell({
+              value: result.rows[viewerCell.row]?.[viewerCell.col],
+              typeName: columnTypes?.[viewerCell.col],
+              columnName: result.columns[viewerCell.col],
+              driver,
+            }).defaultViewer
+          }
+          onClose={() => setViewerCell(null)}
+        />
+      )}
     </div>
   );
 }

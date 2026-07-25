@@ -1,29 +1,77 @@
 import { ConnectionProfile } from "../types/connection";
-import { ConnectionSchemaCache, SchemaInfo, SchemaNode, TableNode } from "../types/schema";
+import {
+  ConnectionSchemaCache,
+  ObjectNode,
+  ObjectsByGroup,
+  SchemaInfo,
+  SchemaNode,
+  TABLES_GROUP,
+} from "../types/schema";
 
-const STORAGE_KEY = "hypergrid.schema-cache.v1";
+const STORAGE_KEY = "hypergrid.schema-cache.v2";
+const LEGACY_STORAGE_KEY = "hypergrid.schema-cache.v1";
 
 const cacheByConnection = new Map<string, ConnectionSchemaCache>();
 
 function hydrate() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as Record<string, ConnectionSchemaCache>;
-    if (!parsed || typeof parsed !== "object") return;
-    for (const [connectionId, cache] of Object.entries(parsed)) {
-      if (!cache || !Array.isArray(cache.schemas)) continue;
-      cacheByConnection.set(connectionId, {
-        schemas: cache.schemas,
-        tablesBySchema:
-          cache.tablesBySchema && typeof cache.tablesBySchema === "object"
-            ? cache.tablesBySchema
-            : {},
-      });
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, ConnectionSchemaCache>;
+      if (parsed && typeof parsed === "object") {
+        for (const [connectionId, cache] of Object.entries(parsed)) {
+          if (!cache || !Array.isArray(cache.schemas)) continue;
+          cacheByConnection.set(connectionId, {
+            schemas: cache.schemas,
+            objectsBySchema:
+              cache.objectsBySchema && typeof cache.objectsBySchema === "object"
+                ? cache.objectsBySchema
+                : {},
+          });
+        }
+      }
+      return;
     }
+    hydrateLegacy();
   } catch {
     // Ignore corrupt cache and start fresh.
   }
+}
+
+/** Fold the v1 shape (tables only) into the "tables" group. */
+function hydrateLegacy() {
+  const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!raw) return;
+  const parsed = JSON.parse(raw) as Record<
+    string,
+    {
+      schemas?: SchemaInfo[];
+      tablesBySchema?: Record<
+        string,
+        Array<{ name: string; kind?: string; columns?: ObjectNode["children"] }>
+      >;
+    }
+  >;
+  if (!parsed || typeof parsed !== "object") return;
+  for (const [connectionId, cache] of Object.entries(parsed)) {
+    if (!cache || !Array.isArray(cache.schemas)) continue;
+    const objectsBySchema: Record<string, ObjectsByGroup> = {};
+    for (const [schema, tables] of Object.entries(cache.tablesBySchema ?? {})) {
+      objectsBySchema[schema] = {
+        [TABLES_GROUP]: (tables ?? []).map((table) => ({
+          name: table.name,
+          kind: table.kind ?? "BASE TABLE",
+          children: table.columns ?? [],
+        })),
+      };
+    }
+    cacheByConnection.set(connectionId, {
+      schemas: cache.schemas,
+      objectsBySchema,
+    });
+  }
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
+  persist();
 }
 
 function persist() {
@@ -49,55 +97,79 @@ export function hasSchemaCache(connectionId: string): boolean {
 
 export function setSchemaList(connectionId: string, schemas: SchemaInfo[]) {
   const existing = cacheByConnection.get(connectionId);
-  const keptTables: Record<string, TableNode[]> = {};
+  const kept: Record<string, ObjectsByGroup> = {};
   const names = new Set(schemas.map((schema) => schema.name));
   if (existing) {
-    for (const [name, tables] of Object.entries(existing.tablesBySchema)) {
-      if (names.has(name)) keptTables[name] = tables;
+    for (const [name, groups] of Object.entries(existing.objectsBySchema)) {
+      if (names.has(name)) kept[name] = groups;
     }
   }
-  cacheByConnection.set(connectionId, {
-    schemas,
-    tablesBySchema: keptTables,
-  });
+  cacheByConnection.set(connectionId, { schemas, objectsBySchema: kept });
   persist();
 }
 
-export function setSchemaTables(
+export function setSchemaObjects(
   connectionId: string,
   schema: string,
-  tables: TableNode[],
+  group: string,
+  objects: ObjectNode[],
 ) {
   const existing = cacheByConnection.get(connectionId) ?? {
     schemas: [],
-    tablesBySchema: {},
+    objectsBySchema: {},
   };
   cacheByConnection.set(connectionId, {
     ...existing,
-    tablesBySchema: {
-      ...existing.tablesBySchema,
-      [schema]: tables,
+    objectsBySchema: {
+      ...existing.objectsBySchema,
+      [schema]: {
+        ...(existing.objectsBySchema[schema] ?? {}),
+        [group]: objects,
+      },
     },
   });
   persist();
 }
 
-export function clearSchemaTables(connectionId: string, schema?: string) {
+export function hasSchemaObjects(
+  connectionId: string,
+  schema: string,
+  group: string,
+): boolean {
+  const cache = cacheByConnection.get(connectionId);
+  const groups = cache?.objectsBySchema[schema];
+  return Boolean(
+    groups && Object.prototype.hasOwnProperty.call(groups, group),
+  );
+}
+
+/** Drop cached objects for one schema, one group, or the whole connection. */
+export function clearSchemaObjects(
+  connectionId: string,
+  schema?: string,
+  group?: string,
+) {
   const existing = cacheByConnection.get(connectionId);
   if (!existing) return;
   if (!schema) {
     cacheByConnection.set(connectionId, {
       schemas: existing.schemas,
-      tablesBySchema: {},
+      objectsBySchema: {},
     });
     persist();
     return;
   }
-  const next = { ...existing.tablesBySchema };
-  delete next[schema];
+  const next = { ...existing.objectsBySchema };
+  if (group) {
+    const groups = { ...(next[schema] ?? {}) };
+    delete groups[group];
+    next[schema] = groups;
+  } else {
+    delete next[schema];
+  }
   cacheByConnection.set(connectionId, {
     schemas: existing.schemas,
-    tablesBySchema: next,
+    objectsBySchema: next,
   });
   persist();
 }
@@ -120,16 +192,13 @@ export function filterSchemasForProfile(
   return schemas.filter((schema) => selected.has(schema.name));
 }
 
-export function toSchemaNodes(cache: ConnectionSchemaCache | null): SchemaNode[] {
+export function toSchemaNodes(
+  cache: ConnectionSchemaCache | null,
+): SchemaNode[] {
   if (!cache) return [];
   return cache.schemas.map((schema) => ({
     name: schema.name,
     isSystem: schema.isSystem,
-    tables: Object.prototype.hasOwnProperty.call(
-      cache.tablesBySchema,
-      schema.name,
-    )
-      ? cache.tablesBySchema[schema.name]
-      : null,
+    objects: cache.objectsBySchema[schema.name] ?? {},
   }));
 }

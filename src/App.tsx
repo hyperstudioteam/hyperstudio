@@ -10,6 +10,7 @@ import { ConnectionModal } from "./components/connection-modal/ConnectionModal";
 import { FolderModal } from "./components/connection-modal/FolderModal";
 import { VaultCreateModal } from "./components/connection-modal/VaultCreateModal";
 import { VaultUnlockModal } from "./components/connection-modal/VaultUnlockModal";
+import { PluginsPanel } from "./components/PluginsPanel";
 import { useConnectionTree } from "./hooks/useConnectionTree";
 import { useDatabaseSession } from "./hooks/useDatabaseSession";
 import {
@@ -22,6 +23,9 @@ import { getVaultSecret, isVaultUnlocked } from "./lib/vault";
 import { ConnectionProfile } from "./types/connection";
 import { SchemaInfo } from "./types/schema";
 import { collectFolderOptions } from "./lib/tree";
+import { databaseApi } from "./api/database";
+import { cacheDriverGroups } from "./lib/driverGroups";
+import { syncPluginColumnTypes } from "./plugins/init";
 import "./styles/app.css";
 
 function App() {
@@ -41,7 +45,22 @@ function App() {
   const [vaultPrompt, setVaultPrompt] = useState<"unlock" | "create" | null>(
     null,
   );
+  const [pluginsOpen, setPluginsOpen] = useState(false);
   const vaultRetry = useRef<(() => void) | null>(null);
+
+  const refreshDrivers = () => {
+    void databaseApi
+      .listDrivers()
+      .then((list) => {
+        syncPluginColumnTypes(list);
+        cacheDriverGroups(list);
+      })
+      .catch(() => undefined);
+  };
+
+  useEffect(() => {
+    refreshDrivers();
+  }, []);
 
   useEffect(() => {
     if (tree.tree.length === 0 && !modalProfile && !folderModal) {
@@ -135,7 +154,11 @@ function App() {
     <div className="app-shell">
       <TitleBar />
       <div className="app-body">
-        <ActivityBar />
+        <ActivityBar
+          active="databases"
+          onSelect={() => undefined}
+          onOpenPlugins={() => setPluginsOpen(true)}
+        />
         <ConnectionSidebar
           tree={tree.tree}
           selection={tree.selection}
@@ -164,6 +187,11 @@ function App() {
           }
           onRefreshSchema={(profile, schema) =>
             void withVaultGate(() => session.refreshSchema(profile, schema))
+          }
+          onRefreshGroup={(profile, schema, group) =>
+            void withVaultGate(() =>
+              session.refreshGroup(profile, schema, group),
+            )
           }
           onMove={tree.moveNode}
           onNewConnection={openNewConnection}
@@ -275,6 +303,13 @@ function App() {
             setVaultPrompt(null);
             vaultRetry.current = null;
           }}
+        />
+      )}
+
+      {pluginsOpen && (
+        <PluginsPanel
+          onClose={() => setPluginsOpen(false)}
+          onDriversChanged={refreshDrivers}
         />
       )}
     </div>

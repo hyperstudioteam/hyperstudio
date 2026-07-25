@@ -1,25 +1,60 @@
 mod commands;
 mod db;
+mod drivers;
 mod models;
+mod plugins;
 
 use commands::{
-    connect, disconnect, execute_query, list_schema, list_schemas, list_tables, test_connection,
+    connect, disconnect, execute_query, install_plugin, list_drivers, list_object_groups,
+    list_objects, list_plugins, list_schema, list_schemas, list_tables, reload_plugins,
+    set_plugin_enabled, test_connection, uninstall_plugin,
 };
 use db::AppState;
+use plugins::discover_and_register;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(AppState::default())
+        .manage(AppState::new())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let data = match app_handle.path().app_data_dir() {
+                    Ok(path) => path,
+                    Err(error) => {
+                        eprintln!("Failed to resolve app data dir: {error}");
+                        return;
+                    }
+                };
+                let state = app_handle.state::<AppState>();
+                match discover_and_register(&state.registry, &data).await {
+                    Ok(loaded) if !loaded.is_empty() => {
+                        eprintln!("Loaded plugins: {}", loaded.join(", "));
+                    }
+                    Ok(_) => {}
+                    Err(error) => eprintln!("Plugin discovery failed: {error}"),
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            list_drivers,
             test_connection,
             connect,
             disconnect,
             list_schemas,
             list_schema,
             list_tables,
-            execute_query
+            list_object_groups,
+            list_objects,
+            execute_query,
+            list_plugins,
+            install_plugin,
+            uninstall_plugin,
+            set_plugin_enabled,
+            reload_plugins,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Hypergrid");

@@ -12,9 +12,11 @@ import {
 } from "../../lib/vault";
 import {
   ConnectionProfile,
-  Driver,
+  DriverInfo,
 } from "../../types/connection";
 import { SchemaInfo } from "../../types/schema";
+import { cacheDriverGroups } from "../../lib/driverGroups";
+import { syncPluginColumnTypes } from "../../plugins/init";
 import { GeneralTab } from "./GeneralTab";
 import { SchemasTab } from "./SchemasTab";
 import { VaultCreateModal } from "./VaultCreateModal";
@@ -46,12 +48,24 @@ export function ConnectionModal({
   isAlreadyConnected,
 }: ConnectionModalProps) {
   const [profile, setProfile] = useState(initial);
+  const [drivers, setDrivers] = useState<DriverInfo[]>([]);
   const [tab, setTab] = useState<ModalTab>("general");
   const [testing, setTesting] = useState(false);
   const [loadingSchemas, setLoadingSchemas] = useState(false);
   const [testStatus, setTestStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [vaultGate, setVaultGate] = useState<"create" | "unlock" | null>(null);
+
+  useEffect(() => {
+    void databaseApi
+      .listDrivers()
+      .then((list) => {
+        setDrivers(list);
+        syncPluginColumnTypes(list);
+        cacheDriverGroups(list);
+      })
+      .catch(() => setDrivers([]));
+  }, []);
 
   useEffect(() => {
     if (
@@ -68,15 +82,56 @@ export function ConnectionModal({
     }
   }, [initial.id, initial.password, initial.passwordStorage]);
 
+  const activeDriver = drivers.find((driver) => driver.id === profile.driver);
+  const supportsSchemas = activeDriver?.capabilities.schemas ?? true;
+
   function update(patch: Partial<ConnectionProfile>) {
     setProfile((current) => ({ ...current, ...patch }));
   }
 
-  function switchDriver(driver: Driver) {
+  function switchDriver(driverId: string) {
+    const driver = drivers.find((item) => item.id === driverId);
+    if (!driver) {
+      update({ driver: driverId });
+      return;
+    }
+    const caps = driver.capabilities;
+    const fields = driver.connectionFields ?? [];
+    const usesCustom = fields.length > 0;
+    const keys = new Set(fields.map((field) => field.key));
+
+    const protocolDefault =
+      usesCustom && keys.has("database")
+        ? fields.find((field) => field.key === "database")?.options?.[0] ||
+          "http"
+        : undefined;
+
     update({
-      driver,
-      port: driver === "postgres" ? 5432 : 3306,
-      username: driver === "postgres" ? "postgres" : "root",
+      driver: driver.id,
+      port: driver.defaultPort ?? 0,
+      host:
+        caps.fileBased || caps.folderBased || caps.noConnectionRequired
+          ? ""
+          : profile.host || "localhost",
+      username: usesCustom
+        ? keys.has("username")
+          ? profile.username
+          : ""
+        : driver.id === "postgres"
+          ? "postgres"
+          : driver.id === "mysql"
+            ? "root"
+            : caps.noConnectionRequired
+              ? ""
+              : profile.username,
+      database: usesCustom
+        ? keys.has("database")
+          ? protocolDefault || profile.database || ""
+          : ""
+        : caps.noConnectionRequired
+          ? driver.id
+          : profile.database,
+      password: usesCustom && !keys.has("password") ? "" : profile.password,
     });
   }
 
@@ -95,6 +150,7 @@ export function ConnectionModal({
       const ready = profileForConnect();
       const info = await databaseApi.testConnection(ready);
       setTestStatus(`Connected to ${info.database}`);
+      if (!supportsSchemas) return;
       setLoadingSchemas(true);
       await databaseApi.connect(ready);
       try {
@@ -187,7 +243,10 @@ export function ConnectionModal({
         event.target === event.currentTarget && onClose()
       }
     >
-      <form className="connection-modal wide" onSubmit={(e) => void handleSubmit(e)}>
+      <form
+        className="connection-modal wide"
+        onSubmit={(e) => void handleSubmit(e)}
+      >
         <div className="modal-heading">
           <div>
             <span className={`db-icon ${profile.driver}`}>
@@ -213,18 +272,21 @@ export function ConnectionModal({
           >
             General
           </button>
-          <button
-            type="button"
-            className={tab === "schemas" ? "active" : ""}
-            onClick={() => setTab("schemas")}
-          >
-            Schemas
-          </button>
+          {supportsSchemas && (
+            <button
+              type="button"
+              className={tab === "schemas" ? "active" : ""}
+              onClick={() => setTab("schemas")}
+            >
+              Schemas
+            </button>
+          )}
         </div>
 
-        {tab === "general" ? (
+        {tab === "general" || !supportsSchemas ? (
           <GeneralTab
             profile={profile}
+            drivers={drivers}
             folderId={folderId}
             folderOptions={folderOptions}
             onChange={update}
