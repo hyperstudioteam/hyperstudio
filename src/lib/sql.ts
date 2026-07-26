@@ -70,23 +70,30 @@ export function defaultMaxRows(maxRows?: number): number {
   return maxRows && maxRows > 0 ? maxRows : DEFAULT_MAX_ROWS;
 }
 
-function isRowQuery(sql: string): boolean {
+function startsWithKeyword(statement: string, keyword: string): boolean {
+  if (!statement.startsWith(keyword)) return false;
+  const next = statement.charCodeAt(keyword.length);
+  if (Number.isNaN(next)) return true;
+  return !(
+    (next >= 48 && next <= 57) ||
+    (next >= 65 && next <= 90) ||
+    (next >= 97 && next <= 122) ||
+    next === 95
+  );
+}
+
+/** SELECT-like statements that accept a trailing LIMIT/OFFSET for paging. */
+function supportsLimitClause(sql: string): boolean {
   const statement = sql.trim().replace(/^;+/, "").trimStart().toLowerCase();
-  return [
-    "select",
-    "with",
-    "show",
-    "describe",
-    "desc",
-    "explain",
-    "values",
-  ].some((keyword) => statement.startsWith(keyword));
+  return ["select", "with", "values"].some((keyword) =>
+    startsWithKeyword(statement, keyword),
+  );
 }
 
 /** EXPLAIN plans must not be rewritten with LIMIT/OFFSET paging. */
 export function isExplainSql(sql: string): boolean {
   const statement = sql.trim().replace(/^;+/, "").trimStart().toLowerCase();
-  return statement.startsWith("explain");
+  return startsWithKeyword(statement, "explain");
 }
 
 /** Strip a trailing LIMIT / OFFSET so the UI can re-apply paging. */
@@ -131,7 +138,7 @@ export type PagedQueryPlan =
  */
 export function planPagedQuery(sql: string, maxRows: number): PagedQueryPlan {
   const limit = defaultMaxRows(maxRows);
-  if (!isRowQuery(sql) || isExplainSql(sql)) {
+  if (!supportsLimitClause(sql)) {
     return { pageable: false, sql };
   }
   const existing = trailingLimit(sql);

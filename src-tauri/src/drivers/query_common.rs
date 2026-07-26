@@ -8,15 +8,28 @@ pub fn is_row_query(sql: &str) -> bool {
         "select", "with", "show", "describe", "desc", "explain", "values",
     ]
     .iter()
-    .any(|keyword| statement.starts_with(keyword))
+    .any(|keyword| starts_with_keyword(&statement, keyword))
 }
 
-/// EXPLAIN plans must not receive LIMIT/OFFSET capping — that corrupts the statement.
-pub fn is_explain_query(sql: &str) -> bool {
+/// Statements that accept a trailing LIMIT/OFFSET. Metadata commands like
+/// SHOW / DESCRIBE / DESC / EXPLAIN return rows but reject LIMIT.
+pub fn supports_limit_clause(sql: &str) -> bool {
     let statement = sql
         .trim_start_matches(|character: char| character.is_whitespace() || character == ';')
         .to_ascii_lowercase();
-    statement.starts_with("explain")
+    ["select", "with", "values"]
+        .iter()
+        .any(|keyword| starts_with_keyword(&statement, keyword))
+}
+
+fn starts_with_keyword(statement: &str, keyword: &str) -> bool {
+    if !statement.starts_with(keyword) {
+        return false;
+    }
+    match statement.as_bytes().get(keyword.len()) {
+        None => true,
+        Some(b) => !b.is_ascii_alphanumeric() && *b != b'_',
+    }
 }
 
 pub struct TrailingLimit {

@@ -1077,6 +1077,7 @@ export function QueryWorkspace({
                 value={query}
                 driver={queryConnection?.driver ?? "postgres"}
                 completionSchema={completionSchema}
+                schemas={querySchemas}
                 defaultSchema={defaultSchema}
                 onChange={setQuerySql}
                 onRun={runSql}
