@@ -5,7 +5,10 @@ import {
   PasswordStorage,
   SslMode,
 } from "../../types/connection";
+import { useEffect, useState } from "react";
 import { cn } from "../../lib/cn";
+import { keychainAvailable } from "../../lib/keychain";
+import { CONNECTION_COLORS, SAFETY_OPTIONS } from "../../lib/connectionGuard";
 import { vaultExists, isVaultUnlocked } from "../../lib/vault";
 
 interface GeneralTabProps {
@@ -48,6 +51,11 @@ export function GeneralTab({
   const savePassword = profile.passwordStorage !== "none";
   const vaultReady = vaultExists();
   const vaultOpen = isVaultUnlocked();
+  const [keychainReady, setKeychainReady] = useState(false);
+
+  useEffect(() => {
+    void keychainAvailable().then(setKeychainReady);
+  }, []);
   const active =
     drivers.find((driver) => driver.id === profile.driver) ?? null;
   const caps = active?.capabilities;
@@ -76,9 +84,11 @@ export function GeneralTab({
       ? vaultOpen
         ? "Stored in vault"
         : "Stored in vault (unlock to edit)"
-      : profile.passwordStorage === "raw"
-        ? "Stored as plain text"
-        : "Not stored on disk";
+      : profile.passwordStorage === "keychain"
+        ? "Stored in the OS credential store"
+        : profile.passwordStorage === "raw"
+          ? "Stored as plain text"
+          : "Not stored on disk";
 
   function fieldValue(key: string): string | number {
     switch (key) {
@@ -157,6 +167,67 @@ export function GeneralTab({
             onChange={(event) => onChange({ name: event.target.value })}
           />
         </label>
+        <div className={`${formLabelClass} col-span-full`}>
+          Colour
+          <div className="flex gap-1.5">
+            {CONNECTION_COLORS.map((swatch) => (
+              <button
+                type="button"
+                key={swatch.id}
+                aria-label={swatch.label}
+                title={swatch.label}
+                className={cn(
+                  "size-[22px] cursor-pointer rounded-full border-2 bg-transparent",
+                  (profile.color ?? "none") === swatch.id
+                    ? "border-white"
+                    : "border-transparent hover:border-border-bright",
+                )}
+                onClick={() => onChange({ color: swatch.id })}
+              >
+                <span
+                  className="block size-full rounded-full border"
+                  style={{
+                    backgroundColor: swatch.dot,
+                    borderColor: swatch.border,
+                  }}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={`${formLabelClass} col-span-full`}>
+          Safety
+          <div
+            className="flex flex-col gap-2 rounded-md border border-border bg-[#14171d] p-2.5 px-[11px]"
+            role="radiogroup"
+            aria-label="Safety"
+          >
+            {SAFETY_OPTIONS.map((option) => (
+              <label
+                key={option.id}
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-[#b4bbc6]"
+              >
+                <input
+                  type="radio"
+                  name="connection-safety"
+                  className="m-0 size-3.5 shrink-0 cursor-pointer accent-accent"
+                  checked={(profile.safety ?? "none") === option.id}
+                  onChange={() => onChange({ safety: option.id })}
+                />
+                <span className="flex flex-col gap-0.5">
+                  <strong className="text-[11px] font-semibold text-[#d5dae3]">
+                    {option.label}
+                  </strong>
+                  <em className="text-[10px] not-italic text-[#6f7785]">
+                    {option.description}
+                  </em>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <label className={`${formLabelClass} col-span-full`}>
           Folder
           <select
@@ -223,6 +294,7 @@ export function GeneralTab({
             passwordStorage={profile.passwordStorage}
             vaultReady={vaultReady}
             vaultOpen={vaultOpen}
+            keychainReady={keychainReady}
             onToggleSave={setSavePassword}
             onStorage={setStorage}
           />
@@ -286,6 +358,7 @@ export function GeneralTab({
               passwordStorage={profile.passwordStorage}
               vaultReady={vaultReady}
               vaultOpen={vaultOpen}
+              keychainReady={keychainReady}
               onToggleSave={setSavePassword}
               onStorage={setStorage}
             />
@@ -394,6 +467,7 @@ function PasswordStorageBlock({
   passwordStorage,
   vaultReady,
   vaultOpen,
+  keychainReady,
   onToggleSave,
   onStorage,
 }: {
@@ -401,6 +475,7 @@ function PasswordStorageBlock({
   passwordStorage: PasswordStorage;
   vaultReady: boolean;
   vaultOpen: boolean;
+  keychainReady: boolean;
   onToggleSave: (enabled: boolean) => void;
   onStorage: (mode: PasswordStorage) => void;
 }) {
@@ -440,6 +515,31 @@ function PasswordStorageBlock({
                     ? "Encrypted · vault unlocked"
                     : "Encrypted · unlock on save"
                   : "Encrypted · create a vault on save"}
+              </em>
+            </span>
+          </label>
+          <label
+            className={cn(
+              "flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer",
+              !keychainReady && "opacity-50 cursor-default",
+            )}
+          >
+            <input
+              type="radio"
+              name="password-storage"
+              className="w-3.5 h-3.5 m-0 shrink-0 accent-accent cursor-pointer"
+              checked={passwordStorage === "keychain"}
+              disabled={!keychainReady}
+              onChange={() => onStorage("keychain")}
+            />
+            <span className="flex flex-col gap-0.5">
+              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+                OS credential store
+              </strong>
+              <em className="text-[#6f7785] text-[10px] not-italic">
+                {keychainReady
+                  ? "Managed by the system keychain · no master password"
+                  : "Not available on this system"}
               </em>
             </span>
           </label>

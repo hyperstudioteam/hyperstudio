@@ -49,6 +49,7 @@ interface ConnectionSidebarProps {
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
   onShowEr: (schema: string) => void;
+  onImportCsv: Parameters<typeof SchemaBrowser>[0]["onImportCsv"];
   schemaReadonly?: boolean;
   findConnection: (id: string) => ConnectionProfile | null;
   findFolder: (
@@ -171,6 +172,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
           onViewTable={props.onViewTable}
           onEditTable={props.onEditTable}
           onShowEr={props.onShowEr}
+          onImportCsv={props.onImportCsv}
           readonly={props.schemaReadonly}
         />
       )}

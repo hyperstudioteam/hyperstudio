@@ -5,7 +5,10 @@ export type Driver = string;
 export type SslMode = "prefer" | "require" | "disable";
 
 /** How the DB password is persisted. */
-export type PasswordStorage = "none" | "raw" | "vault";
+export type PasswordStorage = "none" | "raw" | "vault" | "keychain";
+
+/** How aggressively writes are guarded on a connection. */
+export type ConnectionSafety = "none" | "confirm" | "readOnly";
 
 export interface DriverCapabilities {
   schemas: boolean;
@@ -17,6 +20,10 @@ export interface DriverCapabilities {
   identifierQuote: string;
   /** Max rows per SELECT page from the query editor. */
   maxRows?: number;
+  /** Driver supports explicit transactions and query cancellation. */
+  sessions?: boolean;
+  /** Driver can commit a batch of statements atomically. */
+  transactions?: boolean;
 }
 
 export interface ColumnTypeDeclaration {
@@ -66,6 +73,19 @@ export interface InstalledPluginInfo {
   path: string;
 }
 
+export type SshAuth = "password" | "key" | "agent";
+
+export interface SshTunnelSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  auth: SshAuth;
+  password: string;
+  privateKeyPath: string;
+  passphrase: string;
+}
+
 export interface ConnectionProfile {
   id: string;
   name: string;
@@ -75,13 +95,35 @@ export interface ConnectionProfile {
   database: string;
   username: string;
   password: string;
-  /** none = session only; raw = plaintext on disk; vault = encrypted. */
+  /**
+   * none = session only; raw = plaintext on disk; vault = encrypted;
+   * keychain = held by the OS credential store.
+   */
   passwordStorage: PasswordStorage;
   sslMode: SslMode;
   /** When true, introspect every accessible schema. */
   allSchemas: boolean;
   /** Used when allSchemas is false. */
   schemas: string[];
+  /** Optional SSH hop in front of the database host. */
+  ssh?: SshTunnelSettings;
+  /** Swatch id used to tint the connection in the tree. */
+  color?: string;
+  /** Guard applied to statements that are not reads. */
+  safety?: ConnectionSafety;
+}
+
+export function blankSsh(): SshTunnelSettings {
+  return {
+    enabled: false,
+    host: "",
+    port: 22,
+    username: "",
+    auth: "password",
+    password: "",
+    privateKeyPath: "",
+    passphrase: "",
+  };
 }
 
 export type TreeNode =
@@ -114,6 +156,9 @@ export function blankProfile(driver: Driver = "postgres"): ConnectionProfile {
     sslMode: "prefer",
     allSchemas: true,
     schemas: [],
+    ssh: blankSsh(),
+    color: "none",
+    safety: "none",
   };
 }
 

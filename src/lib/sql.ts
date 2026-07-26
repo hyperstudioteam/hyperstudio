@@ -83,6 +83,12 @@ function isRowQuery(sql: string): boolean {
   ].some((keyword) => statement.startsWith(keyword));
 }
 
+/** EXPLAIN plans must not be rewritten with LIMIT/OFFSET paging. */
+export function isExplainSql(sql: string): boolean {
+  const statement = sql.trim().replace(/^;+/, "").trimStart().toLowerCase();
+  return statement.startsWith("explain");
+}
+
 /** Strip a trailing LIMIT / OFFSET so the UI can re-apply paging. */
 export function stripTrailingLimitOffset(sql: string): string {
   const trimmed = sql.trim();
@@ -125,7 +131,7 @@ export type PagedQueryPlan =
  */
 export function planPagedQuery(sql: string, maxRows: number): PagedQueryPlan {
   const limit = defaultMaxRows(maxRows);
-  if (!isRowQuery(sql)) {
+  if (!isRowQuery(sql) || isExplainSql(sql)) {
     return { pageable: false, sql };
   }
   const existing = trailingLimit(sql);

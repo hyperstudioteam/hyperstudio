@@ -1,3 +1,5 @@
+mod keychain;
+
 use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
@@ -13,6 +15,8 @@ use crate::plugins::{
     write_enabled,
 };
 
+pub use keychain::{keychain_available, keychain_delete, keychain_get, keychain_set};
+
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
@@ -24,13 +28,45 @@ pub async fn list_drivers(state: State<'_, AppState>) -> Result<Vec<DriverInfo>,
     Ok(state.registry.list().await)
 }
 
+use crate::ssh;
+
+fn ssh_enabled(config: &ConnectionConfig) -> Option<&crate::models::SshTunnelConfig> {
+    config
+        .ssh
+        .as_ref()
+        .filter(|ssh| ssh.enabled && !ssh.host.trim().is_empty())
+}
+
+async fn with_tunnel(
+    config: ConnectionConfig,
+    state: &AppState,
+) -> Result<(ConnectionConfig, bool), String> {
+    let Some(ssh) = ssh_enabled(&config).cloned() else {
+        return Ok((config, false));
+    };
+    let target_host = config.host.clone();
+    let target_port = config.port;
+    let connection_id = config.id.clone();
+    let port = state
+        .tunnels
+        .open(&connection_id, &ssh, &target_host, target_port)
+        .await?;
+    Ok((ssh::apply_local_endpoint(config, port), true))
+}
+
 #[tauri::command]
 pub async fn test_connection(
     config: ConnectionConfig,
     state: State<'_, AppState>,
 ) -> Result<ConnectionInfo, String> {
-    let driver = state.registry.get(&config.driver).await?;
-    driver.test_connection(&config).await
+    let id = config.id.clone();
+    let (ready, tunneled) = with_tunnel(config, &state).await?;
+    let driver = state.registry.get(&ready.driver).await?;
+    let result = driver.test_connection(&ready).await;
+    if tunneled {
+        state.tunnels.close(&id).await;
+    }
+    result
 }
 
 #[tauri::command]
@@ -38,13 +74,20 @@ pub async fn connect(
     config: ConnectionConfig,
     state: State<'_, AppState>,
 ) -> Result<ConnectionInfo, String> {
-    let driver = state.registry.get(&config.driver).await?;
-    let info = driver.connect(&config).await?;
-    state
-        .registry
-        .bind_connection(config.id.clone(), config.driver.clone())
-        .await;
-    Ok(info)
+    let id = config.id.clone();
+    let driver_name = config.driver.clone();
+    let (ready, _) = with_tunnel(config, &state).await?;
+    let driver = state.registry.get(&ready.driver).await?;
+    match driver.connect(&ready).await {
+        Ok(info) => {
+            state.registry.bind_connection(id, driver_name).await;
+            Ok(info)
+        }
+        Err(error) => {
+            state.tunnels.close(&id).await;
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -54,6 +97,7 @@ pub async fn disconnect(connection_id: String, state: State<'_, AppState>) -> Re
             driver.disconnect(&connection_id).await?;
         }
     }
+    state.tunnels.close(&connection_id).await;
     Ok(())
 }
 
@@ -131,6 +175,94 @@ pub async fn execute_query(
 ) -> Result<QueryResult, String> {
     let driver = state.registry.driver_for_connection(&connection_id).await?;
     driver.execute_query(&connection_id, &sql).await
+}
+
+/// Append a formatted chunk of an export to disk.
+///
+/// Exports are streamed batch by batch so a large result set never has to be
+/// held in memory as one string. `append` is false for the first chunk, which
+/// truncates any existing file.
+#[tauri::command]
+pub async fn write_export_chunk(
+    path: String,
+    contents: String,
+    append: bool,
+) -> Result<(), String> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(append)
+        .truncate(!append)
+        .open(&path)
+        .map_err(|error| format!("Cannot open {path}: {error}"))?;
+    file.write_all(contents.as_bytes())
+        .map_err(|error| format!("Cannot write {path}: {error}"))
+}
+
+#[tauri::command]
+pub async fn table_ddl(
+    connection_id: String,
+    schema: String,
+    table: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.table_ddl(&connection_id, &schema, &table).await
+}
+
+#[tauri::command]
+pub async fn execute_batch(
+    connection_id: String,
+    statements: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<u64>, String> {
+    if statements.is_empty() {
+        return Ok(Vec::new());
+    }
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.execute_batch(&connection_id, &statements).await
+}
+
+#[tauri::command]
+pub async fn begin_transaction(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.begin_transaction(&connection_id).await
+}
+
+#[tauri::command]
+pub async fn end_transaction(
+    connection_id: String,
+    commit: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.end_transaction(&connection_id, commit).await
+}
+
+#[tauri::command]
+pub async fn transaction_open(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let Ok(driver) = state.registry.driver_for_connection(&connection_id).await else {
+        return Ok(false);
+    };
+    Ok(driver.transaction_open(&connection_id).await)
+}
+
+#[tauri::command]
+pub async fn cancel_query(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.cancel_query(&connection_id).await
 }
 
 #[tauri::command]

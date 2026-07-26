@@ -5,19 +5,36 @@ import {
   ChevronRight,
   ChevronsLeft,
   CirclePlus,
+  Clock,
+  Download,
+  GitBranch,
+  ListOrdered,
   LoaderCircle,
   Network,
   Play,
+  Square,
+  Star,
   Table2,
+  Undo2,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { errorMessage } from "../lib/format";
 import { ErDiagram } from "../lib/erDiagram";
+import { save } from "@tauri-apps/plugin-dialog";
 import {
   buildCompletionSchema,
   defaultSchemaFor,
   hasCompletionData,
 } from "../lib/completionSchema";
+import {
+  ExplainPlan,
+  canVisualizeExplain,
+  explainHasAnalyze,
+  isExplainSql,
+  parseExplainResult,
+  wrapExplainSql,
+} from "../lib/explain";
 import { getSchemaCache } from "../lib/schemaCache";
 import {
   buildTableQuery,
@@ -36,9 +53,33 @@ import {
 } from "../types/schema";
 import { cn } from "../lib/cn";
 import { ErDiagramView } from "./ErDiagramView";
+import { StatementRun, toStatementRuns } from "../lib/scriptRun";
+import { splitStatements } from "../lib/splitStatements";
+import {
+  HistoryEntry,
+  SavedQuery,
+  clearHistory,
+  loadHistory,
+  loadSavedQueries,
+  recordHistory,
+  removeHistoryEntry,
+  removeSavedQuery,
+  saveQuery,
+} from "../lib/queryHistory";
+import {
+  ExportFormat,
+  exportResultSet,
+  extensionFor,
+} from "../lib/exportResults";
+import { ExplainPlanView } from "./explain/ExplainPlanView";
+import { ExportModal, ExportOptions } from "./ExportModal";
+import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { ResultGrid } from "./ResultGrid";
+import { ScriptResults } from "./ScriptResults";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
+
+type ResultPanel = "results" | "plan" | "messages";
 
 const STARTER_QUERY = `SELECT *
 FROM users
@@ -87,9 +128,20 @@ interface QueryWorkspaceProps {
   /** Driver max rows per SELECT page (from capabilities.maxRows). */
   maxRows?: number;
   openRequest: WorkspaceOpen;
+  /** Driver supports explicit transactions and cancellation. */
+  sessions?: boolean;
+  /** True while an explicit transaction is open on this connection. */
+  txnOpen?: boolean;
   onRun: (sql: string) => void;
-  onExecute: (sql: string) => Promise<QueryResult>;
+  onExecute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
   onLoadEr: (schema: string) => Promise<ErDiagram>;
+  onCancel?: () => void;
+  onBeginTransaction?: () => void;
+  onEndTransaction?: (commit: boolean) => void;
+  /** Set only when the driver can commit a batch atomically. */
+  onExecuteBatch?: (statements: string[]) => Promise<number[]>;
+  /** Prompts for a guarded connection; resolves true when the user agrees. */
+  onConfirmWrites?: (preview: string) => Promise<boolean>;
 }
 
 function findTableMeta(
@@ -113,9 +165,16 @@ export function QueryWorkspace({
   schemas,
   maxRows: maxRowsProp,
   openRequest,
+  sessions = false,
+  txnOpen = false,
   onRun,
   onExecute,
   onLoadEr,
+  onCancel,
+  onBeginTransaction,
+  onEndTransaction,
+  onExecuteBatch,
+  onConfirmWrites,
 }: QueryWorkspaceProps) {
   const pageSize = defaultMaxRows(maxRowsProp);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
@@ -127,8 +186,31 @@ export function QueryWorkspace({
   const [erDiagram, setErDiagram] = useState<ErDiagram | null>(null);
   const [erBusy, setErBusy] = useState(false);
   const [erError, setErError] = useState("");
+  const [scriptRuns, setScriptRuns] = useState<StatementRun[] | null>(null);
+  const [scriptIndex, setScriptIndex] = useState(0);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [stopOnError, setStopOnError] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const [saved, setSaved] = useState<SavedQuery[]>(() => loadSavedQueries());
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportError, setExportError] = useState("");
+  const [formatError, setFormatError] = useState("");
+  const [resultPanel, setResultPanel] = useState<ResultPanel>("results");
+  const [analyzeEnabled, setAnalyzeEnabled] = useState(false);
+  const [explainPlan, setExplainPlan] = useState<ExplainPlan | null>(null);
+  const pendingExplainRef = useRef<{
+    analyzed: boolean;
+    sql: string;
+    driver: "postgres" | "mysql";
+  } | null>(null);
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
+  const cancelScript = useRef(false);
+  /** SQL awaiting its result so the run can be recorded once it settles. */
+  const pendingRunRef = useRef<string | null>(null);
 
   const completionSchema = useMemo(
     () => buildCompletionSchema(schemas),
@@ -145,6 +227,13 @@ export function QueryWorkspace({
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
   const query = active?.kind === "query" ? active.sql : STARTER_QUERY;
+  const statementCount = useMemo(
+    () => splitStatements(query).length,
+    [query],
+  );
+  const explainCapable = canVisualizeExplain(selected?.driver);
+  const explainDisabled =
+    busy === "query" || !selected || connectedId !== selected.id || !explainCapable;
 
   const pageable = pagePlan?.pageable === true;
   const hasMore =
@@ -156,6 +245,51 @@ export function QueryWorkspace({
       ? 0
       : resultPage * pageSize + 1;
   const rangeEnd = resultPage * pageSize + (result?.rows.length ?? 0);
+
+  // Record the run once its outcome is known, so failures are captured too.
+  useEffect(() => {
+    const sql = pendingRunRef.current;
+    if (!sql || busy === "query") return;
+    if (!result && !error) return;
+
+    pendingRunRef.current = null;
+    setHistory(
+      recordHistory({
+        sql,
+        connectionId: selected?.id ?? "",
+        succeeded: !error,
+        elapsedMs: result?.elapsedMs,
+        rowCount: result?.columns.length ? result.rows.length : undefined,
+      }),
+    );
+    // Only react to a settled query; selected is read as a snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, error, busy]);
+
+  useEffect(() => {
+    const pending = pendingExplainRef.current;
+    if (!pending) return;
+    if (busy === "query") return;
+
+    pendingExplainRef.current = null;
+    if (error || !result) {
+      setExplainPlan(null);
+      setResultPanel(error ? "messages" : "results");
+      return;
+    }
+
+    const plan = parseExplainResult(pending.driver, result, {
+      analyzed: pending.analyzed,
+      sql: pending.sql,
+    });
+    if (plan) {
+      setExplainPlan(plan);
+      setResultPanel("plan");
+    } else {
+      setExplainPlan(null);
+      setResultPanel("results");
+    }
+  }, [result, error, busy]);
 
   useEffect(() => {
     if (!openRequest || !selected) return;
@@ -254,10 +388,35 @@ export function QueryWorkspace({
     );
   }
 
+  function runExplainSql(sql: string, analyze: boolean) {
+    if (!selected || !canVisualizeExplain(selected.driver)) return;
+    const wrapped = wrapExplainSql(selected.driver, sql, { analyze });
+    pendingExplainRef.current = {
+      analyzed: analyze,
+      sql: wrapped,
+      driver: selected.driver,
+    };
+    setPagePlan({ pageable: false, sql: wrapped });
+    setResultPage(0);
+    setExplainPlan(null);
+    onRun(wrapped);
+  }
+
   function runSql(sql: string) {
+    setScriptRuns(null);
+    if (isExplainSql(sql) && selected && canVisualizeExplain(selected.driver)) {
+      const analyze = explainHasAnalyze(sql) || analyzeEnabled;
+      runExplainSql(sql, analyze);
+      return;
+    }
+
+    pendingExplainRef.current = null;
+    setExplainPlan(null);
+    setResultPanel("results");
     const plan = planPagedQuery(sql, pageSize);
     setPagePlan(plan);
     setResultPage(0);
+    pendingRunRef.current = sql;
     onRun(sqlForPage(plan, 0));
   }
 
@@ -266,10 +425,156 @@ export function QueryWorkspace({
     runSql(editorRef.current?.getSqlToRun() ?? query);
   }
 
+  async function runScript() {
+    if (!active || active.kind !== "query" || scriptBusy) return;
+    const statements = splitStatements(
+      editorRef.current?.getSqlToRun() ?? query,
+    );
+    if (statements.length === 0) return;
+
+    const runs = toStatementRuns(statements);
+    cancelScript.current = false;
+    setScriptRuns(runs);
+    setScriptIndex(0);
+    setScriptBusy(true);
+
+    // Mutate a local copy so each statement's outcome renders as it lands.
+    const publish = () => setScriptRuns([...runs]);
+
+    for (let index = 0; index < runs.length; index += 1) {
+      if (cancelScript.current) {
+        for (let rest = index; rest < runs.length; rest += 1) {
+          runs[rest].status = "skipped";
+        }
+        publish();
+        break;
+      }
+      runs[index].status = "running";
+      setScriptIndex(index);
+      publish();
+      try {
+        runs[index].result = await onExecute(runs[index].sql);
+        runs[index].status = "ok";
+      } catch (error) {
+        runs[index].status = "error";
+        runs[index].error = errorMessage(error);
+        publish();
+        if (stopOnError) {
+          for (let rest = index + 1; rest < runs.length; rest += 1) {
+            runs[rest].status = "skipped";
+          }
+          publish();
+          break;
+        }
+      }
+      publish();
+    }
+
+    setScriptBusy(false);
+    // Land on the first failure so it is not buried in a long script.
+    const failure = runs.findIndex((item) => item.status === "error");
+    if (failure >= 0) setScriptIndex(failure);
+  }
+
+  function formatQuery() {
+    if (!active || active.kind !== "query") return;
+    setFormatError("");
+    editorRef.current?.format();
+  }
+
+  function explain() {
+    if (!active || active.kind !== "query") return;
+    const sql = editorRef.current?.getSqlToRun() ?? query;
+    runExplainSql(sql, analyzeEnabled);
+  }
+
   function loadPage(page: number) {
     if (!pagePlan?.pageable) return;
     setResultPage(page);
     onRun(sqlForPage(pagePlan, page));
+  }
+
+  function useHistorySql(sql: string) {
+    if (!active || active.kind !== "query") {
+      queryCounter.current += 1;
+      const id = `query-${queryCounter.current}`;
+      setTabs((current) => [
+        ...current,
+        { id, kind: "query", title: `Query ${queryCounter.current}`, sql },
+      ]);
+      setActiveId(id);
+      return;
+    }
+    setQuerySql(sql);
+  }
+
+  function saveCurrentQuery() {
+    if (!active || active.kind !== "query") return;
+    const sql = editorRef.current?.getSqlToRun() ?? query;
+    if (!sql.trim()) return;
+    const name = window.prompt("Save query as", active.title);
+    if (!name) return;
+    setSaved(saveQuery({ name, sql, connectionId: selected?.id ?? null }));
+    setHistoryOpen(true);
+  }
+
+  async function runExport(options: ExportOptions) {
+    if (!result || !selected) return;
+
+    const suggested = `export-${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, "-")}.${extensionFor(options.format as ExportFormat)}`;
+
+    let path: string | null = null;
+    try {
+      path = await save({
+        defaultPath: suggested,
+        filters: [
+          {
+            name: options.format.toUpperCase(),
+            extensions: [extensionFor(options.format)],
+          },
+        ],
+      });
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+      return;
+    }
+    if (!path) return;
+
+    setExportBusy(true);
+    setExportError("");
+    setExportProgress(0);
+
+    const plan = pagePlan;
+    const currentRows = result.rows;
+
+    try {
+      const outcome = await exportResultSet({
+        path,
+        format: options.format,
+        driver: selected.driver,
+        target: "exported_rows",
+        includeHeader: options.includeHeader,
+        pageSize,
+        fetchPage: async (page) => {
+          if (!options.allRows || !plan?.pageable) {
+            return page === 0
+              ? { ...result, rows: currentRows }
+              : null;
+          }
+          return onExecute(sqlForPage(plan, page));
+        },
+        onProgress: setExportProgress,
+      });
+      setExportProgress(outcome.rows);
+      setExportOpen(false);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setExportBusy(false);
+    }
   }
 
   function addQueryTab() {
@@ -299,9 +604,10 @@ export function QueryWorkspace({
   }
 
   return (
+    <div className="flex min-w-0 overflow-hidden">
     <main
       className={cn(
-        "min-w-0 grid overflow-hidden bg-bg",
+        "min-w-0 flex-1 grid overflow-hidden bg-bg",
         active?.kind === "edit" || active?.kind === "er"
           ? "grid-rows-[36px_1fr_23px]"
           : "grid-rows-[36px_minmax(190px,42%)_1fr_23px]",
@@ -376,6 +682,8 @@ export function QueryWorkspace({
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
           pageSize={pageSize}
           execute={onExecute}
+          executeBatch={onExecuteBatch}
+          confirmWrites={onConfirmWrites}
         />
       ) : active?.kind === "er" ? (
         <ErDiagramView
@@ -404,9 +712,168 @@ export function QueryWorkspace({
                   ⌘↵
                 </kbd>
               </button>
+              {busy === "query" && sessions && (
+                <button
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
+                  onClick={onCancel}
+                  title="Ask the server to stop this statement"
+                >
+                  <Square size={11} fill="currentColor" />
+                  Cancel
+                </button>
+              )}
+              {sessions && (
+                <>
+                  <span className="h-4 w-px bg-border" />
+                  {txnOpen ? (
+                    <div className="flex items-center gap-1">
+                      <span
+                        className="rounded-[3px] border border-warn bg-[rgba(201,162,39,.12)] px-[7px] py-0.5 text-[10px] text-warn"
+                        title="Statements run inside an open transaction"
+                      >
+                        Tx: Open
+                      </span>
+                      <button
+                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-green hover:text-white disabled:opacity-60"
+                        disabled={busy === "query"}
+                        onClick={() => onEndTransaction?.(true)}
+                      >
+                        <Check size={12} />
+                        Commit
+                      </button>
+                      <button
+                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-red hover:text-white disabled:opacity-60"
+                        disabled={busy === "query"}
+                        onClick={() => onEndTransaction?.(false)}
+                      >
+                        <Undo2 size={12} />
+                        Rollback
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
+                      disabled={busy === "query" || !selected}
+                      onClick={onBeginTransaction}
+                      title="Run the next statements inside a transaction"
+                    >
+                      Begin transaction
+                    </button>
+                  )}
+                </>
+              )}
+              {statementCount > 1 && (
+                <button
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
+                  disabled={busy === "query" || scriptBusy}
+                  onClick={() => void runScript()}
+                  title="Run every statement in order"
+                >
+                  <ListOrdered size={13} />
+                  Run script
+                  <span className="text-subtle">({statementCount})</span>
+                </button>
+              )}
+              {scriptBusy && (
+                <button
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
+                  onClick={() => {
+                    cancelScript.current = true;
+                  }}
+                  title="Stop after the running statement"
+                >
+                  <Square size={11} fill="currentColor" />
+                  Stop
+                </button>
+              )}
+              <button
+                type="button"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                disabled={busy === "query"}
+                title="Format selection, or the whole query"
+                onClick={formatQuery}
+              >
+                <WandSparkles size={14} />
+                Format
+                <kbd className="rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                  ⇧⌥F
+                </kbd>
+              </button>
+              <button
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                disabled={explainDisabled}
+                title={
+                  explainCapable
+                    ? analyzeEnabled
+                      ? "EXPLAIN ANALYZE — runs the query"
+                      : "Explain query plan"
+                    : "Explain is available for PostgreSQL and MySQL"
+                }
+                onClick={explain}
+              >
+                <GitBranch size={14} />
+                Explain
+              </button>
+              <label
+                className={cn(
+                  "flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-transparent px-1.5 text-[10px] text-muted",
+                  explainDisabled && "cursor-default opacity-60",
+                )}
+                title="ANALYZE executes the statement and reports actual timings"
+              >
+                <input
+                  type="checkbox"
+                  className="size-3 accent-accent"
+                  checked={analyzeEnabled}
+                  disabled={explainDisabled}
+                  onChange={(event) => setAnalyzeEnabled(event.target.checked)}
+                />
+                Analyze
+              </label>
+              {analyzeEnabled && explainCapable && (
+                <span className="text-[9px] text-warn">runs the query</span>
+              )}
+              <button
+                type="button"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                title="Save this query"
+                disabled={busy === "query"}
+                onClick={saveCurrentQuery}
+              >
+                <Star size={13} />
+                Save
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white",
+                  historyOpen && "border-accent bg-accent-soft text-[#c9c2ff]",
+                )}
+                title="Query history and saved queries"
+                onClick={() => setHistoryOpen((value) => !value)}
+              >
+                <Clock size={13} />
+                History
+              </button>
               <span className="h-4 w-px bg-border" />
               <span className="text-[9px] text-subtle">
-                Run selection or current query
+                {formatError ? (
+                  <span className="text-danger">
+                    Cannot format: {formatError}
+                  </span>
+                ) : statementCount > 1 ? (
+                  <label className="flex cursor-pointer items-center gap-1 text-[9px] text-subtle">
+                    <input
+                      type="checkbox"
+                      className="size-3 cursor-pointer accent-accent"
+                      checked={stopOnError}
+                      onChange={(event) => setStopOnError(event.target.checked)}
+                    />
+                    Stop on error
+                  </label>
+                ) : (
+                  "Run selection or current query"
+                )}
               </span>
               <span className="ml-auto pr-1 text-[9px] text-subtle">
                 {completionReady
@@ -424,6 +891,7 @@ export function QueryWorkspace({
                 defaultSchema={defaultSchema}
                 onChange={setQuerySql}
                 onRun={runSql}
+                onFormatError={setFormatError}
               />
             </div>
           </section>
@@ -431,14 +899,62 @@ export function QueryWorkspace({
           <section className="flex min-h-0 flex-col overflow-hidden">
             <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-border bg-[#14171b]">
               <div className="flex">
-                <button className="cursor-pointer border-0 border-b border-accent bg-transparent px-3.5 text-[10px] text-[#d5dae3]">
+                <button
+                  type="button"
+                  className={cn(
+                    "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
+                    resultPanel === "results" && "border-accent text-[#d5dae3]",
+                  )}
+                  onClick={() => setResultPanel("results")}
+                >
                   Results
                 </button>
-                <button className="cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted">
+                {explainPlan && (
+                  <button
+                    type="button"
+                    className={cn(
+                      "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
+                      resultPanel === "plan" && "border-accent text-[#d5dae3]",
+                    )}
+                    onClick={() => setResultPanel("plan")}
+                  >
+                    Plan
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={cn(
+                    "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
+                    resultPanel === "messages" && "border-accent text-[#d5dae3]",
+                  )}
+                  onClick={() => setResultPanel("messages")}
+                >
                   Messages
                 </button>
               </div>
-              {result && (
+              {scriptRuns ? (
+                <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle">
+                  <span>
+                    {scriptRuns.filter((item) => item.status === "ok").length} of{" "}
+                    {scriptRuns.length} succeeded
+                  </span>
+                  {scriptRuns.some((item) => item.status === "error") && (
+                    <span className="text-red">
+                      {scriptRuns.filter((item) => item.status === "error").length}{" "}
+                      failed
+                    </span>
+                  )}
+                  <span>
+                    {scriptRuns.reduce(
+                      (total, item) => total + (item.result?.elapsedMs ?? 0),
+                      0,
+                    )}{" "}
+                    ms
+                  </span>
+                </div>
+              ) : (
+                result &&
+                resultPanel === "results" && (
                 <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle [&>span]:flex [&>span]:items-center [&>span]:gap-1">
                   {pageable && result.columns.length > 0 ? (
                     <div className="flex items-center gap-0.5">
@@ -486,16 +1002,76 @@ export function QueryWorkspace({
                   {result.truncated && (
                     <span>Limited to {pageSize.toLocaleString()} rows</span>
                   )}
+                  {result.columns.length > 0 && (
+                    <button
+                      type="button"
+                      className="flex cursor-pointer items-center gap-1 rounded-[4px] border-0 bg-transparent px-1.5 py-1 !text-muted hover:bg-panel-soft hover:!text-text"
+                      title="Export result set to a file"
+                      onClick={() => {
+                        setExportError("");
+                        setExportProgress(null);
+                        setExportOpen(true);
+                      }}
+                    >
+                      <Download size={13} />
+                      Export
+                    </button>
+                  )}
                 </div>
+                )
               )}
             </div>
-            <ResultGrid
-              result={result}
-              error={error}
-              driver={selected?.driver}
-            />
+            {scriptRuns ? (
+              <ScriptResults
+                runs={scriptRuns}
+                activeIndex={scriptIndex}
+                driver={selected?.driver}
+                onSelect={setScriptIndex}
+              />
+            ) : resultPanel === "plan" && explainPlan ? (
+              <ExplainPlanView plan={explainPlan} />
+            ) : resultPanel === "messages" ? (
+              <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] text-[#c9d0db]">
+                {error ? (
+                  <pre className="m-0 whitespace-pre-wrap text-danger">
+                    {error}
+                  </pre>
+                ) : result ? (
+                  <p className="m-0 text-muted">
+                    Query finished in {result.elapsedMs} ms
+                    {result.columns.length
+                      ? ` · ${result.rows.length} row${result.rows.length === 1 ? "" : "s"}`
+                      : ` · ${result.affectedRows} affected`}
+                    {explainPlan
+                      ? ` · plan: ${explainPlan.analyzed ? "ANALYZE" : "EXPLAIN"}`
+                      : ""}
+                    .
+                  </p>
+                ) : (
+                  <p className="m-0 text-subtle">No messages yet.</p>
+                )}
+              </div>
+            ) : (
+              <ResultGrid
+                result={result}
+                error={error}
+                driver={selected?.driver}
+              />
+            )}
           </section>
         </>
+      )}
+
+      {exportOpen && result && (
+        <ExportModal
+          pageRows={result.rows.length}
+          canExportAll={pagePlan?.pageable === true}
+          busy={exportBusy}
+          progress={exportProgress}
+          error={exportError}
+          onClose={() => setExportOpen(false)}
+          onExport={(options) => void runExport(options)}
+        />
       )}
 
       <footer className="flex h-[23px] items-center overflow-hidden border-t border-border bg-[#171a20] px-[9px] text-[9px] whitespace-nowrap text-[#687181]">
@@ -506,11 +1082,28 @@ export function QueryWorkspace({
               ? `ER diagram · ${active.schema}`
               : (connectionInfo?.serverVersion ?? "HyperStudio local session")}
         </span>
+        {txnOpen && (
+          <span className="ml-2 text-warn">Transaction open · uncommitted</span>
+        )}
         <span className="ml-auto flex gap-[13px]">
           UTF-8 <span>LF</span> SQL
         </span>
       </footer>
     </main>
+
+      {historyOpen && (
+        <QueryHistoryPanel
+          history={history}
+          saved={saved}
+          connectionId={selected?.id ?? null}
+          onClose={() => setHistoryOpen(false)}
+          onUse={useHistorySql}
+          onDeleteHistory={(id) => setHistory(removeHistoryEntry(id))}
+          onClearHistory={() => setHistory(clearHistory())}
+          onDeleteSaved={(id) => setSaved(removeSavedQuery(id))}
+        />
+      )}
+    </div>
   );
 }
 
