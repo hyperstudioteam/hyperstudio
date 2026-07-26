@@ -1,4 +1,5 @@
 mod alter;
+mod er;
 mod objects;
 mod pool;
 mod query;
@@ -16,7 +17,8 @@ use crate::drivers::DatabaseDriver;
 use crate::drivers::shared::{get_pool, insert_pool, remove_pool};
 use crate::models::{
     AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ConnectionConfig, ConnectionInfo,
-    DriverCapabilities, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
+    DriverCapabilities, ErDiagram, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode,
+    TableNode,
 };
 
 pub struct NativeMySql {
@@ -184,5 +186,14 @@ impl DatabaseDriver for NativeMySql {
         let pool = get_pool(&self.pools, connection_id).await?;
         let max_rows = self.capabilities().max_rows as usize;
         query::execute(&pool, sql, max_rows).await
+    }
+
+    async fn er_diagram(
+        &self,
+        connection_id: &str,
+        schema: &str,
+    ) -> Result<ErDiagram, String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        er::diagram(&pool, schema).await
     }
 }

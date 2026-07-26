@@ -71,7 +71,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Column types, nullability, and primary-key markers
 - [ ] Indexes, foreign keys, constraints, and triggers
 - [ ] Search and filter within the tree
-- [ ] Table DDL viewer and ER diagrams
+- [x] Table DDL viewer and ER diagrams
 
 ### Query workspace
 
@@ -170,6 +170,7 @@ first query, refresh, or edit.
 | --- | --- | --- |
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
+| ER diagram | Right-click a schema → **Show ER diagram** | Opens an SVG map of tables and foreign keys |
 
 **5. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
@@ -290,7 +291,7 @@ Key modules worth knowing:
 
 ### Later
 
-- ER diagrams and schema comparison
+- ER diagrams and schema comparison → ER diagrams shipped; schema comparison still later
 - Import from CSV
 - Scripted extractor plugins and UI slots
 - Themes and layout customization
