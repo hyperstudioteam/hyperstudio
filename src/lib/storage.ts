@@ -1,6 +1,7 @@
 import {
   blankProfile,
   ConnectionProfile,
+  ConnectionSafety,
   PasswordStorage,
   TreeNode,
 } from "../types/connection";
@@ -22,6 +23,13 @@ function normalizeStorage(value: unknown): PasswordStorage {
   return "none";
 }
 
+function normalizeSafety(value: unknown): ConnectionSafety {
+  if (value === "confirm" || value === "readOnly" || value === "none") {
+    return value;
+  }
+  return "none";
+}
+
 function prepareProfileForDisk(profile: ConnectionProfile): ConnectionProfile {
   const passwordStorage = normalizeStorage(profile.passwordStorage);
   return {
@@ -30,6 +38,8 @@ function prepareProfileForDisk(profile: ConnectionProfile): ConnectionProfile {
     password: passwordStorage === "raw" ? profile.password : "",
     allSchemas: profile.allSchemas ?? true,
     schemas: profile.schemas ?? [],
+    color: profile.color ?? "none",
+    safety: normalizeSafety(profile.safety),
   };
 }
 
@@ -60,6 +70,8 @@ function normalizeLoadedProfile(
     password: passwordStorage === "raw" ? (profile.password ?? "") : "",
     allSchemas: profile.allSchemas ?? !(profile.schemas?.length),
     schemas: Array.isArray(profile.schemas) ? profile.schemas : [],
+    color: profile.color ?? "none",
+    safety: normalizeSafety(profile.safety),
     id: profile.id || crypto.randomUUID(),
   };
 }

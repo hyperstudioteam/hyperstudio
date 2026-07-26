@@ -4,8 +4,11 @@ import {
   ChevronRight,
   Database,
   Folder,
+  Lock,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { colorDot, safetyOf } from "../lib/connectionGuard";
 import {
   DragPayload,
   DropPosition,
@@ -265,8 +268,23 @@ export function ConnectionTree({
             <Database size={15} />
           </span>
           <span className="flex flex-1 min-w-0 flex-col gap-0.5">
-            <strong className="text-[#cdd3de] text-xs font-[560] truncate">
-              {profile.name || profile.database || "Untitled"}
+            <strong className="flex items-center gap-1.5 text-[#cdd3de] text-xs font-[560]">
+              {colorDot(profile.color) && (
+                <span
+                  className="size-[7px] shrink-0 rounded-full"
+                  style={{ backgroundColor: colorDot(profile.color)! }}
+                  aria-hidden
+                />
+              )}
+              <span className="truncate">
+                {profile.name || profile.database || "Untitled"}
+              </span>
+              {safetyOf(profile) === "readOnly" && (
+                <Lock size={10} className="shrink-0 text-subtle" />
+              )}
+              {safetyOf(profile) === "confirm" && (
+                <ShieldAlert size={10} className="shrink-0 text-warn" />
+              )}
             </strong>
             <small className="text-subtle text-[10px] font-mono truncate">
               {profile.host}:{profile.port}
