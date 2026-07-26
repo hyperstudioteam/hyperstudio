@@ -137,7 +137,16 @@ fn auth_method(ssh: &SshTunnelConfig) -> Result<AuthMethod, String> {
                 },
             ))
         }
-        "agent" => Ok(AuthMethod::with_agent()),
+        "agent" => {
+            #[cfg(unix)]
+            {
+                Ok(AuthMethod::with_agent())
+            }
+            #[cfg(not(unix))]
+            {
+                Err("SSH agent authentication is not supported on this platform.".into())
+            }
+        }
         _ => {
             if ssh.password.is_empty() {
                 return Err("SSH password is required.".into());
