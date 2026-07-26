@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   CirclePlus,
+  Download,
   GitBranch,
   LoaderCircle,
   Play,
@@ -12,6 +13,7 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
 import {
   buildCompletionSchema,
   defaultSchemaFor,
@@ -42,7 +44,13 @@ import {
   tableFromObject,
 } from "../types/schema";
 import { cn } from "../lib/cn";
+import {
+  ExportFormat,
+  exportResultSet,
+  extensionFor,
+} from "../lib/exportResults";
 import { ExplainPlanView } from "./explain/ExplainPlanView";
+import { ExportModal, ExportOptions } from "./ExportModal";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
@@ -123,6 +131,10 @@ export function QueryWorkspace({
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportError, setExportError] = useState("");
   const [formatError, setFormatError] = useState("");
   const [resultPanel, setResultPanel] = useState<ResultPanel>("results");
   const [analyzeEnabled, setAnalyzeEnabled] = useState(false);
@@ -306,6 +318,65 @@ export function QueryWorkspace({
     if (!pagePlan?.pageable) return;
     setResultPage(page);
     onRun(sqlForPage(pagePlan, page));
+  }
+
+  async function runExport(options: ExportOptions) {
+    if (!result || !selected) return;
+
+    const suggested = `export-${new Date()
+      .toISOString()
+      .slice(0, 19)
+      .replace(/[:T]/g, "-")}.${extensionFor(options.format as ExportFormat)}`;
+
+    let path: string | null = null;
+    try {
+      path = await save({
+        defaultPath: suggested,
+        filters: [
+          {
+            name: options.format.toUpperCase(),
+            extensions: [extensionFor(options.format)],
+          },
+        ],
+      });
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+      return;
+    }
+    if (!path) return;
+
+    setExportBusy(true);
+    setExportError("");
+    setExportProgress(0);
+
+    const plan = pagePlan;
+    const currentRows = result.rows;
+
+    try {
+      const outcome = await exportResultSet({
+        path,
+        format: options.format,
+        driver: selected.driver,
+        target: "exported_rows",
+        includeHeader: options.includeHeader,
+        pageSize,
+        fetchPage: async (page) => {
+          if (!options.allRows || !plan?.pageable) {
+            return page === 0
+              ? { ...result, rows: currentRows }
+              : null;
+          }
+          return onExecute(sqlForPage(plan, page));
+        },
+        onProgress: setExportProgress,
+      });
+      setExportProgress(outcome.rows);
+      setExportOpen(false);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setExportBusy(false);
+    }
   }
 
   function addQueryTab() {
@@ -592,6 +663,21 @@ export function QueryWorkspace({
                   {result.truncated && (
                     <span>Limited to {pageSize.toLocaleString()} rows</span>
                   )}
+                  {result.columns.length > 0 && (
+                    <button
+                      type="button"
+                      className="flex cursor-pointer items-center gap-1 rounded-[4px] border-0 bg-transparent px-1.5 py-1 !text-muted hover:bg-panel-soft hover:!text-text"
+                      title="Export result set to a file"
+                      onClick={() => {
+                        setExportError("");
+                        setExportProgress(null);
+                        setExportOpen(true);
+                      }}
+                    >
+                      <Download size={13} />
+                      Export
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -627,6 +713,18 @@ export function QueryWorkspace({
             )}
           </section>
         </>
+      )}
+
+      {exportOpen && result && (
+        <ExportModal
+          pageRows={result.rows.length}
+          canExportAll={pagePlan?.pageable === true}
+          busy={exportBusy}
+          progress={exportProgress}
+          error={exportError}
+          onClose={() => setExportOpen(false)}
+          onExport={(options) => void runExport(options)}
+        />
       )}
 
       <footer className="flex h-[23px] items-center overflow-hidden border-t border-border bg-[#171a20] px-[9px] text-[9px] whitespace-nowrap text-[#687181]">
