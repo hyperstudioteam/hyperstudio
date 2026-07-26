@@ -88,6 +88,10 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  /** Runs every statement in one transaction; resolves to affected rows each. */
+  executeBatch(connectionId: string, statements: string[]) {
+    return invoke<number[]>("execute_batch", { connectionId, statements });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },

@@ -134,6 +134,19 @@ pub async fn execute_query(
 }
 
 #[tauri::command]
+pub async fn execute_batch(
+    connection_id: String,
+    statements: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<u64>, String> {
+    if statements.is_empty() {
+        return Ok(Vec::new());
+    }
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.execute_batch(&connection_id, &statements).await
+}
+
+#[tauri::command]
 pub async fn alter_table(
     connection_id: String,
     request: AlterTableRequest,

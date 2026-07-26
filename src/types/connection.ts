@@ -17,6 +17,8 @@ export interface DriverCapabilities {
   identifierQuote: string;
   /** Max rows per SELECT page from the query editor. */
   maxRows?: number;
+  /** Driver can commit a batch of statements atomically. */
+  transactions?: boolean;
 }
 
 export interface ColumnTypeDeclaration {

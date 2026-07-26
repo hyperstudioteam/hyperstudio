@@ -61,6 +61,7 @@ impl DatabaseDriver for NativePostgres {
             readonly: false,
             identifier_quote: "\"".into(),
             max_rows: DriverCapabilities::DEFAULT_MAX_ROWS,
+            transactions: true,
         }
     }
     fn object_groups(&self) -> Vec<ObjectGroupDef> {
@@ -184,5 +185,14 @@ impl DatabaseDriver for NativePostgres {
         let pool = get_pool(&self.pools, connection_id).await?;
         let max_rows = self.capabilities().max_rows as usize;
         query::execute(&pool, sql, max_rows).await
+    }
+
+    async fn execute_batch(
+        &self,
+        connection_id: &str,
+        statements: &[String],
+    ) -> Result<Vec<u64>, String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        query::execute_batch(&pool, statements).await
     }
 }

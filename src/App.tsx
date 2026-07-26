@@ -160,6 +160,36 @@ function App() {
     });
   }
 
+  function executeBatchWithVault(statements: string[]): Promise<number[]> {
+    if (!tree.selected) {
+      return Promise.reject(
+        new Error("Select a connection before committing changes."),
+      );
+    }
+    const profile = tree.selected;
+    return new Promise((resolve, reject) => {
+      const attempt = () => {
+        void session
+          .executeBatch(profile, statements)
+          .then(resolve)
+          .catch((error) => {
+            if (error instanceof VaultLockedError) {
+              vaultRetry.current = attempt;
+              setVaultPrompt("unlock");
+              return;
+            }
+            if (error instanceof VaultMissingError) {
+              vaultRetry.current = attempt;
+              setVaultPrompt("create");
+              return;
+            }
+            reject(error);
+          });
+      };
+      attempt();
+    });
+  }
+
   const hasSchemaCacheUi = tree.selected
     ? hasSchemaCache(tree.selected.id) ||
       (session.activeId === tree.selected.id && session.schemas.length > 0)
@@ -268,6 +298,12 @@ function App() {
             void withVaultGate(() => session.runQuery(tree.selected!, sql));
           }}
           onExecute={(sql) => executeWithVault(sql)}
+          onExecuteBatch={
+            drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.transactions
+              ? executeBatchWithVault
+              : undefined
+          }
         />
       </div>
 
