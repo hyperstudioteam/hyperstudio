@@ -17,6 +17,7 @@ import {
 } from "../types/schema";
 
 export function toConfig(profile: ConnectionProfile) {
+  const ssh = profile.ssh;
   return {
     id: profile.id,
     name: profile.name,
@@ -29,6 +30,19 @@ export function toConfig(profile: ConnectionProfile) {
     sslMode: profile.sslMode,
     schemas: profile.schemas,
     allSchemas: profile.allSchemas,
+    ssh:
+      ssh && ssh.enabled
+        ? {
+            enabled: true,
+            host: ssh.host,
+            port: ssh.port,
+            username: ssh.username,
+            auth: ssh.auth,
+            password: ssh.password,
+            privateKeyPath: ssh.privateKeyPath,
+            passphrase: ssh.passphrase,
+          }
+        : null,
   };
 }
 

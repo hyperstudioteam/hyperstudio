@@ -20,6 +20,39 @@ pub struct ConnectionConfig {
     #[serde(default)]
     #[allow(dead_code)]
     pub all_schemas: bool,
+    /// Optional SSH hop that fronts the database host.
+    #[serde(default)]
+    pub ssh: Option<SshTunnelConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SshTunnelConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub host: String,
+    #[serde(default = "default_ssh_port")]
+    pub port: u16,
+    #[serde(default)]
+    pub username: String,
+    /// `password`, `key`, or `agent`.
+    #[serde(default = "default_ssh_auth")]
+    pub auth: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub private_key_path: String,
+    #[serde(default)]
+    pub passphrase: String,
+}
+
+fn default_ssh_port() -> u16 {
+    22
+}
+
+fn default_ssh_auth() -> String {
+    "password".into()
 }
 
 #[derive(Serialize)]
