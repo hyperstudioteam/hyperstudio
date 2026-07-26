@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, FilterX } from "lucide-react";
 import { cn } from "../lib/cn";
+import {
+  ColumnFilter,
+  ColumnSort,
+  applyGridView,
+  nextSort,
+} from "../lib/gridFilter";
+import { ColumnHeader } from "./grid/ColumnHeader";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
@@ -47,9 +54,18 @@ export function ResultGrid({
     y: number;
   } | null>(null);
   const [copyAsOpen, setCopyAsOpen] = useState(false);
+  const [sort, setSort] = useState<ColumnSort | null>(null);
+  const [filters, setFilters] = useState<ColumnFilter[]>([]);
   const dragging = useRef(false);
 
-  const matrix = result?.rows ?? [];
+  const columns = useMemo(() => result?.columns ?? [], [result]);
+  const sourceRows = useMemo(() => result?.rows ?? [], [result]);
+  // Sorting and filtering here reshape the loaded page only; they never re-query.
+  const view = useMemo(
+    () => applyGridView(columns, sourceRows, sort, filters),
+    [columns, sourceRows, sort, filters],
+  );
+  const matrix = view.rows;
   const stats = useMemo(
     () => selectionStats(cellRange, matrix),
     [cellRange, matrix],
@@ -57,7 +73,21 @@ export function ResultGrid({
 
   useEffect(() => {
     setCellRange(null);
+    setSort(null);
+    setFilters([]);
   }, [result]);
+
+  function filterFor(column: string): ColumnFilter | null {
+    return filters.find((item) => item.column === column) ?? null;
+  }
+
+  function setColumnFilter(column: string, filter: ColumnFilter | null) {
+    setCellRange(null);
+    setFilters((current) => {
+      const rest = current.filter((item) => item.column !== column);
+      return filter ? [...rest, filter] : rest;
+    });
+  }
 
   useEffect(() => {
     function onMouseUp() {
@@ -125,7 +155,7 @@ export function ResultGrid({
         extractor: format,
         driver,
         columns: result.columns,
-        matrix: result.rows,
+        matrix,
         range: cellRange,
         includeHeader,
       });
@@ -186,12 +216,33 @@ export function ResultGrid({
           <span className="text-[#72c99d]">{copyFlash}</span>
         )}
         {copyError && <span className="text-red">{copyError}</span>}
-        {stats.cells > 0 && (
-          <span className="ml-auto text-[10px] text-[#8b93a1]">
-            {stats.sum != null && <>SUM: {stats.sum} · </>}
-            {stats.cells} cells, {stats.rows} rows · {stats.coord}
-          </span>
-        )}
+        <span className="ml-auto flex items-center gap-2.5 text-[10px] text-[#8b93a1]">
+          {filters.length > 0 && (
+            <>
+              <span className="text-warn">
+                {matrix.length} of {sourceRows.length} rows on this page
+              </span>
+              <button
+                type="button"
+                className="flex cursor-pointer items-center gap-1 rounded-[4px] border-0 bg-transparent px-1 py-0.5 text-muted hover:bg-panel-soft hover:text-text"
+                title="Clear all column filters"
+                onClick={() => {
+                  setFilters([]);
+                  setCellRange(null);
+                }}
+              >
+                <FilterX size={12} />
+                Clear filters
+              </button>
+            </>
+          )}
+          {stats.cells > 0 && (
+            <span>
+              {stats.sum != null && <>SUM: {stats.sum} · </>}
+              {stats.cells} cells, {stats.rows} rows · {stats.coord}
+            </span>
+          )}
+        </span>
       </div>
       <div
         className="scrollbar-thin-app flex-1 overflow-auto"
@@ -206,12 +257,23 @@ export function ResultGrid({
                 #
               </th>
               {result.columns.map((column, index) => (
-                <th key={`${column}-${index}`}>{column}</th>
+                <ColumnHeader
+                  key={`${column}-${index}`}
+                  column={column}
+                  className={thClass}
+                  sort={sort}
+                  filter={filterFor(column)}
+                  onSortToggle={() => {
+                    setSort((current) => nextSort(current, column));
+                    setCellRange(null);
+                  }}
+                  onFilterChange={(filter) => setColumnFilter(column, filter)}
+                />
               ))}
             </tr>
           </thead>
           <tbody>
-            {result.rows.map((row, rowIndex) => (
+            {matrix.map((row, rowIndex) => (
               <tr key={rowIndex} className="group">
                 <td
                   className={cn(
@@ -219,7 +281,7 @@ export function ResultGrid({
                     "w-[42px] min-w-[42px] bg-row-num! text-right text-[#596272]",
                   )}
                 >
-                  {rowIndex + 1}
+                  {(view.sourceIndex[rowIndex] ?? rowIndex) + 1}
                 </td>
                 {row.map((value, columnIndex) => {
                   const cell = presentCell({
@@ -331,14 +393,14 @@ export function ResultGrid({
       {viewerCell && result && (
         <CellViewer
           context={{
-            value: result.rows[viewerCell.row]?.[viewerCell.col],
+            value: matrix[viewerCell.row]?.[viewerCell.col],
             typeName: columnTypes?.[viewerCell.col],
             columnName: result.columns[viewerCell.col],
             driver,
           }}
           preferredViewer={
             presentCell({
-              value: result.rows[viewerCell.row]?.[viewerCell.col],
+              value: matrix[viewerCell.row]?.[viewerCell.col],
               typeName: columnTypes?.[viewerCell.col],
               columnName: result.columns[viewerCell.col],
               driver,
