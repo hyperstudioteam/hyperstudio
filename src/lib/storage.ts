@@ -6,8 +6,8 @@ import {
 } from "../types/connection";
 import { queueVaultSecretRemoval } from "./vault";
 
-const STORAGE_KEY = "hypergrid.connections.v2";
-const LEGACY_STORAGE_KEY = "hypergrid.connections.v1";
+const STORAGE_KEY = "hyperstudio.connections.v2";
+const LEGACY_STORAGE_KEY = "hyperstudio.connections.v1";
 
 function normalizeStorage(value: unknown): PasswordStorage {
   if (value === "raw" || value === "vault" || value === "none") return value;

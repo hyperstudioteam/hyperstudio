@@ -443,7 +443,7 @@ export function QueryWorkspace({
         <span>
           {active?.kind === "edit"
             ? `Edit Data · ${active.schema}.${active.table}`
-            : (connectionInfo?.serverVersion ?? "Hypergrid local session")}
+            : (connectionInfo?.serverVersion ?? "HyperStudio local session")}
         </span>
         <span className="ml-auto flex gap-[13px]">
           UTF-8 <span>LF</span> SQL

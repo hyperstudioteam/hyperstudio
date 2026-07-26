@@ -1,13 +1,13 @@
 [package]
-name = "hypergrid-typesense"
+name = "hyperstudio-typesense"
 version = "0.1.0"
 edition = "2021"
-description = "Typesense driver plugin for Hypergrid"
+description = "Typesense driver plugin for HyperStudio"
 license = "MIT"
 publish = false
 
 [[bin]]
-name = "hypergrid-typesense"
+name = "hyperstudio-typesense"
 path = "src/main.rs"
 
 [dependencies]

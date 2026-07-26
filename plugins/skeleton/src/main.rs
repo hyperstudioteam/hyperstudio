@@ -1,8 +1,8 @@
-//! Minimal Hypergrid driver plugin.
+//! Minimal HyperStudio driver plugin.
 //!
 //! Speaks JSON-RPC 2.0 over newline-delimited stdin/stdout.
 //! Build with `cargo build --release` then install the folder containing
-//! this `manifest.json` and the `hypergrid-skeleton` binary.
+//! this `manifest.json` and the `hyperstudio-skeleton` binary.
 
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
@@ -89,7 +89,7 @@ fn dispatch(method: &str, id: Value) -> Value {
             json!({
                 "columns": ["id", "message", "payload"],
                 "rows": [
-                    [1, "Hello from Hypergrid plugin", "{\"kind\":\"greeting\",\"tags\":[\"demo\",\"json\"]}"],
+                    [1, "Hello from HyperStudio plugin", "{\"kind\":\"greeting\",\"tags\":[\"demo\",\"json\"]}"],
                     [2, "JSON-RPC over stdin/stdout", "{\"kind\":\"transport\",\"lines\":1}"]
                 ],
                 "affectedRows": 0,

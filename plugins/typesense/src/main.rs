@@ -1,4 +1,4 @@
-//! Typesense driver plugin for Hypergrid.
+//! Typesense driver plugin for HyperStudio.
 //!
 //! Speaks JSON-RPC 2.0 over newline-delimited stdin/stdout.
 //!
@@ -8,7 +8,7 @@
 //! - Password → API key (`X-TYPESENSE-API-KEY`)
 //! - Database → optional protocol: `http` or `https` (default http, or https on 443)
 //!
-//! Build: `cargo build --release && cp target/release/hypergrid-typesense .`
+//! Build: `cargo build --release && cp target/release/hyperstudio-typesense .`
 
 mod client;
 mod query;

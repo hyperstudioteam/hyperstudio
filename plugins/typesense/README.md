@@ -1,16 +1,16 @@
-# Typesense plugin for Hypergrid
+# Typesense plugin for HyperStudio
 
-Browse Typesense collections and run searches from Hypergrid.
+Browse Typesense collections and run searches from HyperStudio.
 
 ## Install
 
 ```bash
 cd plugins/typesense
 cargo build --release
-cp target/release/hypergrid-typesense .
+cp target/release/hyperstudio-typesense .
 ```
 
-In Hypergrid → **Plugins**, paste this folder path and install.
+In HyperStudio → **Plugins**, paste this folder path and install.
 
 ## Connection
 

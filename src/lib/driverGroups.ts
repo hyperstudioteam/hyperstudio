@@ -1,7 +1,7 @@
 import { DriverInfo } from "../types/connection";
 import { ObjectGroupDef, TABLES_GROUP } from "../types/schema";
 
-const STORAGE_KEY = "hypergrid.driver-groups.v1";
+const STORAGE_KEY = "hyperstudio.driver-groups.v1";
 
 /** Every driver has tables unless it says otherwise. */
 export const DEFAULT_OBJECT_GROUPS: ObjectGroupDef[] = [

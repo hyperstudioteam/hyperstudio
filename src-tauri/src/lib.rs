@@ -62,5 +62,5 @@ pub fn run() {
             reload_plugins,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running Hypergrid");
+        .expect("error while running HyperStudio");
 }

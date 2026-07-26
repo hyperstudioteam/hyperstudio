@@ -1,4 +1,4 @@
-<h1 align="center">Hypergrid</h1>
+<h1 align="center">HyperStudio</h1>
 
 <p align="center">
   A fast, open-source desktop database client for PostgreSQL and MySQL.<br/>
@@ -15,14 +15,14 @@
 
 ---
 
-Hypergrid is a native desktop client for people who live in SQL. It aims to give you the
+HyperStudio is a native desktop client for people who live in SQL. It aims to give you the
 day-to-day ergonomics of a commercial tool — a real data editor, spreadsheet-style cell
 selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 
 **Why it exists**
 
 - **Native and light.** A Rust backend with `sqlx` connection pools instead of a bundled browser runtime doing the querying.
-- **Offline-friendly.** Schemas are cached locally, so browsing your tree does not require an open connection. Hypergrid connects lazily, the first time you actually run something.
+- **Offline-friendly.** Schemas are cached locally, so browsing your tree does not require an open connection. HyperStudio connects lazily, the first time you actually run something.
 - **Your credentials stay yours.** Passwords are never stored unless you ask. When you do, you choose between plain local storage or an encrypted vault sealed with a master password.
 
 > **Status:** alpha. The core workflow (browse → query → edit → copy) works end to end, but
@@ -32,7 +32,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 
 - [Features](#features)
 - [Getting started](#getting-started)
-- [Using Hypergrid](#using-hypergrid)
+- [Using HyperStudio](#using-hyperstudio)
 - [Keyboard shortcuts](#keyboard-shortcuts)
 - [Security model](#security-model)
 - [Architecture](#architecture)
@@ -122,8 +122,8 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 ### Run it
 
 ```bash
-git clone https://github.com/your-org/hypergrid.git
-cd hypergrid
+git clone https://github.com/your-org/hyperstudio.git
+cd hyperstudio
 pnpm install
 pnpm tauri dev
 ```
@@ -150,7 +150,7 @@ pnpm build          # tsc + vite build
 cd src-tauri && cargo check
 ```
 
-## Using Hypergrid
+## Using HyperStudio
 
 **1. Create a connection.** Pick a driver, fill in the host and credentials, then use
 **Test connection** to verify and pull the schema list. The **Schemas** tab lets you limit
@@ -189,13 +189,13 @@ until you submit them.
 
 ## Security model
 
-Hypergrid stores everything locally; there is no server, telemetry, or sync.
+HyperStudio stores everything locally; there is no server, telemetry, or sync.
 
 | Data | Location | Notes |
 | --- | --- | --- |
-| Connection profiles | `hypergrid.connections.v2` | Passwords are stripped unless the mode is **raw** |
-| Schema cache | `hypergrid.schema-cache.v1` | Names, types, and PK flags only — never row data |
-| Encrypted vault | `hypergrid.vault.v1` | Salt, verifier, and AES-GCM ciphertext |
+| Connection profiles | `hyperstudio.connections.v2` | Passwords are stripped unless the mode is **raw** |
+| Schema cache | `hyperstudio.schema-cache.v1` | Names, types, and PK flags only — never row data |
+| Encrypted vault | `hyperstudio.vault.v1` | Salt, verifier, and AES-GCM ciphertext |
 
 The vault derives a 256-bit AES-GCM key from your master password using PBKDF2-SHA256 with
 310,000 iterations and a random 16-byte salt. The master password itself is never written
@@ -321,4 +321,4 @@ error text where possible.
 
 ## License
 
-[MIT](LICENSE) © Hypergrid contributors
+[MIT](LICENSE) © HyperStudio contributors

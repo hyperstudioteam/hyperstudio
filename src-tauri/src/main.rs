@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    hypergrid_lib::run()
+    hyperstudio_lib::run()
 }

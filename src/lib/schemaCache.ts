@@ -8,8 +8,8 @@ import {
   TABLES_GROUP,
 } from "../types/schema";
 
-const STORAGE_KEY = "hypergrid.schema-cache.v2";
-const LEGACY_STORAGE_KEY = "hypergrid.schema-cache.v1";
+const STORAGE_KEY = "hyperstudio.schema-cache.v2";
+const LEGACY_STORAGE_KEY = "hyperstudio.schema-cache.v1";
 
 const cacheByConnection = new Map<string, ConnectionSchemaCache>();
 

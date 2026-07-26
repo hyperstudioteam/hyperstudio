@@ -793,7 +793,7 @@ export function EditTableModal({
                   <label className={modifyFormLabelClass}>
                     Data Type
                     <input
-                      list="hypergrid-column-types"
+                      list="hyperstudio-column-types"
                       className={modifyFormInputClass}
                       value={selectedColumn.dataType}
                       disabled={busy}
@@ -801,7 +801,7 @@ export function EditTableModal({
                         updateColumn({ dataType: event.target.value })
                       }
                     />
-                    <datalist id="hypergrid-column-types">
+                    <datalist id="hyperstudio-column-types">
                       {COMMON_DATA_TYPES.map((type) => (
                         <option key={type} value={type} />
                       ))}

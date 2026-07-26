@@ -33,7 +33,7 @@ function readDrag(event: DragEvent): DragPayload | null {
   try {
     const raw =
       event.dataTransfer.getData("text/plain") ||
-      event.dataTransfer.getData("application/x-hypergrid-node");
+      event.dataTransfer.getData("application/x-hyperstudio-node");
     if (!raw) return null;
     return JSON.parse(raw) as DragPayload;
   } catch {
@@ -108,7 +108,7 @@ export function ConnectionTree({
     const serialized = JSON.stringify(payload);
     // text/plain is reliable across WebKit; custom type as secondary.
     event.dataTransfer.setData("text/plain", serialized);
-    event.dataTransfer.setData("application/x-hypergrid-node", serialized);
+    event.dataTransfer.setData("application/x-hyperstudio-node", serialized);
   }
 
   function endDrag() {

@@ -17,7 +17,7 @@ export function TitleBar() {
         <span className="grid h-6 w-6 place-items-center rounded-md bg-[linear-gradient(145deg,#9e91ff,#6655db)] text-white">
           <Braces size={17} />
         </span>
-        <span>Hypergrid</span>
+        <span>HyperStudio</span>
         <span className="rounded border border-border-bright px-[5px] text-[9px] uppercase leading-4 tracking-[0.06em] text-muted">
           alpha
         </span>

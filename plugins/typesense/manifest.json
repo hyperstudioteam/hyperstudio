@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Typesense search engine — browse collections and run SEARCH / SELECT queries",
   "default_port": 8108,
-  "executable": "hypergrid-typesense",
+  "executable": "hyperstudio-typesense",
   "capabilities": {
     "schemas": true,
     "views": false,

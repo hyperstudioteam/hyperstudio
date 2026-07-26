@@ -1,5 +1,5 @@
-const VAULT_KEY = "hypergrid.vault.v1";
-const VERIFIER_PLAINTEXT = "hypergrid-vault-ok";
+const VAULT_KEY = "hyperstudio.vault.v1";
+const VERIFIER_PLAINTEXT = "hyperstudio-vault-ok";
 const PBKDF2_ITERATIONS = 310_000;
 
 interface StoredVault {

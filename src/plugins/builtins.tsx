@@ -48,7 +48,7 @@ function textOf(ctx: CellContext): string {
 }
 
 /**
- * Register the column types and viewers that ship with Hypergrid. These use the
+ * Register the column types and viewers that ship with HyperStudio. These use the
  * exact same public API a plugin would, so the core stays "just another plugin".
  */
 export function registerBuiltinContributions() {

@@ -87,7 +87,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hypergrid-typesense"
+name = "hyperstudio-typesense"
 version = "0.1.0"
 dependencies = [
  "serde",

@@ -1,13 +1,13 @@
 [package]
-name = "hypergrid-skeleton"
+name = "hyperstudio-skeleton"
 version = "0.1.0"
 edition = "2021"
-description = "Minimal Hypergrid driver plugin skeleton (JSON-RPC over stdin/stdout)"
+description = "Minimal HyperStudio driver plugin skeleton (JSON-RPC over stdin/stdout)"
 license = "MIT"
 publish = false
 
 [[bin]]
-name = "hypergrid-skeleton"
+name = "hyperstudio-skeleton"
 path = "src/main.rs"
 
 [dependencies]

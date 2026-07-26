@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 /**
  * Contribution system for column types and data viewers.
  *
- * Everything is a contribution: even Hypergrid's built-in cell rendering and
+ * Everything is a contribution: even HyperStudio's built-in cell rendering and
  * viewers register through this same API. Driver plugins can add column types
  * declaratively (via manifest `contributes.columnTypes`), and future UI
  * plugins can register custom viewers at runtime.

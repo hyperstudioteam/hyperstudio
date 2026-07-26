@@ -1,6 +1,6 @@
-# Writing a Hypergrid Driver Plugin
+# Writing a HyperStudio Driver Plugin
 
-Hypergrid can load **external database drivers** as separate processes that speak
+HyperStudio can load **external database drivers** as separate processes that speak
 **JSON-RPC 2.0** over newline-delimited `stdin` / `stdout` — the same shape used
 by [Tabularis](https://tabularis.dev/plugins).
 
@@ -10,7 +10,7 @@ ships as a plugin.
 ## Architecture
 
 ```
-Hypergrid (Tauri / Rust)
+HyperStudio (Tauri / Rust)
   └─ PluginProcess actor  ── JSON-RPC ──►  plugin executable
          stdin / stdout                     (any language)
 ```
@@ -26,15 +26,15 @@ Plugins live under the app data directory:
 
 | OS | Path |
 | --- | --- |
-| macOS | `~/Library/Application Support/hypergrid/plugins/<id>/` |
-| Linux | `~/.local/share/hypergrid/plugins/<id>/` |
-| Windows | `%APPDATA%\hypergrid\plugins\<id>\` |
+| macOS | `~/Library/Application Support/hyperstudio/plugins/<id>/` |
+| Linux | `~/.local/share/hyperstudio/plugins/<id>/` |
+| Windows | `%APPDATA%\hyperstudio\plugins\<id>\` |
 
 ```text
 plugins/
 └── skeleton/
     ├── manifest.json
-    └── hypergrid-skeleton   # or .exe on Windows
+    └── hyperstudio-skeleton   # or .exe on Windows
 ```
 
 Install from **Settings → Plugins** (or the puzzle icon) by pasting a folder or `.zip` path.
@@ -49,7 +49,7 @@ The folder name must match `manifest.id`.
   "version": "0.1.0",
   "description": "Example driver",
   "default_port": null,
-  "executable": "hypergrid-skeleton",
+  "executable": "hyperstudio-skeleton",
   "capabilities": {
     "schemas": true,
     "views": false,
@@ -114,7 +114,7 @@ One JSON object per line.
 | `alter_key` | no | `null` — add / drop / rename PK or UNIQUE (`{ schema, table, name?, newName?, kind?, columns?, drop? }`) |
 
 Schema mutations are optional. Built-in SQL drivers implement them with `ALTER TABLE`.
-Plugins that do not support a method should return a clear JSON-RPC error (Hypergrid shows it
+Plugins that do not support a method should return a clear JSON-RPC error (HyperStudio shows it
 to the user). Typesense implements `alter_column` via `PATCH /collections/:name` and rejects
 `alter_table` / `alter_key`.
 
@@ -122,7 +122,7 @@ Object group `actions` may include `editTable`, `editColumn`, and `editKey` so t
 offers the matching context menus. Omit them when the plugin does not implement the method.
 
 \*Required when `capabilities.schemas` is true / when browsing tables. If `get_objects`
-is missing, Hypergrid falls back to `get_tables` for the `tables` group only.
+is missing, HyperStudio falls back to `get_tables` for the `tables` group only.
 
 Connection params passed to `test_connection` / `connect`:
 
@@ -145,9 +145,9 @@ cd plugins/skeleton
 cargo build --release
 
 # Copy the binary next to manifest.json (macOS/Linux):
-cp target/release/hypergrid-skeleton .
+cp target/release/hyperstudio-skeleton .
 
-# In Hypergrid: Settings → Plugins → install this folder path
+# In HyperStudio: Settings → Plugins → install this folder path
 ```
 
 Or package a zip whose root (or single child folder) contains `manifest.json` + the executable.
@@ -155,13 +155,13 @@ Or package a zip whose root (or single child folder) contains `manifest.json` + 
 ## Contributions: column types & data viewers
 
 Beyond drivers, plugins can shape how cell values are displayed and inspected. The UI
-keeps a **contribution registry** — and Hypergrid's own built-ins register through the
+keeps a **contribution registry** — and HyperStudio's own built-ins register through the
 exact same API, so the core is "just another plugin".
 
 ### Column types (declarative, no code)
 
 Declare them in `manifest.json` under `contributes.columnTypes` (snake_case
-`column_types` is also accepted). Hypergrid maps your
+`column_types` is also accepted). HyperStudio maps your
 engine's type names to inline formatting + a default viewer. This runs **no plugin code**:
 
 ```json
@@ -325,7 +325,7 @@ Username / Password form with a custom field list:
 | `placeholder` / `description` | Hints. |
 | `width` | `half` (default grid cell) or `full`. |
 
-When `connectionFields` is present and non-empty, Hypergrid renders only those fields
+When `connectionFields` is present and non-empty, HyperStudio renders only those fields
 (plus connection name / folder). Built-in Postgres/MySQL leave it empty and keep the
 standard SQL form. Values are still sent to the plugin as the usual connection params
 (`password` is the API key for Typesense, `database` can be the protocol, etc.).

@@ -2,9 +2,9 @@
   "id": "skeleton",
   "name": "Skeleton",
   "version": "0.1.0",
-  "description": "Example Hypergrid driver plugin (in-memory demo tables)",
+  "description": "Example HyperStudio driver plugin (in-memory demo tables)",
   "default_port": null,
-  "executable": "hypergrid-skeleton",
+  "executable": "hyperstudio-skeleton",
   "capabilities": {
     "schemas": true,
     "views": false,
