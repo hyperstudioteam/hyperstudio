@@ -12,6 +12,7 @@ import {
   Clock,
   Columns3,
   Eye,
+  FileSpreadsheet,
   FunctionSquare,
   Hash,
   KeyRound,
@@ -140,6 +141,7 @@ interface SchemaBrowserProps {
   onToggle: (key: string) => void;
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
+  onImportCsv: (schema: string, table: string, columns: ColumnNode[]) => void;
 }
 
 const ICON_MAP: Record<string, ComponentType<{ size?: number }>> = {
@@ -198,6 +200,7 @@ export function SchemaBrowser({
   onToggle,
   onViewTable,
   onEditTable,
+  onImportCsv,
 }: SchemaBrowserProps) {
   const [menu, setMenu] = useState<BrowserMenu | null>(null);
   const [editDialog, setEditDialog] = useState<SchemaEditDialog | null>(null);
@@ -559,6 +562,22 @@ export function SchemaBrowser({
                   <Table2 size={14} /> View Data
                 </button>
               )}
+              {canMutate &&
+                objectActions(menu.group, menu.object).includes("editData") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onImportCsv(
+                        menu.schema,
+                        menu.object.name,
+                        menu.object.children ?? [],
+                      );
+                      setMenu(null);
+                    }}
+                  >
+                    <FileSpreadsheet size={14} /> Import CSV…
+                  </button>
+                )}
               {live && (
                 <button
                   type="button"
