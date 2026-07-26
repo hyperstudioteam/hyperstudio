@@ -5,10 +5,12 @@ import {
   ChevronRight,
   ChevronsLeft,
   CirclePlus,
+  Clock,
   Download,
   GitBranch,
   LoaderCircle,
   Play,
+  Star,
   Table2,
   WandSparkles,
   X,
@@ -45,12 +47,24 @@ import {
 } from "../types/schema";
 import { cn } from "../lib/cn";
 import {
+  HistoryEntry,
+  SavedQuery,
+  clearHistory,
+  loadHistory,
+  loadSavedQueries,
+  recordHistory,
+  removeHistoryEntry,
+  removeSavedQuery,
+  saveQuery,
+} from "../lib/queryHistory";
+import {
   ExportFormat,
   exportResultSet,
   extensionFor,
 } from "../lib/exportResults";
 import { ExplainPlanView } from "./explain/ExplainPlanView";
 import { ExportModal, ExportOptions } from "./ExportModal";
+import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
@@ -131,6 +145,9 @@ export function QueryWorkspace({
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const [saved, setSaved] = useState<SavedQuery[]>(() => loadSavedQueries());
   const [exportOpen, setExportOpen] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
@@ -146,6 +163,8 @@ export function QueryWorkspace({
   } | null>(null);
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
+  /** SQL awaiting its result so the run can be recorded once it settles. */
+  const pendingRunRef = useRef<string | null>(null);
 
   const completionSchema = useMemo(
     () => buildCompletionSchema(schemas),
@@ -176,6 +195,26 @@ export function QueryWorkspace({
       ? 0
       : resultPage * pageSize + 1;
   const rangeEnd = resultPage * pageSize + (result?.rows.length ?? 0);
+
+  // Record the run once its outcome is known, so failures are captured too.
+  useEffect(() => {
+    const sql = pendingRunRef.current;
+    if (!sql || busy === "query") return;
+    if (!result && !error) return;
+
+    pendingRunRef.current = null;
+    setHistory(
+      recordHistory({
+        sql,
+        connectionId: selected?.id ?? "",
+        succeeded: !error,
+        elapsedMs: result?.elapsedMs,
+        rowCount: result?.columns.length ? result.rows.length : undefined,
+      }),
+    );
+    // Only react to a settled query; selected is read as a snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, error, busy]);
 
   useEffect(() => {
     const pending = pendingExplainRef.current;
@@ -294,6 +333,7 @@ export function QueryWorkspace({
     const plan = planPagedQuery(sql, pageSize);
     setPagePlan(plan);
     setResultPage(0);
+    pendingRunRef.current = sql;
     onRun(sqlForPage(plan, 0));
   }
 
@@ -318,6 +358,30 @@ export function QueryWorkspace({
     if (!pagePlan?.pageable) return;
     setResultPage(page);
     onRun(sqlForPage(pagePlan, page));
+  }
+
+  function useHistorySql(sql: string) {
+    if (!active || active.kind !== "query") {
+      queryCounter.current += 1;
+      const id = `query-${queryCounter.current}`;
+      setTabs((current) => [
+        ...current,
+        { id, kind: "query", title: `Query ${queryCounter.current}`, sql },
+      ]);
+      setActiveId(id);
+      return;
+    }
+    setQuerySql(sql);
+  }
+
+  function saveCurrentQuery() {
+    if (!active || active.kind !== "query") return;
+    const sql = editorRef.current?.getSqlToRun() ?? query;
+    if (!sql.trim()) return;
+    const name = window.prompt("Save query as", active.title);
+    if (!name) return;
+    setSaved(saveQuery({ name, sql, connectionId: selected?.id ?? null }));
+    setHistoryOpen(true);
   }
 
   async function runExport(options: ExportOptions) {
@@ -406,9 +470,10 @@ export function QueryWorkspace({
   }
 
   return (
+    <div className="flex min-w-0 overflow-hidden">
     <main
       className={cn(
-        "min-w-0 grid overflow-hidden bg-bg",
+        "min-w-0 flex-1 grid overflow-hidden bg-bg",
         active?.kind === "edit"
           ? "grid-rows-[36px_1fr_23px]"
           : "grid-rows-[36px_minmax(190px,42%)_1fr_23px]",
@@ -548,6 +613,28 @@ export function QueryWorkspace({
               {analyzeEnabled && explainCapable && (
                 <span className="text-[9px] text-warn">runs the query</span>
               )}
+              <button
+                type="button"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                title="Save this query"
+                disabled={busy === "query"}
+                onClick={saveCurrentQuery}
+              >
+                <Star size={13} />
+                Save
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white",
+                  historyOpen && "border-accent bg-accent-soft text-[#c9c2ff]",
+                )}
+                title="Query history and saved queries"
+                onClick={() => setHistoryOpen((value) => !value)}
+              >
+                <Clock size={13} />
+                History
+              </button>
               <span className="h-4 w-px bg-border" />
               <span className="text-[9px] text-subtle">
                 {formatError ? (
@@ -738,6 +825,20 @@ export function QueryWorkspace({
         </span>
       </footer>
     </main>
+
+      {historyOpen && (
+        <QueryHistoryPanel
+          history={history}
+          saved={saved}
+          connectionId={selected?.id ?? null}
+          onClose={() => setHistoryOpen(false)}
+          onUse={useHistorySql}
+          onDeleteHistory={(id) => setHistory(removeHistoryEntry(id))}
+          onClearHistory={() => setHistory(clearHistory())}
+          onDeleteSaved={(id) => setSaved(removeSavedQuery(id))}
+        />
+      )}
+    </div>
   );
 }
 
