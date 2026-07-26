@@ -11,12 +11,19 @@ import { FolderModal } from "./components/connection-modal/FolderModal";
 import { VaultCreateModal } from "./components/connection-modal/VaultCreateModal";
 import { VaultUnlockModal } from "./components/connection-modal/VaultUnlockModal";
 import { PluginsPanel } from "./components/PluginsPanel";
+import { WriteConfirmModal } from "./components/WriteConfirmModal";
 import { useConnectionTree } from "./hooks/useConnectionTree";
 import { useDatabaseSession } from "./hooks/useDatabaseSession";
 import {
   VaultLockedError,
   VaultMissingError,
 } from "./lib/passwords";
+import {
+  ReadOnlyConnectionError,
+  WriteConfirmationRequiredError,
+  safetyOf,
+} from "./lib/connectionGuard";
+import { errorMessage } from "./lib/format";
 import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
@@ -48,6 +55,12 @@ function App() {
     null,
   );
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [writeGate, setWriteGate] = useState<{
+    connectionName: string;
+    sql: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  } | null>(null);
   const vaultRetry = useRef<(() => void) | null>(null);
   const completionPrefetched = useRef<string | null>(null);
 
@@ -130,7 +143,10 @@ function App() {
     }
   }
 
-  function executeWithVault(sql: string): Promise<import("./types/query").QueryResult> {
+  function executeWithVault(
+    sql: string,
+    confirmedWrite = false,
+  ): Promise<import("./types/query").QueryResult> {
     if (!tree.selected) {
       return Promise.reject(
         new Error("Select a connection before running a query."),
@@ -138,25 +154,82 @@ function App() {
     }
     const profile = tree.selected;
     return new Promise((resolve, reject) => {
-      const attempt = () => {
+      const attempt = (confirmed = confirmedWrite) => {
         void session
-          .executeSql(profile, sql)
+          .executeSql(profile, sql, confirmed)
           .then(resolve)
           .catch((error) => {
             if (error instanceof VaultLockedError) {
-              vaultRetry.current = attempt;
+              vaultRetry.current = () => attempt(confirmed);
               setVaultPrompt("unlock");
               return;
             }
             if (error instanceof VaultMissingError) {
-              vaultRetry.current = attempt;
+              vaultRetry.current = () => attempt(confirmed);
               setVaultPrompt("create");
+              return;
+            }
+            if (error instanceof WriteConfirmationRequiredError) {
+              setWriteGate({
+                connectionName: error.connectionName,
+                sql: error.sql,
+                onConfirm: () => attempt(true),
+                onCancel: () => reject(error),
+              });
               return;
             }
             reject(error);
           });
       };
       attempt();
+    });
+  }
+
+  /** Show the write gate for a whole batch and report the user's answer. */
+  function confirmWrites(preview: string): Promise<boolean> {
+    if (!tree.selected) return Promise.resolve(false);
+    const name = tree.selected.name || tree.selected.database;
+    return new Promise((resolve) => {
+      setWriteGate({
+        connectionName: name,
+        sql: preview,
+        onConfirm: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  }
+
+  /** Run a query from the editor, routing guard failures to the right prompt. */
+  function runQueryGuarded(
+    profile: ConnectionProfile,
+    sql: string,
+    confirmed = false,
+  ) {
+    void session.runQuery(profile, sql, confirmed).catch((error) => {
+      if (error instanceof VaultLockedError) {
+        vaultRetry.current = () => runQueryGuarded(profile, sql, confirmed);
+        setVaultPrompt("unlock");
+        return;
+      }
+      if (error instanceof VaultMissingError) {
+        vaultRetry.current = () => runQueryGuarded(profile, sql, confirmed);
+        setVaultPrompt("create");
+        return;
+      }
+      if (error instanceof WriteConfirmationRequiredError) {
+        setWriteGate({
+          connectionName: error.connectionName,
+          sql: error.sql,
+          onConfirm: () => runQueryGuarded(profile, sql, true),
+          onCancel: () => undefined,
+        });
+        return;
+      }
+      if (error instanceof ReadOnlyConnectionError) {
+        session.setError(error.message);
+        return;
+      }
+      session.setError(errorMessage(error));
     });
   }
 
@@ -240,8 +313,10 @@ function App() {
             });
           }}
           schemaReadonly={
-            drivers.find((driver) => driver.id === tree.selected?.driver)
-              ?.capabilities.readonly ?? false
+            (drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.readonly ??
+              false) ||
+            (tree.selected ? safetyOf(tree.selected) === "readOnly" : false)
           }
           findConnection={tree.findConnection}
           findFolder={tree.findFolder}
@@ -265,11 +340,30 @@ function App() {
               session.setError("Select a connection before running a query.");
               return;
             }
-            void withVaultGate(() => session.runQuery(tree.selected!, sql));
+            runQueryGuarded(tree.selected, sql);
           }}
-          onExecute={(sql) => executeWithVault(sql)}
+          onExecute={(sql, confirmedWrite) =>
+            executeWithVault(sql, confirmedWrite)
+          }
+          onConfirmWrites={confirmWrites}
         />
       </div>
+
+      {writeGate && (
+        <WriteConfirmModal
+          connectionName={writeGate.connectionName}
+          sql={writeGate.sql}
+          onCancel={() => {
+            writeGate.onCancel();
+            setWriteGate(null);
+          }}
+          onConfirm={() => {
+            const confirm = writeGate.onConfirm;
+            setWriteGate(null);
+            confirm();
+          }}
+        />
+      )}
 
       {modalProfile && (
         <ConnectionModal
