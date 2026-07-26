@@ -43,6 +43,7 @@ import {
   columnTypeIcon,
   primaryKeyColumns,
 } from "../lib/sql";
+import { safetyOf } from "../lib/connectionGuard";
 import {
   ColumnFilter,
   ColumnSort,
@@ -71,7 +72,9 @@ interface TableDataEditorProps {
   tableMeta: TableNode | null;
   /** Rows per page; defaults to driver max (500). */
   pageSize?: number;
-  execute: (sql: string) => Promise<QueryResult>;
+  execute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  /** Asks the user to approve a batch on a guarded connection. */
+  confirmWrites?: (preview: string) => Promise<boolean>;
 }
 
 function parseCellInput(raw: string): unknown {
@@ -111,6 +114,7 @@ export function TableDataEditor({
   tableMeta,
   pageSize = 500,
   execute,
+  confirmWrites,
 }: TableDataEditorProps) {
   const [where, setWhere] = useState("");
   const [orderBy, setOrderBy] = useState("");
@@ -517,43 +521,69 @@ export function TableDataEditor({
       return;
     }
 
-    setBusy(true);
-    setError("");
-    try {
-      for (const row of rows) {
-        if (row.status === "inserted") {
-          await execute(
-            buildInsertSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              values: row.values,
-            }),
-          );
-        } else if (row.status === "deleted") {
-          await execute(
-            buildDeleteSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              pkColumns: pkNames,
-              original: row.original,
-            }),
-          );
-        } else if (row.status === "modified") {
-          const sql = buildUpdateSql({
+    // Build the whole batch first so a guarded connection can approve it in
+    // one prompt rather than once per row.
+    const statements: string[] = [];
+    for (const row of rows) {
+      if (row.status === "inserted") {
+        statements.push(
+          buildInsertSql({
+            driver: profile.driver,
+            schema,
+            table,
+            columns,
+            values: row.values,
+          }),
+        );
+      } else if (row.status === "deleted") {
+        statements.push(
+          buildDeleteSql({
             driver: profile.driver,
             schema,
             table,
             columns,
             pkColumns: pkNames,
             original: row.original,
-            next: row.values,
-          });
-          if (sql) await execute(sql);
-        }
+          }),
+        );
+      } else if (row.status === "modified") {
+        const sql = buildUpdateSql({
+          driver: profile.driver,
+          schema,
+          table,
+          columns,
+          pkColumns: pkNames,
+          original: row.original,
+          next: row.values,
+        });
+        if (sql) statements.push(sql);
+      }
+    }
+    if (statements.length === 0) return;
+
+    const safety = safetyOf(profile);
+    if (safety === "readOnly") {
+      setError(
+        `“${profile.name}” is marked read-only. No changes were submitted.`,
+      );
+      return;
+    }
+
+    let approved = safety !== "confirm";
+    if (!approved) {
+      if (!confirmWrites) {
+        setError("This connection requires confirmation, which is unavailable.");
+        return;
+      }
+      approved = await confirmWrites(statements.join("\n"));
+      if (!approved) return;
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      for (const sql of statements) {
+        await execute(sql, true);
       }
       await load(page);
     } catch (nextError) {

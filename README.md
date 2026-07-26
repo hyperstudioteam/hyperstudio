@@ -52,7 +52,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Lazy connect — cached connections open a pool only when you run something
 - [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
 - [ ] SSH tunnels
-- [ ] Connection color coding and read-only / production guards
+- [x] Connection colour coding and read-only / production guards
 
 ### Password storage
 
