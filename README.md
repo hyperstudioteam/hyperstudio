@@ -84,7 +84,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Schema-aware autocompletion for schemas, tables, views, and columns
 - [x] SQL formatting (`Shift+Alt+F`, or the **Format** button)
 - [x] Query history and saved queries
-- [ ] Explicit transaction control and query cancellation
+- [x] Explicit transaction control (**Begin** / **Commit** / **Rollback**) and query cancellation
 - [x] Multi-statement scripts and per-statement results
 
 ### Data editor
@@ -173,23 +173,29 @@ first query, refresh, or edit.
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
 
-**5. Run a script.** When the buffer holds more than one statement, a **Run script** button
+**5. Control the transaction.** **Begin transaction** parks a connection for your session so
+every following statement, including data-editor writes, runs inside it. The badge stays on
+**Tx: Open** until you **Commit** or **Rollback**; disconnecting rolls back. While a statement
+is running, **Cancel** asks the server to abandon it (`pg_cancel_backend` on PostgreSQL,
+`KILL QUERY` on MySQL) without dropping the session.
+
+**6. Run a script.** When the buffer holds more than one statement, a **Run script** button
 appears next to **Run**. Statements execute in order, each result is listed on the left of
 the results pane, and clicking one shows its grid or error. Scripts stop at the first
 failure unless you clear **Stop on error**, and **Stop** halts after the running statement.
 Semicolons inside strings, comments, and `$$` blocks are left alone by the splitter.
 
-**6. Choose how edits commit.** The **Tx** badge in the data editor toolbar switches between
+**7. Choose how edits commit.** The **Tx** badge in the data editor toolbar switches between
 **Atomic** (all staged changes go out in one transaction that rolls back on the first error)
 and **Auto** (one statement at a time). Atomic is the default on PostgreSQL and MySQL;
 drivers without transaction support stay on Auto.
 
-**7. Load a CSV.** Right-click a table → **Import CSV…**. The delimiter is sniffed from the
+**8. Load a CSV.** Right-click a table → **Import CSV…**. The delimiter is sniffed from the
 file, the first row is treated as a header, and columns are matched by name (ignoring case,
 spaces, underscores, and dashes) with a dropdown per column to correct or skip. Rows go out
 in batches of 200, and the progress line reports how many landed if one fails.
 
-**8. Move data around.** Drag across cells to select a range, then copy with your chosen
+**9. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
@@ -280,8 +286,8 @@ Key modules worth knowing:
 
 ### v0.2 — Trust the editor
 
-- [x] Transactional commit mode for the data editor (explicit **Commit** / **Rollback** toolbar still to come)
-- [ ] Query cancellation and a visible transaction state
+- [x] Transactional commit mode for the data editor (**Atomic** / **Auto**)
+- [x] Explicit transaction control and query cancellation in the query workspace
 - [ ] Column sorting and header filters in both grids
 - [ ] Export a result set or table to CSV, JSON, or SQL
 

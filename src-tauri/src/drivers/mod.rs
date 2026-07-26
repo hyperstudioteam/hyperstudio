@@ -3,6 +3,7 @@ pub mod objects_common;
 pub mod postgres;
 pub mod query_common;
 pub mod schema_common;
+pub mod session;
 mod shared;
 
 use std::collections::HashMap;
@@ -155,6 +156,14 @@ pub trait DatabaseDriver: Send + Sync {
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String>;
 
+    /// Start a transaction that later statements on this connection join.
+    async fn begin_transaction(&self, _connection_id: &str) -> Result<(), String> {
+        Err(format!(
+            "Driver '{}' does not support transactions.",
+            self.id()
+        ))
+    }
+
     /// Run every statement in one transaction, returning affected rows per
     /// statement. Only offered by drivers whose capabilities set
     /// `transactions`; callers fall back to statement-at-a-time execution.
@@ -165,6 +174,27 @@ pub trait DatabaseDriver: Send + Sync {
     ) -> Result<Vec<u64>, String> {
         Err(format!(
             "Driver '{}' does not support transactions.",
+            self.id()
+        ))
+    }
+
+    /// Finish the open transaction, committing or rolling it back.
+    async fn end_transaction(&self, _connection_id: &str, _commit: bool) -> Result<(), String> {
+        Err(format!(
+            "Driver '{}' does not support transactions.",
+            self.id()
+        ))
+    }
+
+    async fn transaction_open(&self, _connection_id: &str) -> bool {
+        false
+    }
+
+    /// Ask the server to abandon the statement currently running on this
+    /// connection. Returns false when nothing was running.
+    async fn cancel_query(&self, _connection_id: &str) -> Result<bool, String> {
+        Err(format!(
+            "Driver '{}' does not support cancellation.",
             self.id()
         ))
     }

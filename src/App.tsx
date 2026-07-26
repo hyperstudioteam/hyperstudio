@@ -404,6 +404,22 @@ function App() {
               ?.capabilities.maxRows
           }
           openRequest={openRequest}
+          sessions={
+            drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.sessions ?? false
+          }
+          txnOpen={session.txnOpen}
+          onCancel={() => void session.cancelQuery()}
+          onBeginTransaction={() => {
+            if (!tree.selected) return;
+            void withVaultGate(() => session.beginTransaction(tree.selected!));
+          }}
+          onEndTransaction={(commit) => {
+            if (!tree.selected) return;
+            void session
+              .endTransaction(tree.selected, commit)
+              .catch((error) => session.setError(errorMessage(error)));
+          }}
           onRun={(sql) => {
             if (!tree.selected) {
               session.setError("Select a connection before running a query.");
