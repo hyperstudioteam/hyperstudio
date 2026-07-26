@@ -97,7 +97,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
 - [x] Pluggable column types and data viewers via the contribution registry
 - [ ] Transactional commit mode (currently auto-commit per statement)
-- [ ] Column sorting and per-column filters from the grid header
+- [x] Column sorting and per-column filters from the grid header
 
 ### Selection, copy, and paste
 
