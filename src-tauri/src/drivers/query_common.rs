@@ -11,6 +11,14 @@ pub fn is_row_query(sql: &str) -> bool {
     .any(|keyword| statement.starts_with(keyword))
 }
 
+/// EXPLAIN plans must not receive LIMIT/OFFSET capping — that corrupts the statement.
+pub fn is_explain_query(sql: &str) -> bool {
+    let statement = sql
+        .trim_start_matches(|character: char| character.is_whitespace() || character == ';')
+        .to_ascii_lowercase();
+    statement.starts_with("explain")
+}
+
 pub struct TrailingLimit {
     /// Byte offset where the LIMIT/OFFSET clause begins.
     pub start: usize,
