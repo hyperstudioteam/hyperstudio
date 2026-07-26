@@ -51,7 +51,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Per-connection schema filters (all schemas, or an explicit allowlist)
 - [x] Lazy connect — cached connections open a pool only when you run something
 - [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
-- [ ] SSH tunnels
+- [x] SSH tunnels
 - [ ] Connection color coding and read-only / production guards
 
 ### Password storage
@@ -159,6 +159,11 @@ introspection to the schemas you care about, which keeps large servers fast.
 **2. Decide how the password is stored.** Leave **Save password** off to keep it in memory
 for the session, or turn it on and choose **Into vault** or **Raw password**. The first vault
 save walks you through creating a master password.
+
+**2b. Optional SSH tunnel.** On the **SSH** tab, enable a tunnel through a bastion host.
+Authenticate with a password, a private key file (`~/.ssh/…` is expanded), or the local
+SSH agent. The host and port on the General tab are the database address *as seen from the
+SSH server* (often a private IP or `localhost`).
 
 **3. Browse.** Expand a schema to load its tables. Everything is cached locally, so
 reopening the app shows the tree immediately without connecting. The pool opens on your
@@ -275,7 +280,7 @@ Key modules worth knowing:
 
 - [x] Plugin driver host (JSON-RPC over stdin/stdout) with local install
 - [ ] SQLite / DuckDB / other engines as community plugins
-- [ ] SSH tunnel support
+- [x] SSH tunnel support
 - [ ] Client certificate and full SSL configuration
 - [ ] Read-only and production connection guards
 

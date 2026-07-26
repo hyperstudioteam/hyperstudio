@@ -24,13 +24,45 @@ pub async fn list_drivers(state: State<'_, AppState>) -> Result<Vec<DriverInfo>,
     Ok(state.registry.list().await)
 }
 
+use crate::ssh;
+
+fn ssh_enabled(config: &ConnectionConfig) -> Option<&crate::models::SshTunnelConfig> {
+    config
+        .ssh
+        .as_ref()
+        .filter(|ssh| ssh.enabled && !ssh.host.trim().is_empty())
+}
+
+async fn with_tunnel(
+    config: ConnectionConfig,
+    state: &AppState,
+) -> Result<(ConnectionConfig, bool), String> {
+    let Some(ssh) = ssh_enabled(&config).cloned() else {
+        return Ok((config, false));
+    };
+    let target_host = config.host.clone();
+    let target_port = config.port;
+    let connection_id = config.id.clone();
+    let port = state
+        .tunnels
+        .open(&connection_id, &ssh, &target_host, target_port)
+        .await?;
+    Ok((ssh::apply_local_endpoint(config, port), true))
+}
+
 #[tauri::command]
 pub async fn test_connection(
     config: ConnectionConfig,
     state: State<'_, AppState>,
 ) -> Result<ConnectionInfo, String> {
-    let driver = state.registry.get(&config.driver).await?;
-    driver.test_connection(&config).await
+    let id = config.id.clone();
+    let (ready, tunneled) = with_tunnel(config, &state).await?;
+    let driver = state.registry.get(&ready.driver).await?;
+    let result = driver.test_connection(&ready).await;
+    if tunneled {
+        state.tunnels.close(&id).await;
+    }
+    result
 }
 
 #[tauri::command]
@@ -38,13 +70,20 @@ pub async fn connect(
     config: ConnectionConfig,
     state: State<'_, AppState>,
 ) -> Result<ConnectionInfo, String> {
-    let driver = state.registry.get(&config.driver).await?;
-    let info = driver.connect(&config).await?;
-    state
-        .registry
-        .bind_connection(config.id.clone(), config.driver.clone())
-        .await;
-    Ok(info)
+    let id = config.id.clone();
+    let driver_name = config.driver.clone();
+    let (ready, _) = with_tunnel(config, &state).await?;
+    let driver = state.registry.get(&ready.driver).await?;
+    match driver.connect(&ready).await {
+        Ok(info) => {
+            state.registry.bind_connection(id, driver_name).await;
+            Ok(info)
+        }
+        Err(error) => {
+            state.tunnels.close(&id).await;
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]
@@ -54,6 +93,7 @@ pub async fn disconnect(connection_id: String, state: State<'_, AppState>) -> Re
             driver.disconnect(&connection_id).await?;
         }
     }
+    state.tunnels.close(&connection_id).await;
     Ok(())
 }
 
