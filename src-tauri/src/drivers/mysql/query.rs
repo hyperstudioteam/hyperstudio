@@ -5,8 +5,8 @@ use sqlx::{Column, MySqlPool, Row};
 
 use crate::drivers::mysql::values::decode;
 use crate::drivers::query_common::{
-    TrailingLimit, is_row_query, parse_standard_limit, probe_one_extra, read_usize_back,
-    require_keyword_back, skip_spaces_back, split_trailing_semi, with_semi,
+    TrailingLimit, is_explain_query, is_row_query, parse_standard_limit, probe_one_extra,
+    read_usize_back, require_keyword_back, skip_spaces_back, split_trailing_semi, with_semi,
 };
 use crate::models::QueryResult;
 
@@ -43,7 +43,7 @@ fn parse_limit(body: &str) -> Option<TrailingLimit> {
 /// Cap SELECT-like statements at `max_rows` using MySQL LIMIT forms
 /// (`LIMIT n`, `LIMIT n OFFSET m`, `LIMIT offset, count`).
 pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
-    if max_rows == 0 || !is_row_query(sql) {
+    if max_rows == 0 || !is_row_query(sql) || is_explain_query(sql) {
         return sql.to_string();
     }
 
@@ -155,6 +155,14 @@ mod tests {
         assert_eq!(
             enforce_select_limit("DELETE FROM users", 500),
             "DELETE FROM users"
+        );
+    }
+
+    #[test]
+    fn leaves_explain_alone() {
+        assert_eq!(
+            enforce_select_limit("EXPLAIN FORMAT=JSON SELECT * FROM users", 500),
+            "EXPLAIN FORMAT=JSON SELECT * FROM users"
         );
     }
 }
