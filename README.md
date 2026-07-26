@@ -95,6 +95,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Insert and delete rows, then submit or revert as a batch
 - [x] Primary-key-aware `UPDATE` / `DELETE` statement generation
 - [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
+- [x] Import a CSV into a table with header detection and column mapping
 - [x] Pluggable column types and data viewers via the contribution registry
 - [ ] Transactional commit mode (currently auto-commit per statement)
 - [ ] Column sorting and per-column filters from the grid header
@@ -171,7 +172,12 @@ first query, refresh, or edit.
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
 
-**5. Move data around.** Drag across cells to select a range, then copy with your chosen
+**5. Load a CSV.** Right-click a table → **Import CSV…**. The delimiter is sniffed from the
+file, the first row is treated as a header, and columns are matched by name (ignoring case,
+spaces, underscores, and dashes) with a dropdown per column to correct or skip. Rows go out
+in batches of 200, and the progress line reports how many landed if one fails.
+
+**6. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
@@ -291,7 +297,6 @@ Key modules worth knowing:
 ### Later
 
 - ER diagrams and schema comparison
-- Import from CSV
 - Scripted extractor plugins and UI slots
 - Themes and layout customization
 
