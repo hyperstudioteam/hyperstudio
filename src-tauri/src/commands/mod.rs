@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager, State};
 use crate::db::AppState;
 use crate::models::{
     AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ConnectionConfig, ConnectionInfo,
-    DriverInfo, InstalledPluginInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo,
+    DriverInfo, ErDiagram, InstalledPluginInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo,
     SchemaNode, TableNode,
 };
 use crate::plugins::{
@@ -263,6 +263,16 @@ pub async fn cancel_query(
 ) -> Result<bool, String> {
     let driver = state.registry.driver_for_connection(&connection_id).await?;
     driver.cancel_query(&connection_id).await
+}
+
+#[tauri::command]
+pub async fn er_diagram(
+    connection_id: String,
+    schema: String,
+    state: State<'_, AppState>,
+) -> Result<ErDiagram, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.er_diagram(&connection_id, &schema).await
 }
 
 #[tauri::command]

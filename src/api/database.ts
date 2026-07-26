@@ -102,6 +102,12 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  erDiagram(connectionId: string, schema: string) {
+    return invoke<import("../lib/erDiagram").ErDiagram>("er_diagram", {
+      connectionId,
+      schema,
+    });
+  },
   beginTransaction(connectionId: string) {
     return invoke<void>("begin_transaction", { connectionId });
   },

@@ -15,7 +15,7 @@ use tokio::sync::RwLock;
 use crate::models::{
     AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ColumnTypeDeclaration,
     ConnectionConfig, ConnectionFieldDef, ConnectionInfo, DriverCapabilities, DriverInfo,
-    ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
+    ErDiagram, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
 };
 
 pub use mysql::NativeMySql;
@@ -155,6 +155,18 @@ pub trait DatabaseDriver: Send + Sync {
     }
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String>;
+
+    /// Tables and foreign keys for one schema, used by the ER diagram view.
+    async fn er_diagram(
+        &self,
+        _connection_id: &str,
+        _schema: &str,
+    ) -> Result<ErDiagram, String> {
+        Err(format!(
+            "Driver '{}' does not support ER diagrams.",
+            self.id()
+        ))
+    }
 
     /// Start a transaction that later statements on this connection join.
     async fn begin_transaction(&self, _connection_id: &str) -> Result<(), String> {

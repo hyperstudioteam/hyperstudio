@@ -347,6 +347,42 @@ pub struct QueryResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ErColumn {
+    pub name: String,
+    pub data_type: String,
+    pub primary_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErTable {
+    pub name: String,
+    pub columns: Vec<ErColumn>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErEdge {
+    pub name: String,
+    pub from_table: String,
+    pub from_columns: Vec<String>,
+    pub to_schema: String,
+    pub to_table: String,
+    pub to_columns: Vec<String>,
+    pub on_update: String,
+    pub on_delete: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ErDiagram {
+    pub schema: String,
+    pub tables: Vec<ErTable>,
+    pub edges: Vec<ErEdge>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DriverCapabilities {
     pub schemas: bool,
     pub views: bool,

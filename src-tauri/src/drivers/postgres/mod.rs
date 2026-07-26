@@ -1,5 +1,6 @@
 mod alter;
 mod ddl;
+mod er;
 mod objects;
 mod pool;
 mod query;
@@ -19,7 +20,8 @@ use crate::drivers::session::SessionState;
 use crate::drivers::shared::{get_pool, insert_pool, remove_pool};
 use crate::models::{
     AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ConnectionConfig, ConnectionInfo,
-    DriverCapabilities, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
+    DriverCapabilities, ErDiagram, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode,
+    TableNode,
 };
 
 pub struct NativePostgres {
@@ -275,5 +277,14 @@ impl DatabaseDriver for NativePostgres {
     ) -> Result<Vec<u64>, String> {
         let pool = get_pool(&self.pools, connection_id).await?;
         query::execute_batch(&pool, statements).await
+    }
+
+    async fn er_diagram(
+        &self,
+        connection_id: &str,
+        schema: &str,
+    ) -> Result<ErDiagram, String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        er::diagram(&pool, schema).await
     }
 }

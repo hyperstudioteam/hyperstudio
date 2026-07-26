@@ -338,6 +338,14 @@ export function useDatabaseSession() {
     return next;
   }
 
+  async function loadErDiagram(
+    profile: ConnectionProfile,
+    schema: string,
+  ): Promise<import("../lib/erDiagram").ErDiagram> {
+    await ensureLive(profile);
+    return databaseApi.erDiagram(profile.id, schema);
+  }
+
   /** Ask the server to abandon the statement in flight. */
   async function cancelQuery() {
     if (!liveIdRef.current) return;
@@ -485,6 +493,7 @@ export function useDatabaseSession() {
     prefetchObjects,
     runQuery,
     executeSql,
+    loadErDiagram,
     cancelQuery,
     txnOpen,
     beginTransaction,
