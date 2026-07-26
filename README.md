@@ -71,7 +71,8 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Column types, nullability, and primary-key markers
 - [ ] Indexes, foreign keys, constraints, and triggers
 - [ ] Search and filter within the tree
-- [ ] Table DDL viewer and ER diagrams
+- [x] Table DDL viewer (right-click an object → **Show DDL…**)
+- [ ] ER diagrams
 
 ### Query workspace
 

@@ -88,6 +88,9 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  tableDdl(connectionId: string, schema: string, table: string) {
+    return invoke<string>("table_ddl", { connectionId, schema, table });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },
