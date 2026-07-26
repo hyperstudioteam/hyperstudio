@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { databaseApi } from "../api/database";
+import {
+  ReadOnlyConnectionError,
+  WriteConfirmationRequiredError,
+  assertStatementAllowed,
+} from "../lib/connectionGuard";
 import { errorMessage } from "../lib/format";
 import {
   VaultLockedError,
@@ -131,6 +136,14 @@ export function useDatabaseSession() {
   function isVaultAuthError(error: unknown) {
     return (
       error instanceof VaultLockedError || error instanceof VaultMissingError
+    );
+  }
+
+  /** Write gates surface as a prompt or a refusal, not an inline query error. */
+  function isWriteGateError(error: unknown) {
+    return (
+      error instanceof WriteConfirmationRequiredError ||
+      error instanceof ReadOnlyConnectionError
     );
   }
 
@@ -285,14 +298,19 @@ export function useDatabaseSession() {
     }
   }
 
-  async function runQuery(profile: ConnectionProfile, sql: string) {
+  async function runQuery(
+    profile: ConnectionProfile,
+    sql: string,
+    confirmedWrite = false,
+  ) {
     setBusy({ kind: "query" });
     setError("");
     try {
+      assertStatementAllowed(profile, sql, confirmedWrite);
       await ensureLive(profile);
       setResult(await databaseApi.executeQuery(profile.id, sql));
     } catch (nextError) {
-      if (isVaultAuthError(nextError)) {
+      if (isVaultAuthError(nextError) || isWriteGateError(nextError)) {
         setBusy(null);
         throw nextError;
       }
@@ -307,10 +325,21 @@ export function useDatabaseSession() {
   async function executeSql(
     profile: ConnectionProfile,
     sql: string,
+    confirmedWrite = false,
   ): Promise<QueryResult> {
+    assertStatementAllowed(profile, sql, confirmedWrite);
     await ensureLive(profile);
     const next = await databaseApi.executeQuery(profile.id, sql);
     return next;
+  }
+
+  /** Commit several statements atomically (for the table editor). */
+  async function executeBatch(
+    profile: ConnectionProfile,
+    statements: string[],
+  ): Promise<number[]> {
+    await ensureLive(profile);
+    return databaseApi.executeBatch(profile.id, statements);
   }
 
   async function toggleSchemaExpanded(
@@ -430,6 +459,7 @@ export function useDatabaseSession() {
     prefetchObjects,
     runQuery,
     executeSql,
+    executeBatch,
     onDeleted,
     clearSession,
   };
