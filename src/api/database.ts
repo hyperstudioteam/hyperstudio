@@ -88,6 +88,16 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  /** Runs every statement in one transaction; resolves to affected rows each. */
+  executeBatch(connectionId: string, statements: string[]) {
+    return invoke<number[]>("execute_batch", { connectionId, statements });
+  },
+  tableDdl(connectionId: string, schema: string, table: string) {
+    return invoke<string>("table_ddl", { connectionId, schema, table });
+  },
+  writeExportChunk(path: string, contents: string, append: boolean) {
+    return invoke<void>("write_export_chunk", { path, contents, append });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },

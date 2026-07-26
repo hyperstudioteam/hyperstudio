@@ -5,10 +5,11 @@ mod models;
 mod plugins;
 
 use commands::{
-    alter_column, alter_key, alter_table, connect, disconnect, execute_query, install_plugin,
+    alter_column, alter_key, alter_table, connect, disconnect, execute_batch, execute_query,
+    install_plugin,
     list_drivers, list_object_groups, list_object_subgroup, list_objects, list_plugins,
-    list_schema, list_schemas, list_tables, reload_plugins, set_plugin_enabled, test_connection,
-    uninstall_plugin,
+    list_schema, list_schemas, list_tables, reload_plugins, set_plugin_enabled, table_ddl,
+    test_connection, uninstall_plugin, write_export_chunk,
 };
 use db::AppState;
 use plugins::discover_and_register;
@@ -19,6 +20,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState::new())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -52,6 +54,9 @@ pub fn run() {
             list_objects,
             list_object_subgroup,
             execute_query,
+            execute_batch,
+            table_ddl,
+            write_export_chunk,
             alter_table,
             alter_column,
             alter_key,

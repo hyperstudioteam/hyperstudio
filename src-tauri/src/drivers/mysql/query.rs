@@ -5,8 +5,8 @@ use sqlx::{Column, MySqlPool, Row};
 
 use crate::drivers::mysql::values::decode;
 use crate::drivers::query_common::{
-    TrailingLimit, is_row_query, parse_standard_limit, probe_one_extra, read_usize_back,
-    require_keyword_back, skip_spaces_back, split_trailing_semi, with_semi,
+    TrailingLimit, is_explain_query, is_row_query, parse_standard_limit, probe_one_extra,
+    read_usize_back, require_keyword_back, skip_spaces_back, split_trailing_semi, with_semi,
 };
 use crate::models::QueryResult;
 
@@ -43,7 +43,7 @@ fn parse_limit(body: &str) -> Option<TrailingLimit> {
 /// Cap SELECT-like statements at `max_rows` using MySQL LIMIT forms
 /// (`LIMIT n`, `LIMIT n OFFSET m`, `LIMIT offset, count`).
 pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
-    if max_rows == 0 || !is_row_query(sql) {
+    if max_rows == 0 || !is_row_query(sql) || is_explain_query(sql) {
         return sql.to_string();
     }
 
@@ -106,6 +106,25 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
     })
 }
 
+/// Run every statement inside one transaction, rolling back on the first error.
+/// DDL still commits implicitly in MySQL, so callers should keep batches to DML.
+pub async fn execute_batch(pool: &MySqlPool, statements: &[String]) -> Result<Vec<u64>, String> {
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let mut affected = Vec::with_capacity(statements.len());
+    for (index, statement) in statements.iter().enumerate() {
+        let outcome = sqlx::query(statement).execute(&mut *tx).await;
+        match outcome {
+            Ok(done) => affected.push(done.rows_affected()),
+            Err(error) => {
+                let _ = tx.rollback().await;
+                return Err(format!("Statement {} failed: {error}", index + 1));
+            }
+        }
+    }
+    tx.commit().await.map_err(|error| error.to_string())?;
+    Ok(affected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::enforce_select_limit;
@@ -155,6 +174,14 @@ mod tests {
         assert_eq!(
             enforce_select_limit("DELETE FROM users", 500),
             "DELETE FROM users"
+        );
+    }
+
+    #[test]
+    fn leaves_explain_alone() {
+        assert_eq!(
+            enforce_select_limit("EXPLAIN FORMAT=JSON SELECT * FROM users", 500),
+            "EXPLAIN FORMAT=JSON SELECT * FROM users"
         );
     }
 }

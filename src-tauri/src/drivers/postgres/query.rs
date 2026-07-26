@@ -5,13 +5,14 @@ use sqlx::{Column, PgPool, Row};
 
 use crate::drivers::postgres::values::decode;
 use crate::drivers::query_common::{
-    is_row_query, parse_standard_limit, probe_one_extra, split_trailing_semi, with_semi,
+    is_explain_query, is_row_query, parse_standard_limit, probe_one_extra, split_trailing_semi,
+    with_semi,
 };
 use crate::models::QueryResult;
 
 /// Cap SELECT-like statements at `max_rows` using PostgreSQL LIMIT/OFFSET forms.
 pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
-    if max_rows == 0 || !is_row_query(sql) {
+    if max_rows == 0 || !is_row_query(sql) || is_explain_query(sql) {
         return sql.to_string();
     }
 
@@ -74,6 +75,25 @@ pub async fn execute(pool: &PgPool, sql: &str, max_rows: usize) -> Result<QueryR
     })
 }
 
+/// Run every statement inside one transaction, rolling back on the first error.
+pub async fn execute_batch(pool: &PgPool, statements: &[String]) -> Result<Vec<u64>, String> {
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let mut affected = Vec::with_capacity(statements.len());
+    for (index, statement) in statements.iter().enumerate() {
+        let outcome = sqlx::query(statement).execute(&mut *tx).await;
+        match outcome {
+            Ok(done) => affected.push(done.rows_affected()),
+            Err(error) => {
+                // Explicit rollback so the connection returns to the pool clean.
+                let _ = tx.rollback().await;
+                return Err(format!("Statement {} failed: {error}", index + 1));
+            }
+        }
+    }
+    tx.commit().await.map_err(|error| error.to_string())?;
+    Ok(affected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::enforce_select_limit;
@@ -123,6 +143,14 @@ mod tests {
         assert_eq!(
             enforce_select_limit("DELETE FROM users", 500),
             "DELETE FROM users"
+        );
+    }
+
+    #[test]
+    fn leaves_explain_alone() {
+        assert_eq!(
+            enforce_select_limit("EXPLAIN (FORMAT JSON) SELECT * FROM users", 500),
+            "EXPLAIN (FORMAT JSON) SELECT * FROM users"
         );
     }
 }
