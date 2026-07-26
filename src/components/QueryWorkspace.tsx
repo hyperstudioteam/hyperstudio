@@ -76,7 +76,9 @@ interface QueryWorkspaceProps {
   maxRows?: number;
   openRequest: WorkspaceOpen;
   onRun: (sql: string) => void;
-  onExecute: (sql: string) => Promise<QueryResult>;
+  onExecute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  /** Prompts for a guarded connection; resolves true when the user agrees. */
+  onConfirmWrites?: (preview: string) => Promise<boolean>;
 }
 
 function findTableMeta(
@@ -102,6 +104,7 @@ export function QueryWorkspace({
   openRequest,
   onRun,
   onExecute,
+  onConfirmWrites,
 }: QueryWorkspaceProps) {
   const pageSize = defaultMaxRows(maxRowsProp);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
@@ -325,6 +328,7 @@ export function QueryWorkspace({
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
           pageSize={pageSize}
           execute={onExecute}
+          confirmWrites={onConfirmWrites}
         />
       ) : (
         <>
