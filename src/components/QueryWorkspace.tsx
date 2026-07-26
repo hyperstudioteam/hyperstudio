@@ -6,9 +6,11 @@ import {
   ChevronsLeft,
   CirclePlus,
   Download,
+  GitBranch,
   LoaderCircle,
   Play,
   Table2,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -17,6 +19,14 @@ import {
   defaultSchemaFor,
   hasCompletionData,
 } from "../lib/completionSchema";
+import {
+  ExplainPlan,
+  canVisualizeExplain,
+  explainHasAnalyze,
+  isExplainSql,
+  parseExplainResult,
+  wrapExplainSql,
+} from "../lib/explain";
 import { getSchemaCache } from "../lib/schemaCache";
 import {
   buildTableQuery,
@@ -39,10 +49,13 @@ import {
   exportResultSet,
   extensionFor,
 } from "../lib/exportResults";
+import { ExplainPlanView } from "./explain/ExplainPlanView";
 import { ExportModal, ExportOptions } from "./ExportModal";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
+
+type ResultPanel = "results" | "plan" | "messages";
 
 const STARTER_QUERY = `SELECT *
 FROM users
@@ -122,6 +135,15 @@ export function QueryWorkspace({
   const [exportBusy, setExportBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportError, setExportError] = useState("");
+  const [formatError, setFormatError] = useState("");
+  const [resultPanel, setResultPanel] = useState<ResultPanel>("results");
+  const [analyzeEnabled, setAnalyzeEnabled] = useState(false);
+  const [explainPlan, setExplainPlan] = useState<ExplainPlan | null>(null);
+  const pendingExplainRef = useRef<{
+    analyzed: boolean;
+    sql: string;
+    driver: "postgres" | "mysql";
+  } | null>(null);
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
 
@@ -140,6 +162,9 @@ export function QueryWorkspace({
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
   const query = active?.kind === "query" ? active.sql : STARTER_QUERY;
+  const explainCapable = canVisualizeExplain(selected?.driver);
+  const explainDisabled =
+    busy === "query" || !selected || connectedId !== selected.id || !explainCapable;
 
   const pageable = pagePlan?.pageable === true;
   const hasMore =
@@ -151,6 +176,31 @@ export function QueryWorkspace({
       ? 0
       : resultPage * pageSize + 1;
   const rangeEnd = resultPage * pageSize + (result?.rows.length ?? 0);
+
+  useEffect(() => {
+    const pending = pendingExplainRef.current;
+    if (!pending) return;
+    if (busy === "query") return;
+
+    pendingExplainRef.current = null;
+    if (error || !result) {
+      setExplainPlan(null);
+      setResultPanel(error ? "messages" : "results");
+      return;
+    }
+
+    const plan = parseExplainResult(pending.driver, result, {
+      analyzed: pending.analyzed,
+      sql: pending.sql,
+    });
+    if (plan) {
+      setExplainPlan(plan);
+      setResultPanel("plan");
+    } else {
+      setExplainPlan(null);
+      setResultPanel("results");
+    }
+  }, [result, error, busy]);
 
   useEffect(() => {
     if (!openRequest || !selected) return;
@@ -217,7 +267,30 @@ export function QueryWorkspace({
     );
   }
 
+  function runExplainSql(sql: string, analyze: boolean) {
+    if (!selected || !canVisualizeExplain(selected.driver)) return;
+    const wrapped = wrapExplainSql(selected.driver, sql, { analyze });
+    pendingExplainRef.current = {
+      analyzed: analyze,
+      sql: wrapped,
+      driver: selected.driver,
+    };
+    setPagePlan({ pageable: false, sql: wrapped });
+    setResultPage(0);
+    setExplainPlan(null);
+    onRun(wrapped);
+  }
+
   function runSql(sql: string) {
+    if (isExplainSql(sql) && selected && canVisualizeExplain(selected.driver)) {
+      const analyze = explainHasAnalyze(sql) || analyzeEnabled;
+      runExplainSql(sql, analyze);
+      return;
+    }
+
+    pendingExplainRef.current = null;
+    setExplainPlan(null);
+    setResultPanel("results");
     const plan = planPagedQuery(sql, pageSize);
     setPagePlan(plan);
     setResultPage(0);
@@ -227,6 +300,18 @@ export function QueryWorkspace({
   function run() {
     if (!active || active.kind !== "query") return;
     runSql(editorRef.current?.getSqlToRun() ?? query);
+  }
+
+  function formatQuery() {
+    if (!active || active.kind !== "query") return;
+    setFormatError("");
+    editorRef.current?.format();
+  }
+
+  function explain() {
+    if (!active || active.kind !== "query") return;
+    const sql = editorRef.current?.getSqlToRun() ?? query;
+    runExplainSql(sql, analyzeEnabled);
   }
 
   function loadPage(page: number) {
@@ -416,9 +501,62 @@ export function QueryWorkspace({
                   ⌘↵
                 </kbd>
               </button>
+              <button
+                type="button"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                disabled={busy === "query"}
+                title="Format selection, or the whole query"
+                onClick={formatQuery}
+              >
+                <WandSparkles size={14} />
+                Format
+                <kbd className="rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                  ⇧⌥F
+                </kbd>
+              </button>
+              <button
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                disabled={explainDisabled}
+                title={
+                  explainCapable
+                    ? analyzeEnabled
+                      ? "EXPLAIN ANALYZE — runs the query"
+                      : "Explain query plan"
+                    : "Explain is available for PostgreSQL and MySQL"
+                }
+                onClick={explain}
+              >
+                <GitBranch size={14} />
+                Explain
+              </button>
+              <label
+                className={cn(
+                  "flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-transparent px-1.5 text-[10px] text-muted",
+                  explainDisabled && "cursor-default opacity-60",
+                )}
+                title="ANALYZE executes the statement and reports actual timings"
+              >
+                <input
+                  type="checkbox"
+                  className="size-3 accent-accent"
+                  checked={analyzeEnabled}
+                  disabled={explainDisabled}
+                  onChange={(event) => setAnalyzeEnabled(event.target.checked)}
+                />
+                Analyze
+              </label>
+              {analyzeEnabled && explainCapable && (
+                <span className="text-[9px] text-warn">runs the query</span>
+              )}
               <span className="h-4 w-px bg-border" />
               <span className="text-[9px] text-subtle">
-                Run selection or current query
+                {formatError ? (
+                  <span className="text-danger">
+                    Cannot format: {formatError}
+                  </span>
+                ) : (
+                  "Run selection or current query"
+                )}
               </span>
               <span className="ml-auto pr-1 text-[9px] text-subtle">
                 {completionReady
@@ -436,6 +574,7 @@ export function QueryWorkspace({
                 defaultSchema={defaultSchema}
                 onChange={setQuerySql}
                 onRun={runSql}
+                onFormatError={setFormatError}
               />
             </div>
           </section>
@@ -443,14 +582,40 @@ export function QueryWorkspace({
           <section className="flex min-h-0 flex-col overflow-hidden">
             <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-border bg-[#14171b]">
               <div className="flex">
-                <button className="cursor-pointer border-0 border-b border-accent bg-transparent px-3.5 text-[10px] text-[#d5dae3]">
+                <button
+                  type="button"
+                  className={cn(
+                    "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
+                    resultPanel === "results" && "border-accent text-[#d5dae3]",
+                  )}
+                  onClick={() => setResultPanel("results")}
+                >
                   Results
                 </button>
-                <button className="cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted">
+                {explainPlan && (
+                  <button
+                    type="button"
+                    className={cn(
+                      "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
+                      resultPanel === "plan" && "border-accent text-[#d5dae3]",
+                    )}
+                    onClick={() => setResultPanel("plan")}
+                  >
+                    Plan
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={cn(
+                    "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
+                    resultPanel === "messages" && "border-accent text-[#d5dae3]",
+                  )}
+                  onClick={() => setResultPanel("messages")}
+                >
                   Messages
                 </button>
               </div>
-              {result && (
+              {result && resultPanel === "results" && (
                 <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle [&>span]:flex [&>span]:items-center [&>span]:gap-1">
                   {pageable && result.columns.length > 0 ? (
                     <div className="flex items-center gap-0.5">
@@ -516,11 +681,36 @@ export function QueryWorkspace({
                 </div>
               )}
             </div>
-            <ResultGrid
-              result={result}
-              error={error}
-              driver={selected?.driver}
-            />
+            {resultPanel === "plan" && explainPlan ? (
+              <ExplainPlanView plan={explainPlan} />
+            ) : resultPanel === "messages" ? (
+              <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] text-[#c9d0db]">
+                {error ? (
+                  <pre className="m-0 whitespace-pre-wrap text-danger">
+                    {error}
+                  </pre>
+                ) : result ? (
+                  <p className="m-0 text-muted">
+                    Query finished in {result.elapsedMs} ms
+                    {result.columns.length
+                      ? ` · ${result.rows.length} row${result.rows.length === 1 ? "" : "s"}`
+                      : ` · ${result.affectedRows} affected`}
+                    {explainPlan
+                      ? ` · plan: ${explainPlan.analyzed ? "ANALYZE" : "EXPLAIN"}`
+                      : ""}
+                    .
+                  </p>
+                ) : (
+                  <p className="m-0 text-subtle">No messages yet.</p>
+                )}
+              </div>
+            ) : (
+              <ResultGrid
+                result={result}
+                error={error}
+                driver={selected?.driver}
+              />
+            )}
           </section>
         </>
       )}
