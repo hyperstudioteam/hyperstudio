@@ -118,6 +118,8 @@ interface QueryWorkspaceProps {
   openRequest: WorkspaceOpen;
   onRun: (sql: string) => void;
   onExecute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  /** Set only when the driver can commit a batch atomically. */
+  onExecuteBatch?: (statements: string[]) => Promise<number[]>;
   /** Prompts for a guarded connection; resolves true when the user agrees. */
   onConfirmWrites?: (preview: string) => Promise<boolean>;
 }
@@ -145,6 +147,7 @@ export function QueryWorkspace({
   openRequest,
   onRun,
   onExecute,
+  onExecuteBatch,
   onConfirmWrites,
 }: QueryWorkspaceProps) {
   const pageSize = defaultMaxRows(maxRowsProp);
@@ -616,6 +619,7 @@ export function QueryWorkspace({
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
           pageSize={pageSize}
           execute={onExecute}
+          executeBatch={onExecuteBatch}
           confirmWrites={onConfirmWrites}
         />
       ) : (

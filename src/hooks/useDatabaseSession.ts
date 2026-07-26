@@ -333,6 +333,15 @@ export function useDatabaseSession() {
     return next;
   }
 
+  /** Commit several statements atomically (for the table editor). */
+  async function executeBatch(
+    profile: ConnectionProfile,
+    statements: string[],
+  ): Promise<number[]> {
+    await ensureLive(profile);
+    return databaseApi.executeBatch(profile.id, statements);
+  }
+
   async function toggleSchemaExpanded(
     profile: ConnectionProfile,
     key: string,
@@ -450,6 +459,7 @@ export function useDatabaseSession() {
     prefetchObjects,
     runQuery,
     executeSql,
+    executeBatch,
     onDeleted,
     clearSession,
   };

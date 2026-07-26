@@ -91,6 +91,9 @@ impl From<&ManifestCapabilities> for DriverCapabilities {
             } else {
                 value.max_rows
             },
+            // Plugins run one statement per RPC call, so there is no batch to
+            // wrap in a transaction.
+            transactions: false,
         }
     }
 }

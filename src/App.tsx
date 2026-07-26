@@ -213,6 +213,36 @@ function App() {
     });
   }
 
+  function executeBatchWithVault(statements: string[]): Promise<number[]> {
+    if (!tree.selected) {
+      return Promise.reject(
+        new Error("Select a connection before committing changes."),
+      );
+    }
+    const profile = tree.selected;
+    return new Promise((resolve, reject) => {
+      const attempt = () => {
+        void session
+          .executeBatch(profile, statements)
+          .then(resolve)
+          .catch((error) => {
+            if (error instanceof VaultLockedError) {
+              vaultRetry.current = attempt;
+              setVaultPrompt("unlock");
+              return;
+            }
+            if (error instanceof VaultMissingError) {
+              vaultRetry.current = attempt;
+              setVaultPrompt("create");
+              return;
+            }
+            reject(error);
+          });
+      };
+      attempt();
+    });
+  }
+
   /** Show the write gate for a whole batch and report the user's answer. */
   function confirmWrites(preview: string): Promise<boolean> {
     if (!tree.selected) return Promise.resolve(false);
@@ -374,6 +404,12 @@ function App() {
           }}
           onExecute={(sql, confirmedWrite) =>
             executeWithVault(sql, confirmedWrite)
+          }
+          onExecuteBatch={
+            drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.transactions
+              ? executeBatchWithVault
+              : undefined
           }
           onConfirmWrites={confirmWrites}
         />

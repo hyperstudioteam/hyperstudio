@@ -73,6 +73,8 @@ interface TableDataEditorProps {
   /** Rows per page; defaults to driver max (500). */
   pageSize?: number;
   execute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  /** Present when the driver can commit a batch atomically. */
+  executeBatch?: (statements: string[]) => Promise<number[]>;
   /** Asks the user to approve a batch on a guarded connection. */
   confirmWrites?: (preview: string) => Promise<boolean>;
 }
@@ -114,6 +116,7 @@ export function TableDataEditor({
   tableMeta,
   pageSize = 500,
   execute,
+  executeBatch,
   confirmWrites,
 }: TableDataEditorProps) {
   const [where, setWhere] = useState("");
@@ -142,6 +145,7 @@ export function TableDataEditor({
     y: number;
   } | null>(null);
   const [copyAsOpen, setCopyAsOpen] = useState(false);
+  const [transactional, setTransactional] = useState(Boolean(executeBatch));
   const [viewerCell, setViewerCell] = useState<{
     rowId: string;
     col: number;
@@ -509,20 +513,7 @@ export function TableDataEditor({
     setEditing(null);
   }
 
-  async function commit() {
-    if (dirtyCount === 0) return;
-    const needsPk = rows.some(
-      (row) => row.status === "modified" || row.status === "deleted",
-    );
-    if (needsPk && pkNames.length === 0) {
-      setError(
-        "Cannot commit updates/deletes without a primary key. Refresh the table schema and try again.",
-      );
-      return;
-    }
-
-    // Build the whole batch first so a guarded connection can approve it in
-    // one prompt rather than once per row.
+  function pendingStatements(): string[] {
     const statements: string[] = [];
     for (const row of rows) {
       if (row.status === "inserted") {
@@ -559,6 +550,24 @@ export function TableDataEditor({
         if (sql) statements.push(sql);
       }
     }
+    return statements;
+  }
+
+  async function commit() {
+    if (dirtyCount === 0) return;
+    const needsPk = rows.some(
+      (row) => row.status === "modified" || row.status === "deleted",
+    );
+    if (needsPk && pkNames.length === 0) {
+      setError(
+        "Cannot commit updates/deletes without a primary key. Refresh the table schema and try again.",
+      );
+      return;
+    }
+
+    // Build the whole batch first so a guarded connection can approve it in
+    // one prompt rather than once per row.
+    const statements = pendingStatements();
     if (statements.length === 0) return;
 
     const safety = safetyOf(profile);
@@ -582,12 +591,24 @@ export function TableDataEditor({
     setBusy(true);
     setError("");
     try {
-      for (const sql of statements) {
-        await execute(sql, true);
+      if (transactional && executeBatch) {
+        await executeBatch(statements);
+      } else {
+        for (const statement of statements) {
+          await execute(statement, true);
+        }
       }
       await load(page);
     } catch (nextError) {
-      setError(errorMessage(nextError));
+      // A rolled-back batch leaves the staged edits intact so they can be
+      // fixed and resubmitted; an auto-commit run may have applied a prefix,
+      // which the reload below would hide, so keep the rows and let the user
+      // refresh deliberately.
+      setError(
+        transactional
+          ? `${errorMessage(nextError)}\nNothing was committed; the transaction rolled back.`
+          : `${errorMessage(nextError)}\nEarlier statements in this batch may already be committed.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -672,7 +693,11 @@ export function TableDataEditor({
           <button
             type="button"
             className={iconButtonClass}
-            title="Submit changes"
+            title={
+              transactional
+                ? "Submit changes in one transaction"
+                : "Submit changes, one statement at a time"
+            }
             disabled={busy || dirtyCount === 0}
             onClick={() => void commit()}
           >
@@ -690,9 +715,24 @@ export function TableDataEditor({
         </div>
 
         <span className="h-4 w-px bg-border" />
-        <span className="rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3]">
-          Tx: Auto
-        </span>
+        <button
+          type="button"
+          className={cn(
+            "cursor-pointer rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3] disabled:cursor-default disabled:opacity-60",
+            transactional && "border-accent text-[#c9c2ff]",
+          )}
+          disabled={!executeBatch || busy}
+          title={
+            executeBatch
+              ? transactional
+                ? "Changes commit as one transaction; click for auto-commit per statement"
+                : "Each statement commits on its own; click to commit as one transaction"
+              : `${profile.driver} does not support transactional commits`
+          }
+          onClick={() => setTransactional((current) => !current)}
+        >
+          Tx: {transactional ? "Atomic" : "Auto"}
+        </button>
         {pkNames.length === 0 && columns.length > 0 && (
           <span className="text-[9px] text-subtle">
             No primary key · update/delete limited
