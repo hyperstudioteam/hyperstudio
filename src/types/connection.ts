@@ -17,6 +17,8 @@ export interface DriverCapabilities {
   identifierQuote: string;
   /** Max rows per SELECT page from the query editor. */
   maxRows?: number;
+  /** Driver supports explicit transactions and query cancellation. */
+  sessions?: boolean;
 }
 
 export interface ColumnTypeDeclaration {

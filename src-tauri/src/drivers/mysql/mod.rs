@@ -9,10 +9,12 @@ mod values;
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use sqlx::MySqlPool;
+use sqlx::pool::PoolConnection;
+use sqlx::{MySql, MySqlPool};
 use tokio::sync::RwLock;
 
 use crate::drivers::DatabaseDriver;
+use crate::drivers::session::SessionState;
 use crate::drivers::shared::{get_pool, insert_pool, remove_pool};
 use crate::models::{
     AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ConnectionConfig, ConnectionInfo,
@@ -21,12 +23,14 @@ use crate::models::{
 
 pub struct NativeMySql {
     pools: RwLock<HashMap<String, MySqlPool>>,
+    sessions: SessionState<PoolConnection<MySql>>,
 }
 
 impl NativeMySql {
     pub fn new() -> Self {
         Self {
             pools: RwLock::new(HashMap::new()),
+            sessions: SessionState::default(),
         }
     }
 }
@@ -61,6 +65,7 @@ impl DatabaseDriver for NativeMySql {
             readonly: false,
             identifier_quote: "`".into(),
             max_rows: DriverCapabilities::DEFAULT_MAX_ROWS,
+            sessions: true,
         }
     }
     fn object_groups(&self) -> Vec<ObjectGroupDef> {
@@ -84,6 +89,8 @@ impl DatabaseDriver for NativeMySql {
     }
 
     async fn disconnect(&self, connection_id: &str) -> Result<(), String> {
+        // Dropping a parked connection rolls its transaction back.
+        self.sessions.forget(connection_id).await;
         if let Some(pool) = remove_pool(&self.pools, connection_id).await {
             pool.close().await;
         }
@@ -183,6 +190,67 @@ impl DatabaseDriver for NativeMySql {
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String> {
         let pool = get_pool(&self.pools, connection_id).await?;
         let max_rows = self.capabilities().max_rows as usize;
-        query::execute(&pool, sql, max_rows).await
+
+        // Statements join an open transaction when there is one, so the user
+        // sees their own uncommitted writes.
+        let parked = self.sessions.transaction(connection_id).await;
+        let mut owned;
+        let mut guard;
+        let conn: &mut sqlx::MySqlConnection = match parked {
+            Some(ref handle) => {
+                guard = handle.lock().await;
+                &mut guard
+            }
+            None => {
+                owned = pool.acquire().await.map_err(|error| error.to_string())?;
+                &mut owned
+            }
+        };
+
+        let session_id = query::connection_id(conn).await?;
+        self.sessions.mark_running(connection_id, session_id).await;
+        let outcome = query::execute_on(conn, sql, max_rows).await;
+        self.sessions.clear_running(connection_id).await;
+        outcome
+    }
+
+    async fn begin_transaction(&self, connection_id: &str) -> Result<(), String> {
+        if self.sessions.is_open(connection_id).await {
+            return Err("A transaction is already open on this connection.".into());
+        }
+        let pool = get_pool(&self.pools, connection_id).await?;
+        let mut conn = pool.acquire().await.map_err(|error| error.to_string())?;
+        sqlx::query("START TRANSACTION")
+            .execute(&mut *conn)
+            .await
+            .map_err(|error| error.to_string())?;
+        self.sessions.park(connection_id.to_string(), conn).await;
+        Ok(())
+    }
+
+    async fn end_transaction(&self, connection_id: &str, commit: bool) -> Result<(), String> {
+        let parked = self
+            .sessions
+            .take(connection_id)
+            .await
+            .ok_or_else(|| "No transaction is open on this connection.".to_string())?;
+        let mut conn = parked.lock().await;
+        sqlx::query(if commit { "COMMIT" } else { "ROLLBACK" })
+            .execute(&mut **conn)
+            .await
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    }
+
+    async fn transaction_open(&self, connection_id: &str) -> bool {
+        self.sessions.is_open(connection_id).await
+    }
+
+    async fn cancel_query(&self, connection_id: &str) -> Result<bool, String> {
+        let Some(session_id) = self.sessions.running_session(connection_id).await else {
+            return Ok(false);
+        };
+        let pool = get_pool(&self.pools, connection_id).await?;
+        query::kill_query(&pool, session_id).await
     }
 }
