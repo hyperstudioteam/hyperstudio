@@ -88,6 +88,9 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  writeExportChunk(path: string, contents: string, append: boolean) {
+    return invoke<void>("write_export_chunk", { path, contents, append });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },
