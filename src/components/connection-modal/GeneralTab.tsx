@@ -5,7 +5,9 @@ import {
   PasswordStorage,
   SslMode,
 } from "../../types/connection";
+import { useEffect, useState } from "react";
 import { cn } from "../../lib/cn";
+import { keychainAvailable } from "../../lib/keychain";
 import { CONNECTION_COLORS, SAFETY_OPTIONS } from "../../lib/connectionGuard";
 import { vaultExists, isVaultUnlocked } from "../../lib/vault";
 
@@ -49,6 +51,11 @@ export function GeneralTab({
   const savePassword = profile.passwordStorage !== "none";
   const vaultReady = vaultExists();
   const vaultOpen = isVaultUnlocked();
+  const [keychainReady, setKeychainReady] = useState(false);
+
+  useEffect(() => {
+    void keychainAvailable().then(setKeychainReady);
+  }, []);
   const active =
     drivers.find((driver) => driver.id === profile.driver) ?? null;
   const caps = active?.capabilities;
@@ -77,9 +84,11 @@ export function GeneralTab({
       ? vaultOpen
         ? "Stored in vault"
         : "Stored in vault (unlock to edit)"
-      : profile.passwordStorage === "raw"
-        ? "Stored as plain text"
-        : "Not stored on disk";
+      : profile.passwordStorage === "keychain"
+        ? "Stored in the OS credential store"
+        : profile.passwordStorage === "raw"
+          ? "Stored as plain text"
+          : "Not stored on disk";
 
   function fieldValue(key: string): string | number {
     switch (key) {
@@ -285,6 +294,7 @@ export function GeneralTab({
             passwordStorage={profile.passwordStorage}
             vaultReady={vaultReady}
             vaultOpen={vaultOpen}
+            keychainReady={keychainReady}
             onToggleSave={setSavePassword}
             onStorage={setStorage}
           />
@@ -348,6 +358,7 @@ export function GeneralTab({
               passwordStorage={profile.passwordStorage}
               vaultReady={vaultReady}
               vaultOpen={vaultOpen}
+              keychainReady={keychainReady}
               onToggleSave={setSavePassword}
               onStorage={setStorage}
             />
@@ -456,6 +467,7 @@ function PasswordStorageBlock({
   passwordStorage,
   vaultReady,
   vaultOpen,
+  keychainReady,
   onToggleSave,
   onStorage,
 }: {
@@ -463,6 +475,7 @@ function PasswordStorageBlock({
   passwordStorage: PasswordStorage;
   vaultReady: boolean;
   vaultOpen: boolean;
+  keychainReady: boolean;
   onToggleSave: (enabled: boolean) => void;
   onStorage: (mode: PasswordStorage) => void;
 }) {
@@ -502,6 +515,31 @@ function PasswordStorageBlock({
                     ? "Encrypted · vault unlocked"
                     : "Encrypted · unlock on save"
                   : "Encrypted · create a vault on save"}
+              </em>
+            </span>
+          </label>
+          <label
+            className={cn(
+              "flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer",
+              !keychainReady && "opacity-50 cursor-default",
+            )}
+          >
+            <input
+              type="radio"
+              name="password-storage"
+              className="w-3.5 h-3.5 m-0 shrink-0 accent-accent cursor-pointer"
+              checked={passwordStorage === "keychain"}
+              disabled={!keychainReady}
+              onChange={() => onStorage("keychain")}
+            />
+            <span className="flex flex-col gap-0.5">
+              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+                OS credential store
+              </strong>
+              <em className="text-[#6f7785] text-[10px] not-italic">
+                {keychainReady
+                  ? "Managed by the system keychain · no master password"
+                  : "Not available on this system"}
               </em>
             </span>
           </label>

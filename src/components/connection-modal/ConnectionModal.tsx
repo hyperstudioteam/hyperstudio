@@ -12,6 +12,11 @@ import {
   vaultExists,
 } from "../../lib/vault";
 import {
+  getKeychainSecret,
+  removeKeychainSecret,
+  setKeychainSecret,
+} from "../../lib/keychain";
+import {
   ConnectionProfile,
   DriverInfo,
 } from "../../types/connection";
@@ -83,6 +88,23 @@ export function ConnectionModal({
     }
   }, [initial.id, initial.password, initial.passwordStorage]);
 
+  // Prefill from the OS store so editing a profile does not blank the password.
+  useEffect(() => {
+    if (initial.passwordStorage !== "keychain" || initial.password) return;
+    let cancelled = false;
+    void getKeychainSecret(initial.id)
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        setProfile((current) =>
+          current.password ? current : { ...current, password: saved },
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [initial.id, initial.password, initial.passwordStorage]);
+
   const activeDriver = drivers.find((driver) => driver.id === profile.driver);
   const supportsSchemas = activeDriver?.capabilities.schemas ?? true;
 
@@ -136,9 +158,9 @@ export function ConnectionModal({
     });
   }
 
-  function profileForConnect(): ConnectionProfile {
+  async function profileForConnect(): Promise<ConnectionProfile> {
     try {
-      return withResolvedPassword(profile);
+      return await withResolvedPassword(profile);
     } catch {
       return profile;
     }
@@ -148,7 +170,7 @@ export function ConnectionModal({
     setTesting(true);
     setTestStatus("");
     try {
-      const ready = profileForConnect();
+      const ready = await profileForConnect();
       const info = await databaseApi.testConnection(ready);
       setTestStatus(`Connected to ${info.database}`);
       if (!supportsSchemas) return;
@@ -175,7 +197,7 @@ export function ConnectionModal({
     setLoadingSchemas(true);
     setTestStatus("");
     try {
-      const ready = profileForConnect();
+      const ready = await profileForConnect();
       await databaseApi.connect(ready);
       try {
         const listed = await databaseApi.listSchemas(profile.id);
@@ -199,9 +221,27 @@ export function ConnectionModal({
         throw new Error("Enter a password to store in the vault.");
       }
       await setVaultSecret(next.id, password);
+      await removeKeychainSecret(next.id).catch(() => undefined);
       return;
     }
 
+    if (next.passwordStorage === "keychain") {
+      const password =
+        next.password || (await getKeychainSecret(next.id)) || "";
+      if (!password) {
+        throw new Error(
+          "Enter a password to store in the OS credential store.",
+        );
+      }
+      await setKeychainSecret(next.id, password);
+      if (vaultExists() && isVaultUnlocked()) {
+        await removeVaultSecret(next.id);
+      }
+      return;
+    }
+
+    // Switching to raw or session-only leaves no managed copy behind.
+    await removeKeychainSecret(next.id).catch(() => undefined);
     if (vaultExists() && isVaultUnlocked()) {
       await removeVaultSecret(next.id);
     }

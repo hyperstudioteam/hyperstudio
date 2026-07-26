@@ -129,7 +129,7 @@ export function useDatabaseSession() {
 
   async function ensureLive(profile: ConnectionProfile) {
     if (liveId === profile.id) return;
-    const ready = withResolvedPassword(profile);
+    const ready = await withResolvedPassword(profile);
     const info = await databaseApi.connect(ready);
     setLiveId(profile.id);
     setActiveId(profile.id);

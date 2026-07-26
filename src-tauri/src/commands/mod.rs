@@ -1,3 +1,5 @@
+mod keychain;
+
 use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
@@ -12,6 +14,8 @@ use crate::plugins::{
     discover_and_register, install_from_path, list_installed, register_plugin_dir, uninstall,
     write_enabled,
 };
+
+pub use keychain::{keychain_available, keychain_delete, keychain_get, keychain_set};
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
