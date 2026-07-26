@@ -154,6 +154,20 @@ pub trait DatabaseDriver: Send + Sync {
     }
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String>;
+
+    /// Run every statement in one transaction, returning affected rows per
+    /// statement. Only offered by drivers whose capabilities set
+    /// `transactions`; callers fall back to statement-at-a-time execution.
+    async fn execute_batch(
+        &self,
+        _connection_id: &str,
+        _statements: &[String],
+    ) -> Result<Vec<u64>, String> {
+        Err(format!(
+            "Driver '{}' does not support transactions.",
+            self.id()
+        ))
+    }
 }
 
 pub struct DriverRegistry {
