@@ -217,9 +217,17 @@ const pendingRemovals = new Set<string>();
 
 export function queueVaultSecretRemoval(connectionId: string) {
   pendingRemovals.add(connectionId);
+  pendingRemovals.add(`${connectionId}:ssh`);
+  pendingRemovals.add(`${connectionId}:ssh-passphrase`);
   if (sessionKey) {
     void removeVaultSecret(connectionId).then(() => {
       pendingRemovals.delete(connectionId);
+    });
+    void removeVaultSecret(`${connectionId}:ssh`).then(() => {
+      pendingRemovals.delete(`${connectionId}:ssh`);
+    });
+    void removeVaultSecret(`${connectionId}:ssh-passphrase`).then(() => {
+      pendingRemovals.delete(`${connectionId}:ssh-passphrase`);
     });
   }
 }
