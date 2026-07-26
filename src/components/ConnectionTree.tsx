@@ -20,7 +20,7 @@ interface ConnectionTreeProps {
   nodes: TreeNode[];
   selection: Selection;
   expanded: Set<string>;
-  connectedId: string | null;
+  liveConnectionIds: ReadonlySet<string>;
   onSelect: (selection: Selection) => void;
   onToggle: (key: string) => void;
   onConnect: (id: string) => void;
@@ -93,7 +93,7 @@ export function ConnectionTree({
   nodes,
   selection,
   expanded,
-  connectedId,
+  liveConnectionIds,
   onSelect,
   onToggle,
   onConnect,
@@ -296,7 +296,7 @@ export function ConnectionTree({
           <span
             className={cn(
               "size-1.5 shrink-0 rounded-full",
-              connectedId === profile.id
+              liveConnectionIds.has(profile.id)
                 ? "bg-green shadow-[0_0_7px_rgba(73,201,137,0.4)]"
                 : "bg-[#4e5664]",
             )}

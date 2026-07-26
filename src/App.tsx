@@ -38,7 +38,7 @@ import { VaultSettingsModal } from "./components/connection-modal/VaultSettingsM
 import { ConnectionProfile, DriverInfo } from "./types/connection";
 import { ColumnNode, SchemaInfo } from "./types/schema";
 import { ImportCsvModal } from "./components/ImportCsvModal";
-import { collectFolderOptions } from "./lib/tree";
+import { collectConnections, collectFolderOptions } from "./lib/tree";
 import { databaseApi } from "./api/database";
 import { cacheDriverGroups } from "./lib/driverGroups";
 import { syncPluginColumnTypes } from "./plugins/init";
@@ -179,14 +179,15 @@ function App() {
 
   function executeWithVault(
     sql: string,
+    connectionId: string,
     confirmedWrite = false,
   ): Promise<import("./types/query").QueryResult> {
-    if (!tree.selected) {
+    const profile = tree.findConnection(connectionId);
+    if (!profile) {
       return Promise.reject(
         new Error("Select a connection before running a query."),
       );
     }
-    const profile = tree.selected;
     return new Promise((resolve, reject) => {
       const attempt = (confirmed = confirmedWrite) => {
         void session
@@ -219,13 +220,16 @@ function App() {
     });
   }
 
-  function executeBatchWithVault(statements: string[]): Promise<number[]> {
-    if (!tree.selected) {
+  function executeBatchWithVault(
+    connectionId: string,
+    statements: string[],
+  ): Promise<number[]> {
+    const profile = tree.findConnection(connectionId);
+    if (!profile) {
       return Promise.reject(
         new Error("Select a connection before committing changes."),
       );
     }
-    const profile = tree.selected;
     return new Promise((resolve, reject) => {
       const attempt = () => {
         void session
@@ -250,9 +254,13 @@ function App() {
   }
 
   /** Show the write gate for a whole batch and report the user's answer. */
-  function confirmWrites(preview: string): Promise<boolean> {
-    if (!tree.selected) return Promise.resolve(false);
-    const name = tree.selected.name || tree.selected.database;
+  function confirmWrites(
+    connectionId: string,
+    preview: string,
+  ): Promise<boolean> {
+    const profile = tree.findConnection(connectionId);
+    if (!profile) return Promise.resolve(false);
+    const name = profile.name || profile.database;
     return new Promise((resolve) => {
       setWriteGate({
         connectionName: name,
@@ -318,6 +326,7 @@ function App() {
           selection={tree.selection}
           expanded={tree.expanded}
           connectedId={session.connectedId}
+          liveConnectionIds={session.liveIds}
           selected={tree.selected}
           busy={session.busy}
           busyDetail={session.busyDetail}
@@ -385,6 +394,12 @@ function App() {
               nonce: Date.now(),
             });
           }}
+          onNewConsole={() => {
+            setOpenRequest({
+              kind: "console",
+              nonce: Date.now(),
+            });
+          }}
           onImportCsv={(schema, table, columns) =>
             setImportTarget({ schema, table, columns })
           }
@@ -400,49 +415,42 @@ function App() {
         />
         <QueryWorkspace
           selected={tree.selected}
+          connections={collectConnections(tree.tree)}
+          liveConnectionIds={session.liveIds}
           connectedId={session.connectedId}
           connectionInfo={session.connectionInfo}
           busy={session.busy}
           result={session.result}
           error={session.error}
           schemas={session.schemas}
-          maxRows={
-            drivers.find((driver) => driver.id === tree.selected?.driver)
-              ?.capabilities.maxRows
-          }
+          drivers={drivers}
           openRequest={openRequest}
-          sessions={
-            drivers.find((driver) => driver.id === tree.selected?.driver)
-              ?.capabilities.sessions ?? false
-          }
-          txnOpen={session.txnOpen}
-          onCancel={() => void session.cancelQuery()}
-          onBeginTransaction={() => {
-            if (!tree.selected) return;
-            void withVaultGate(() => session.beginTransaction(tree.selected!));
+          txnOpenById={session.txnOpenById}
+          onCancel={(connectionId) => void session.cancelQuery(connectionId)}
+          onBeginTransaction={(connectionId) => {
+            const profile = tree.findConnection(connectionId);
+            if (!profile) return;
+            void withVaultGate(() => session.beginTransaction(profile));
           }}
-          onEndTransaction={(commit) => {
-            if (!tree.selected) return;
+          onEndTransaction={(connectionId, commit) => {
+            const profile = tree.findConnection(connectionId);
+            if (!profile) return;
             void session
-              .endTransaction(tree.selected, commit)
+              .endTransaction(profile, commit)
               .catch((error) => session.setError(errorMessage(error)));
           }}
-          onRun={(sql) => {
-            if (!tree.selected) {
+          onRun={(sql, connectionId) => {
+            const profile = tree.findConnection(connectionId);
+            if (!profile) {
               session.setError("Select a connection before running a query.");
               return;
             }
-            runQueryGuarded(tree.selected, sql);
+            runQueryGuarded(profile, sql);
           }}
-          onExecute={(sql, confirmedWrite) =>
-            executeWithVault(sql, confirmedWrite)
+          onExecute={(sql, connectionId, confirmedWrite) =>
+            executeWithVault(sql, connectionId, confirmedWrite)
           }
-          onExecuteBatch={
-            drivers.find((driver) => driver.id === tree.selected?.driver)
-              ?.capabilities.transactions
-              ? executeBatchWithVault
-              : undefined
-          }
+          onExecuteBatch={executeBatchWithVault}
           onConfirmWrites={confirmWrites}
           onLoadEr={(schema) => {
             if (!tree.selected) {
@@ -562,7 +570,7 @@ function App() {
           schema={importTarget.schema}
           table={importTarget.table}
           columns={importTarget.columns}
-          execute={executeWithVault}
+          execute={(sql) => executeWithVault(sql, tree.selected!.id)}
           onImported={() => {
             setOpenRequest({
               kind: "view",

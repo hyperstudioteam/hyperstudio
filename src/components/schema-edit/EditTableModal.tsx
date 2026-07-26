@@ -61,6 +61,8 @@ interface EditTableModalProps {
   driver: ConnectionProfile["driver"];
   initialSection?: Section;
   initialName?: string;
+  /** Open with a blank draft already added in `initialSection`. */
+  addNew?: boolean;
   busy?: boolean;
   error?: string | null;
   onSave: (request: AlterTableRequest) => void;
@@ -230,6 +232,7 @@ export function EditTableModal({
   driver,
   initialSection = "columns",
   initialName,
+  addNew = false,
   busy,
   error,
   onSave,
@@ -237,17 +240,27 @@ export function EditTableModal({
 }: EditTableModalProps) {
   const isMysql = driver === "mysql";
   const [tableName, setTableName] = useState(table);
-  const [columnDrafts, setColumnDrafts] = useState<DraftColumn[]>(() =>
-    columns.map((column) => columnToDraft(column, nextId("column"))),
-  );
+  const [columnDrafts, setColumnDrafts] = useState<DraftColumn[]>(() => {
+    const drafts = columns.map((column) =>
+      columnToDraft(column, nextId("column")),
+    );
+    if (addNew && initialSection === "columns") {
+      drafts.push(blankDraftColumn(nextId("column")));
+    }
+    return drafts;
+  });
   const [originalKeys, setOriginalKeys] = useState<DraftKey[]>([]);
   const [keyDrafts, setKeyDrafts] = useState<DraftKey[]>([]);
   const [originalIndexes, setOriginalIndexes] = useState<DraftIndex[]>([]);
   const [indexDrafts, setIndexDrafts] = useState<DraftIndex[]>([]);
   const [selection, setSelection] = useState<Selection | null>(() => {
-    const column = initialSection === "columns"
-      ? columnDrafts.find((item) => item.name === initialName) ?? columnDrafts[0]
-      : null;
+    if (initialSection !== "columns") return null;
+    if (addNew) {
+      const draft = columnDrafts[columnDrafts.length - 1];
+      return draft ? { section: "columns", id: draft.id } : null;
+    }
+    const column =
+      columnDrafts.find((item) => item.name === initialName) ?? columnDrafts[0];
     return column ? { section: "columns", id: column.id } : null;
   });
   const [metadataLoading, setMetadataLoading] = useState(true);
@@ -270,16 +283,46 @@ export function EditTableModal({
           .filter((index) => !keyNames.has(index.name))
           .map(indexDraft);
         setOriginalKeys(nextKeys.map((item) => ({ ...item, columns: [...item.columns] })));
-        setKeyDrafts(nextKeys);
         setOriginalIndexes(
           nextIndexes.map((item) => ({ ...item, columns: [...item.columns] })),
         );
-        setIndexDrafts(nextIndexes);
+
         if (initialSection === "keys") {
+          if (addNew) {
+            const draft: DraftKey = {
+              id: nextId("key"),
+              originalName: null,
+              name: "new_key",
+              kind: "UNIQUE",
+              columns: [],
+            };
+            setKeyDrafts([...nextKeys, draft]);
+            setIndexDrafts(nextIndexes);
+            setSelection({ section: "keys", id: draft.id });
+            return;
+          }
+          setKeyDrafts(nextKeys);
+          setIndexDrafts(nextIndexes);
           const item =
             nextKeys.find((key) => key.name === initialName) ?? nextKeys[0];
           setSelection({ section: "keys", id: item?.id ?? "" });
         } else if (initialSection === "indexes") {
+          if (addNew) {
+            const draft: DraftIndex = {
+              id: nextId("index"),
+              originalName: null,
+              name: "new_index",
+              unique: false,
+              method: isMysql ? "BTREE" : "btree",
+              columns: [],
+            };
+            setKeyDrafts(nextKeys);
+            setIndexDrafts([...nextIndexes, draft]);
+            setSelection({ section: "indexes", id: draft.id });
+            return;
+          }
+          setKeyDrafts(nextKeys);
+          setIndexDrafts(nextIndexes);
           const constraintIndex = nextKeys.find(
             (key) => key.name === initialName,
           );
@@ -291,6 +334,9 @@ export function EditTableModal({
             nextIndexes.find((index) => index.name === initialName) ??
             nextIndexes[0];
           setSelection({ section: "indexes", id: item?.id ?? "" });
+        } else {
+          setKeyDrafts(nextKeys);
+          setIndexDrafts(nextIndexes);
         }
       })
       .catch((loadError) => {
@@ -306,7 +352,7 @@ export function EditTableModal({
     return () => {
       cancelled = true;
     };
-  }, [connectionId, initialName, initialSection, schema, table]);
+  }, [addNew, connectionId, initialName, initialSection, isMysql, schema, table]);
 
   const selectedColumn =
     selection?.section === "columns"
