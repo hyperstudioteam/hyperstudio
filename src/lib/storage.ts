@@ -4,13 +4,21 @@ import {
   PasswordStorage,
   TreeNode,
 } from "../types/connection";
+import { removeKeychainSecret } from "./keychain";
 import { queueVaultSecretRemoval } from "./vault";
 
 const STORAGE_KEY = "hyperstudio.connections.v2";
 const LEGACY_STORAGE_KEY = "hyperstudio.connections.v1";
 
 function normalizeStorage(value: unknown): PasswordStorage {
-  if (value === "raw" || value === "vault" || value === "none") return value;
+  if (
+    value === "raw" ||
+    value === "vault" ||
+    value === "keychain" ||
+    value === "none"
+  ) {
+    return value;
+  }
   return "none";
 }
 
@@ -106,6 +114,9 @@ export function saveTree(nodes: TreeNode[]) {
 
 export function onConnectionDeleted(connectionId: string) {
   queueVaultSecretRemoval(connectionId);
+  // Best effort: a locked or unavailable credential store must not block
+  // deleting the profile itself.
+  void removeKeychainSecret(connectionId).catch(() => undefined);
 }
 
 export function mapTreeProfiles(

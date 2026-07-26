@@ -6,8 +6,9 @@ mod plugins;
 
 use commands::{
     alter_column, alter_key, alter_table, connect, disconnect, execute_query, install_plugin,
-    list_drivers, list_object_groups, list_object_subgroup, list_objects, list_plugins,
-    list_schema, list_schemas, list_tables, reload_plugins, set_plugin_enabled, test_connection,
+    keychain_available, keychain_delete, keychain_get, keychain_set, list_drivers,
+    list_object_groups, list_object_subgroup, list_objects, list_plugins, list_schema,
+    list_schemas, list_tables, reload_plugins, set_plugin_enabled, test_connection,
     uninstall_plugin,
 };
 use db::AppState;
@@ -52,6 +53,10 @@ pub fn run() {
             list_objects,
             list_object_subgroup,
             execute_query,
+            keychain_available,
+            keychain_get,
+            keychain_set,
+            keychain_delete,
             alter_table,
             alter_column,
             alter_key,

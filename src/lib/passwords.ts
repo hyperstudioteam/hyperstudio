@@ -1,4 +1,5 @@
 import { ConnectionProfile } from "../types/connection";
+import { getKeychainSecret } from "./keychain";
 import {
   getVaultSecret,
   isVaultUnlocked,
@@ -39,8 +40,26 @@ export function resolvePassword(profile: ConnectionProfile): string {
   );
 }
 
-export function withResolvedPassword(
+/**
+ * Same as `resolvePassword`, but able to reach the OS credential store, which
+ * is only readable across the async command bridge.
+ */
+export async function resolvePasswordAsync(
   profile: ConnectionProfile,
-): ConnectionProfile {
-  return { ...profile, password: resolvePassword(profile) };
+): Promise<string> {
+  if (profile.passwordStorage !== "keychain") {
+    return resolvePassword(profile);
+  }
+  const stored = await getKeychainSecret(profile.id);
+  if (stored) return stored;
+  if (profile.password) return profile.password;
+  throw new Error(
+    "No password found in the OS credential store for this connection. Open settings and save it again.",
+  );
+}
+
+export async function withResolvedPassword(
+  profile: ConnectionProfile,
+): Promise<ConnectionProfile> {
+  return { ...profile, password: await resolvePasswordAsync(profile) };
 }

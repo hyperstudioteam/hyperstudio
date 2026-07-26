@@ -5,7 +5,7 @@ export type Driver = string;
 export type SslMode = "prefer" | "require" | "disable";
 
 /** How the DB password is persisted. */
-export type PasswordStorage = "none" | "raw" | "vault";
+export type PasswordStorage = "none" | "raw" | "vault" | "keychain";
 
 export interface DriverCapabilities {
   schemas: boolean;
@@ -75,7 +75,10 @@ export interface ConnectionProfile {
   database: string;
   username: string;
   password: string;
-  /** none = session only; raw = plaintext on disk; vault = encrypted. */
+  /**
+   * none = session only; raw = plaintext on disk; vault = encrypted;
+   * keychain = held by the OS credential store.
+   */
   passwordStorage: PasswordStorage;
   sslMode: SslMode;
   /** When true, introspect every accessible schema. */
