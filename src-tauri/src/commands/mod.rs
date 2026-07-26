@@ -133,6 +133,42 @@ pub async fn execute_query(
     driver.execute_query(&connection_id, &sql).await
 }
 
+/// Append a formatted chunk of an export to disk.
+///
+/// Exports are streamed batch by batch so a large result set never has to be
+/// held in memory as one string. `append` is false for the first chunk, which
+/// truncates any existing file.
+#[tauri::command]
+pub async fn write_export_chunk(
+    path: String,
+    contents: String,
+    append: bool,
+) -> Result<(), String> {
+    use std::fs::OpenOptions;
+    use std::io::Write;
+
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(append)
+        .truncate(!append)
+        .open(&path)
+        .map_err(|error| format!("Cannot open {path}: {error}"))?;
+    file.write_all(contents.as_bytes())
+        .map_err(|error| format!("Cannot write {path}: {error}"))
+}
+
+#[tauri::command]
+pub async fn table_ddl(
+    connection_id: String,
+    schema: String,
+    table: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.table_ddl(&connection_id, &schema, &table).await
+}
+
 #[tauri::command]
 pub async fn alter_table(
     connection_id: String,
