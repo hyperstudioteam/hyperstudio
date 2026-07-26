@@ -14,8 +14,8 @@ mod client;
 mod query;
 
 use client::{
-    TypesenseClient, TypesenseConfig, alias_to_object, collection_to_object, collection_to_table,
-    key_to_object, schema_name, synonym_to_object,
+    TypesenseClient, TypesenseConfig, alias_to_object, collection_subgroup, collection_to_object,
+    collection_to_table, key_to_object, schema_name, synonym_to_object,
 };
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
@@ -160,6 +160,25 @@ fn dispatch(
                 )),
                 other => Err(format!("Unknown object group '{other}'.")),
             }
+        }
+        "get_object_subgroup" => {
+            let object = params
+                .get("object")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            let subgroup = params
+                .get("subgroup")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+            if object.is_empty() {
+                return Err("object is required for get_object_subgroup.".into());
+            }
+            let guard = state.lock().map_err(|e| e.to_string())?;
+            let client = guard.client()?;
+            let collection = client.get_collection(object)?;
+            Ok(Value::Array(collection_subgroup(&collection, subgroup)?))
         }
         "get_columns" => {
             let table = params

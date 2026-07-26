@@ -26,6 +26,7 @@ interface ConnectionSidebarProps {
   busy: "connect" | "query" | "schema" | null;
   busyDetail: Parameters<typeof SchemaBrowser>[0]["busyDetail"];
   schemas: Parameters<typeof SchemaBrowser>[0]["schemas"];
+  objectSubgroups: Parameters<typeof SchemaBrowser>[0]["objectSubgroups"];
   schemaExpanded: Set<string>;
   hasSchemaCache: boolean;
   onSelect: (selection: Selection) => void;
@@ -147,6 +148,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
           busy={props.busy}
           busyDetail={props.busyDetail}
           schemas={props.schemas}
+          objectSubgroups={props.objectSubgroups}
           expanded={props.schemaExpanded}
           onConnect={() => props.onConnect(props.selected!)}
           onRefreshDatabase={() => props.onRefreshDatabase(props.selected!)}

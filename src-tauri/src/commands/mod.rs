@@ -109,6 +109,20 @@ pub async fn list_objects(
 }
 
 #[tauri::command]
+pub async fn list_object_subgroup(
+    connection_id: String,
+    schema: String,
+    object: String,
+    subgroup: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ObjectNode>, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver
+        .list_object_subgroup(&connection_id, &schema, &object, &subgroup)
+        .await
+}
+
+#[tauri::command]
 pub async fn execute_query(
     connection_id: String,
     sql: String,

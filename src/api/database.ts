@@ -69,6 +69,19 @@ export const databaseApi = {
       group,
     });
   },
+  listObjectSubgroup(
+    connectionId: string,
+    schema: string,
+    object: string,
+    subgroup: string,
+  ) {
+    return invoke<ObjectNode[]>("list_object_subgroup", {
+      connectionId,
+      schema,
+      object,
+      subgroup,
+    });
+  },
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },

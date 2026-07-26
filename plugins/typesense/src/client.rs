@@ -83,6 +83,18 @@ pub struct FieldDef {
     pub field_type: String,
     #[serde(default)]
     pub optional: bool,
+    #[serde(default = "default_true")]
+    pub index: bool,
+    #[serde(default)]
+    pub facet: bool,
+    #[serde(default)]
+    pub sort: bool,
+    #[serde(default)]
+    pub infix: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 pub struct TypesenseClient {
@@ -363,6 +375,49 @@ pub fn collection_to_object(collection: &CollectionSummary) -> Value {
         "children": table.get("columns").cloned().unwrap_or(json!([])),
         "actions": ["viewData", "editData"],
     })
+}
+
+/// Tree entries for one folder under a collection (`facets`, `indexes`, …).
+pub fn collection_subgroup(collection: &CollectionSummary, subgroup: &str) -> Result<Vec<Value>, String> {
+    match subgroup {
+        "facets" => Ok(collection
+            .fields
+            .iter()
+            .filter(|field| field.facet)
+            .map(|field| {
+                json!({
+                    "name": field.name,
+                    "kind": "FACET",
+                    "detail": field.field_type,
+                    "children": [],
+                })
+            })
+            .collect()),
+        "indexes" => Ok(collection
+            .fields
+            .iter()
+            .filter(|field| field.index || field.sort || field.infix)
+            .map(|field| {
+                let mut flags = Vec::new();
+                if field.index {
+                    flags.push("index");
+                }
+                if field.sort {
+                    flags.push("sort");
+                }
+                if field.infix {
+                    flags.push("infix");
+                }
+                json!({
+                    "name": field.name,
+                    "kind": "INDEX",
+                    "detail": format!("{} · {}", field.field_type, flags.join(" · ")),
+                    "children": [],
+                })
+            })
+            .collect()),
+        other => Err(format!("Unknown object subgroup '{other}'.")),
+    }
 }
 
 pub fn alias_to_object(alias: &Value) -> Option<Value> {

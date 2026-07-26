@@ -141,6 +141,12 @@ button.tree-row:hover { background: var(--panel-soft); color: var(--text); }
 .tree-spacer { width: 13px; flex: 0 0 13px; }
 .column-row { padding-left: 64px; color: #818a99; }
 .column-row em { max-width: 74px; overflow: hidden; text-overflow: ellipsis; }
+.object-subgroup-row { padding-left: 54px; color: #9aa3b2; }
+.object-subgroup-row svg:nth-child(2) { color: #4c91f2; }
+.object-subgroup-row em { margin-left: auto; color: #6f7784; font-style: normal; }
+.metadata-row { padding-left: 80px; color: #818a99; }
+.metadata-row span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.metadata-row em { margin-left: auto; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .connect-prompt { margin: 7px; padding: 7px 10px; width: calc(100% - 14px); display: flex; justify-content: center; align-items: center; gap: 6px; border: 1px solid var(--border-bright); border-radius: 6px; background: var(--panel-soft); color: #bac1cc; font-size: 11px; cursor: pointer; }
 .connect-prompt:hover { border-color: var(--accent); color: #fff; }
 .tree-empty { padding: 12px; text-align: center; color: var(--subtle); font-size: 11px; }

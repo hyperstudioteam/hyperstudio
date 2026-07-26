@@ -16,6 +16,12 @@ export interface TableNode {
   columns: ColumnNode[];
 }
 
+export interface ObjectSubgroupDef {
+  id: string;
+  label: string;
+  icon?: string | null;
+}
+
 /**
  * A category of objects a driver exposes under a schema. Drivers declare
  * their own set, so the tree can show routines and triggers for MySQL or
@@ -29,6 +35,8 @@ export interface ObjectGroupDef {
   childLabel?: string | null;
   actions: string[];
   defaultOpen: boolean;
+  /** Lazily loaded folders beneath each object in this group. */
+  objectSubgroups?: ObjectSubgroupDef[];
 }
 
 export interface ObjectNode {

@@ -268,6 +268,28 @@ impl DatabaseDriver for PluginDriver {
         }
     }
 
+    async fn list_object_subgroup(
+        &self,
+        connection_id: &str,
+        schema: &str,
+        object: &str,
+        subgroup: &str,
+    ) -> Result<Vec<ObjectNode>, String> {
+        let process = self.session(connection_id).await?;
+        let value = process
+            .call(
+                "get_object_subgroup",
+                json!({
+                    "connectionId": connection_id,
+                    "schema": schema,
+                    "object": object,
+                    "subgroup": subgroup,
+                }),
+            )
+            .await?;
+        parse_objects(value)
+    }
+
     async fn execute_query(
         &self,
         connection_id: &str,

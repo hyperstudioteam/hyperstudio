@@ -7,7 +7,7 @@ use crate::models::{ObjectGroupDef, ObjectNode};
 
 pub fn groups() -> Vec<ObjectGroupDef> {
     vec![
-        ObjectGroupDef::tables(),
+        ObjectGroupDef::database_tables(),
         group("views", "Views", "eye", Some("Columns"), &["viewData"]),
         group("routines", "Routines", "function", Some("Parameters"), &[]),
         group("triggers", "Triggers", "zap", None, &[]),

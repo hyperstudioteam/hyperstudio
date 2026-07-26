@@ -6,8 +6,8 @@ mod plugins;
 
 use commands::{
     connect, disconnect, execute_query, install_plugin, list_drivers, list_object_groups,
-    list_objects, list_plugins, list_schema, list_schemas, list_tables, reload_plugins,
-    set_plugin_enabled, test_connection, uninstall_plugin,
+    list_object_subgroup, list_objects, list_plugins, list_schema, list_schemas, list_tables,
+    reload_plugins, set_plugin_enabled, test_connection, uninstall_plugin,
 };
 use db::AppState;
 use plugins::discover_and_register;
@@ -49,6 +49,7 @@ pub fn run() {
             list_tables,
             list_object_groups,
             list_objects,
+            list_object_subgroup,
             execute_query,
             list_plugins,
             install_plugin,

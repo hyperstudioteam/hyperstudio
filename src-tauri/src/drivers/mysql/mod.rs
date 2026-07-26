@@ -2,6 +2,7 @@ mod objects;
 mod pool;
 mod query;
 mod schema;
+mod table_metadata;
 mod values;
 
 use std::collections::HashMap;
@@ -138,6 +139,17 @@ impl DatabaseDriver for NativeMySql {
             "views" => schema::list_tables_of_kind(&pool, schema, true).await,
             other => objects::list(&pool, schema, other).await,
         }
+    }
+
+    async fn list_object_subgroup(
+        &self,
+        connection_id: &str,
+        schema: &str,
+        object: &str,
+        subgroup: &str,
+    ) -> Result<Vec<ObjectNode>, String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        table_metadata::list(&pool, schema, object, subgroup).await
     }
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String> {

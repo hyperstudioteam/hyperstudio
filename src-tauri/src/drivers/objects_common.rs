@@ -21,6 +21,7 @@ pub fn group(
         child_label: child_label.map(Into::into),
         actions: actions.iter().map(|action| (*action).into()).collect(),
         default_open: false,
+        object_subgroups: Vec::new(),
     }
 }
 
@@ -87,11 +88,7 @@ where
     Some(ObjectNode {
         name,
         kind: "TRIGGER".into(),
-        detail: Some(
-            format!("{timing} {events} on {table}")
-                .trim()
-                .to_string(),
-        ),
+        detail: Some(format!("{timing} {events} on {table}").trim().to_string()),
         children: Vec::new(),
         actions: None,
     })

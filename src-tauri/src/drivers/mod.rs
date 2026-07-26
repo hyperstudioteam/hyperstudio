@@ -12,8 +12,9 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::models::{
-    ColumnTypeDeclaration, ConnectionConfig, ConnectionFieldDef, ConnectionInfo, DriverCapabilities,
-    DriverInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
+    ColumnTypeDeclaration, ConnectionConfig, ConnectionFieldDef, ConnectionInfo,
+    DriverCapabilities, DriverInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo,
+    SchemaNode, TableNode,
 };
 
 pub use mysql::NativeMySql;
@@ -96,11 +97,20 @@ pub trait DatabaseDriver: Send + Sync {
             .collect())
     }
 
-    async fn execute_query(
+    async fn list_object_subgroup(
         &self,
-        connection_id: &str,
-        sql: &str,
-    ) -> Result<QueryResult, String>;
+        _connection_id: &str,
+        _schema: &str,
+        _object: &str,
+        subgroup: &str,
+    ) -> Result<Vec<ObjectNode>, String> {
+        Err(format!(
+            "Driver '{}' has no object subgroup '{subgroup}'.",
+            self.id()
+        ))
+    }
+
+    async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String>;
 }
 
 pub struct DriverRegistry {

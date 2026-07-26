@@ -183,6 +183,7 @@ function App() {
           busy={session.busy}
           busyDetail={session.busyDetail}
           schemas={session.schemas}
+          objectSubgroups={session.objectSubgroups}
           schemaExpanded={session.schemaExpanded}
           hasSchemaCache={hasSchemaCacheUi}
           onSelect={tree.setSelection}

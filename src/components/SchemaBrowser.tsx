@@ -9,6 +9,8 @@ import {
   Hash,
   KeyRound,
   Layers,
+  Link,
+  ListTree,
   LoaderCircle,
   MoreHorizontal,
   Plug,
@@ -18,7 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { objectGroupsFor } from "../lib/driverGroups";
-import { treeKeys } from "../hooks/useDatabaseSession";
+import { treeKeys, type SessionBusy } from "../hooks/useDatabaseSession";
 import { ConnectionProfile } from "../types/connection";
 import {
   ObjectGroupDef,
@@ -28,12 +30,7 @@ import {
 } from "../types/schema";
 import { ContextMenu } from "./ContextMenu";
 
-type BusyDetail =
-  | { kind: "connect" }
-  | { kind: "query" }
-  | { kind: "schemas" }
-  | { kind: "objects"; schema: string; group: string }
-  | null;
+type BusyDetail = SessionBusy;
 
 type BrowserMenu =
   | { kind: "database"; x: number; y: number }
@@ -55,6 +52,7 @@ interface SchemaBrowserProps {
   busy: "connect" | "query" | "schema" | null;
   busyDetail: BusyDetail;
   schemas: SchemaNode[];
+  objectSubgroups: Record<string, ObjectNode[]>;
   expanded: Set<string>;
   onConnect: () => void;
   onRefreshDatabase: () => void;
@@ -75,6 +73,9 @@ const ICON_MAP: Record<string, ComponentType<{ size?: number }>> = {
   clock: Clock,
   layers: Layers,
   key: KeyRound,
+  columns: Columns3,
+  link: Link,
+  list: ListTree,
 };
 
 function GroupIcon({ name, size = 14 }: { name?: string | null; size?: number }) {
@@ -93,6 +94,7 @@ export function SchemaBrowser({
   busy,
   busyDetail,
   schemas,
+  objectSubgroups,
   expanded,
   onConnect,
   onRefreshDatabase,
@@ -250,6 +252,8 @@ export function SchemaBrowser({
                       schema={schema}
                       group={group}
                       expanded={expanded}
+                      objectSubgroups={objectSubgroups}
+                      busyDetail={busyDetail}
                       busy={busy}
                       refreshing={
                         refreshingObjects?.schema === schema.name &&
@@ -348,6 +352,8 @@ interface ObjectGroupBranchProps {
   schema: SchemaNode;
   group: ObjectGroupDef;
   expanded: Set<string>;
+  objectSubgroups: Record<string, ObjectNode[]>;
+  busyDetail: BusyDetail;
   busy: "connect" | "query" | "schema" | null;
   refreshing: boolean;
   onToggle: (key: string) => void;
@@ -361,6 +367,8 @@ function ObjectGroupBranch({
   schema,
   group,
   expanded,
+  objectSubgroups,
+  busyDetail,
   busy,
   refreshing,
   onToggle,
@@ -423,7 +431,9 @@ function ObjectGroupBranch({
         objects?.map((object) => {
           const objectKey = treeKeys.object(schema.name, group.id, object.name);
           const objectOpen = expanded.has(objectKey);
-          const hasChildren = object.children.length > 0;
+          const subgroupDefs = group.objectSubgroups ?? [];
+          const hasChildren =
+            subgroupDefs.length > 0 || object.children.length > 0;
           return (
             <div key={objectKey}>
               <button
@@ -463,16 +473,92 @@ function ObjectGroupBranch({
                 {object.detail && <em>{object.detail}</em>}
               </button>
               {objectOpen &&
-                object.children.map((child) => (
-                  <div
-                    className="tree-row column-row"
-                    key={`${objectKey}.${child.name}`}
-                  >
-                    <Columns3 size={12} />
-                    <span>{child.name}</span>
-                    <em>{child.dataType}</em>
-                  </div>
-                ))}
+                (subgroupDefs.length > 0
+                  ? subgroupDefs.map((subgroup) => {
+                      const subgroupKey = treeKeys.subgroup(
+                        schema.name,
+                        group.id,
+                        object.name,
+                        subgroup.id,
+                      );
+                      const subgroupOpen = expanded.has(subgroupKey);
+                      const isColumns = subgroup.id === "columns";
+                      const loaded =
+                        isColumns ||
+                        Object.prototype.hasOwnProperty.call(
+                          objectSubgroups,
+                          subgroupKey,
+                        );
+                      const items = objectSubgroups[subgroupKey] ?? [];
+                      const count = isColumns
+                        ? object.children.length
+                        : loaded
+                          ? items.length
+                          : null;
+                      const loading =
+                        busyDetail?.kind === "subgroup" &&
+                        busyDetail.schema === schema.name &&
+                        busyDetail.object === object.name &&
+                        busyDetail.subgroup === subgroup.id;
+                      return (
+                        <div key={subgroupKey}>
+                          <button
+                            type="button"
+                            className="tree-row object-subgroup-row"
+                            onClick={() => onToggle(subgroupKey)}
+                          >
+                            {subgroupOpen ? (
+                              <ChevronDown size={13} />
+                            ) : (
+                              <ChevronRight size={13} />
+                            )}
+                            <GroupIcon name={subgroup.icon} size={13} />
+                            <span>{subgroup.label}</span>
+                            <em>{loading ? "…" : count ?? ""}</em>
+                          </button>
+                          {subgroupOpen &&
+                            (loading && !loaded ? (
+                              <div className="tree-row metadata-row loading-row">
+                                <LoaderCircle className="spin" size={12} />
+                                <span>Loading…</span>
+                              </div>
+                            ) : isColumns ? (
+                              object.children.map((child) => (
+                                <div
+                                  className="tree-row metadata-row"
+                                  key={`${subgroupKey}.${child.name}`}
+                                >
+                                  <Columns3 size={12} />
+                                  <span>{child.name}</span>
+                                  <em>{child.dataType}</em>
+                                </div>
+                              ))
+                            ) : (
+                              items.map((item) => (
+                                <div
+                                  className="tree-row metadata-row"
+                                  key={`${subgroupKey}.${item.name}`}
+                                  title={item.detail ?? undefined}
+                                >
+                                  <GroupIcon name={subgroup.icon} size={12} />
+                                  <span>{item.name}</span>
+                                  <em>{item.detail || item.kind}</em>
+                                </div>
+                              ))
+                            ))}
+                        </div>
+                      );
+                    })
+                  : object.children.map((child) => (
+                      <div
+                        className="tree-row column-row"
+                        key={`${objectKey}.${child.name}`}
+                      >
+                        <Columns3 size={12} />
+                        <span>{child.name}</span>
+                        <em>{child.dataType}</em>
+                      </div>
+                    )))}
             </div>
           );
         })}

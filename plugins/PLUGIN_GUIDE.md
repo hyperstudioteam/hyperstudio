@@ -105,6 +105,7 @@ One JSON object per line.
 | `get_schemas` | yes* | `[{ "name", "isSystem"? }]` or `["public"]` |
 | `get_tables` | yes* | `[{ "name", "kind"?, "columns"? }]` — kept for backwards compatibility |
 | `get_objects` | recommended | `[{ "name", "kind"?, "detail"?, "children"?, "actions"? }]` for one group |
+| `get_object_subgroup` | no | `[{ "name", "kind"?, "detail"?, "children"? }]` for one folder under an object |
 | `get_columns` | no | `[{ "name", "dataType", "nullable", "primaryKey" }]` |
 | `get_schema_tree` | no | `[{ "name", "tables": […] }]` bulk alternative |
 | `execute_query` | yes | `{ "columns", "rows", "affectedRows"?, "truncated"? }` |
@@ -212,10 +213,11 @@ Triggers / Events; Typesense shows Collections / Aliases / Synonyms / API Keys.
 | --- | --- |
 | `id` | Stable key passed to `get_objects` as `group`. Use `tables` for anything that should support Edit/View Data. |
 | `label` | Heading shown in the tree. |
-| `icon` | Lucide icon name: `table`, `eye`, `function`, `zap`, `hash`, `clock`, `layers`, `key`. |
+| `icon` | Lucide icon name: `table`, `eye`, `function`, `zap`, `hash`, `clock`, `layers`, `key`, `columns`, `link`, `list`. |
 | `childLabel` | Optional heading for an object's children (Columns, Parameters, Fields). |
 | `actions` | Context-menu actions: `viewData`, `editData`. |
 | `defaultOpen` | Auto-expand + load this group when the schema is opened. |
+| `objectSubgroups` | Optional folders under each object (Columns / Keys / Indexes / …). |
 
 Then implement `get_objects`:
 
@@ -229,6 +231,51 @@ Then implement `get_objects`:
 Objects may include `children` (columns / parameters / fields) and optionally
 override `actions` per object. Empty `objectGroups` falls back to a single
 Tables group backed by `get_tables`.
+
+### Object subgroups (folders under a table / collection)
+
+Native SQL drivers show Columns / Keys / Foreign Keys / Indexes under each
+table. Plugins opt in the same way — declare folders on a group, then answer
+lazy loads:
+
+```json
+{
+  "id": "tables",
+  "label": "Collections",
+  "icon": "layers",
+  "actions": ["viewData", "editData"],
+  "defaultOpen": true,
+  "objectSubgroups": [
+    { "id": "columns", "label": "Fields", "icon": "columns" },
+    { "id": "facets", "label": "Facets", "icon": "hash" },
+    { "id": "indexes", "label": "Indexed", "icon": "list" }
+  ]
+}
+```
+
+| Subgroup `id` | Load behavior |
+| --- | --- |
+| `columns` | Uses eager `children` / `columns` from `get_objects` (no extra RPC). |
+| any other id | Calls `get_object_subgroup` when the folder is expanded. |
+
+```json
+→ {
+  "method": "get_object_subgroup",
+  "params": {
+    "connectionId": "…",
+    "schema": "typesense",
+    "object": "products",
+    "subgroup": "indexes"
+  }
+}
+← [
+  { "name": "title", "kind": "INDEX", "detail": "string · infix", "children": [] },
+  { "name": "price", "kind": "INDEX", "detail": "float · sort", "children": [] }
+]
+```
+
+Keep `children` on the parent object as the canonical field/column list for
+autocomplete and Edit Data. Subgroups are tree-only metadata.
 
 ### Connection fields (declarative form)
 

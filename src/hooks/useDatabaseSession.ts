@@ -19,13 +19,19 @@ import {
 import { objectGroupsFor } from "../lib/driverGroups";
 import { ConnectionProfile } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
-import { SchemaInfo, SchemaNode } from "../types/schema";
+import { ObjectNode, SchemaInfo, SchemaNode } from "../types/schema";
 
 export type SessionBusy =
   | { kind: "connect" }
   | { kind: "query" }
   | { kind: "schemas" }
   | { kind: "objects"; schema: string; group: string }
+  | {
+      kind: "subgroup";
+      schema: string;
+      object: string;
+      subgroup: string;
+    }
   | null;
 
 /** Tree keys are stable strings so expansion state survives re-renders. */
@@ -34,12 +40,28 @@ export const treeKeys = {
   group: (schema: string, group: string) => `group:${schema}\u0000${group}`,
   object: (schema: string, group: string, name: string) =>
     `object:${schema}\u0000${group}\u0000${name}`,
+  subgroup: (
+    schema: string,
+    group: string,
+    object: string,
+    subgroup: string,
+  ) => `subgroup:${schema}\u0000${group}\u0000${object}\u0000${subgroup}`,
 };
 
 function parseGroupKey(key: string): { schema: string; group: string } | null {
   if (!key.startsWith("group:")) return null;
   const [schema, group] = key.slice("group:".length).split("\u0000");
   return schema && group ? { schema, group } : null;
+}
+
+function parseSubgroupKey(key: string) {
+  if (!key.startsWith("subgroup:")) return null;
+  const [schema, group, object, subgroup] = key
+    .slice("subgroup:".length)
+    .split("\u0000");
+  return schema && group && object && subgroup
+    ? { schema, group, object, subgroup }
+    : null;
 }
 
 export function useDatabaseSession() {
@@ -56,6 +78,9 @@ export function useDatabaseSession() {
   const [schemas, setSchemas] = useState<SchemaNode[]>([]);
   const [availableSchemas, setAvailableSchemas] = useState<SchemaInfo[]>([]);
   const [schemaExpanded, setSchemaExpanded] = useState<Set<string>>(new Set());
+  const [objectSubgroups, setObjectSubgroups] = useState<
+    Record<string, ObjectNode[]>
+  >({});
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<SessionBusy>(null);
@@ -71,6 +96,7 @@ export function useDatabaseSession() {
     setSchemas([]);
     setAvailableSchemas([]);
     setSchemaExpanded(new Set());
+    setObjectSubgroups({});
     setResult(null);
   }
 
@@ -79,6 +105,7 @@ export function useDatabaseSession() {
     setActiveId(profile.id);
     setError("");
     setSchemaExpanded(new Set());
+    setObjectSubgroups({});
     const cache = getSchemaCache(profile.id);
     if (cache) {
       setAvailableSchemas(cache.schemas);
@@ -212,10 +239,12 @@ export function useDatabaseSession() {
   }
 
   async function refreshDatabase(profile: ConnectionProfile) {
+    setObjectSubgroups({});
     await loadSchemaList(profile, { force: true });
   }
 
   async function refreshSchema(profile: ConnectionProfile, schema: string) {
+    setObjectSubgroups({});
     clearSchemaObjects(profile.id, schema);
     syncFromCache(profile.id);
     const groups = objectGroupsFor(profile.driver);
@@ -231,6 +260,7 @@ export function useDatabaseSession() {
     schema: string,
     group: string,
   ) {
+    setObjectSubgroups({});
     clearSchemaObjects(profile.id, schema, group);
     syncFromCache(profile.id);
     await loadSchemaObjects(profile, schema, group, { force: true });
@@ -298,6 +328,34 @@ export function useDatabaseSession() {
 
     if (!opening) return;
 
+    const subgroup = parseSubgroupKey(key);
+    if (subgroup) {
+      if (subgroup.subgroup === "columns" || objectSubgroups[key]) return;
+      setBusy({
+        kind: "subgroup",
+        schema: subgroup.schema,
+        object: subgroup.object,
+        subgroup: subgroup.subgroup,
+      });
+      setError("");
+      try {
+        await ensureLive(profile);
+        const items = await databaseApi.listObjectSubgroup(
+          profile.id,
+          subgroup.schema,
+          subgroup.object,
+          subgroup.subgroup,
+        );
+        setObjectSubgroups((current) => ({ ...current, [key]: items }));
+      } catch (nextError) {
+        if (isVaultAuthError(nextError)) throw nextError;
+        setError(errorMessage(nextError));
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+
     const schemaKey = key.startsWith("schema:")
       ? key.slice("schema:".length)
       : null;
@@ -341,7 +399,9 @@ export function useDatabaseSession() {
       ? "connect"
       : busy?.kind === "query"
         ? "query"
-        : busy?.kind === "schemas" || busy?.kind === "objects"
+        : busy?.kind === "schemas" ||
+            busy?.kind === "objects" ||
+            busy?.kind === "subgroup"
           ? "schema"
           : null;
 
@@ -355,6 +415,7 @@ export function useDatabaseSession() {
     availableSchemas,
     setAvailableSchemas,
     schemaExpanded,
+    objectSubgroups,
     toggleSchemaExpanded,
     result,
     error,

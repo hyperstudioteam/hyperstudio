@@ -65,6 +65,15 @@ pub struct SchemaNode {
 /// driver so the tree can render categories it knows nothing about.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ObjectSubgroupDef {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ObjectGroupDef {
     pub id: String,
     pub label: String,
@@ -80,6 +89,9 @@ pub struct ObjectGroupDef {
     /// Load this group as soon as the schema is expanded.
     #[serde(default, alias = "default_open")]
     pub default_open: bool,
+    /// Lazily loaded folders beneath each object in this group.
+    #[serde(default, alias = "objectSubgroups")]
+    pub object_subgroups: Vec<ObjectSubgroupDef>,
 }
 
 impl ObjectGroupDef {
@@ -91,7 +103,35 @@ impl ObjectGroupDef {
             child_label: Some("Columns".into()),
             actions: vec!["viewData".into(), "editData".into()],
             default_open: true,
+            object_subgroups: Vec::new(),
         }
+    }
+
+    pub fn database_tables() -> Self {
+        let mut group = Self::tables();
+        group.object_subgroups = vec![
+            ObjectSubgroupDef {
+                id: "columns".into(),
+                label: "Columns".into(),
+                icon: Some("columns".into()),
+            },
+            ObjectSubgroupDef {
+                id: "keys".into(),
+                label: "Keys".into(),
+                icon: Some("key".into()),
+            },
+            ObjectSubgroupDef {
+                id: "foreignKeys".into(),
+                label: "Foreign Keys".into(),
+                icon: Some("link".into()),
+            },
+            ObjectSubgroupDef {
+                id: "indexes".into(),
+                label: "Indexes".into(),
+                icon: Some("list".into()),
+            },
+        ];
+        group
     }
 }
 

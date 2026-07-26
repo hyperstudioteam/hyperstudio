@@ -57,7 +57,12 @@
         "icon": "layers",
         "childLabel": "Fields",
         "actions": ["viewData", "editData"],
-        "defaultOpen": true
+        "defaultOpen": true,
+        "objectSubgroups": [
+          { "id": "columns", "label": "Fields", "icon": "columns" },
+          { "id": "facets", "label": "Facets", "icon": "hash" },
+          { "id": "indexes", "label": "Indexed", "icon": "list" }
+        ]
       },
       {
         "id": "aliases",
