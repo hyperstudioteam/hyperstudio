@@ -52,7 +52,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Lazy connect — cached connections open a pool only when you run something
 - [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
 - [ ] SSH tunnels
-- [ ] Connection color coding and read-only / production guards
+- [x] Connection colour coding and read-only / production guards
 
 ### Password storage
 
@@ -70,8 +70,9 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Manual refresh at the database and schema level
 - [x] Column types, nullability, and primary-key markers
 - [ ] Indexes, foreign keys, constraints, and triggers
-- [ ] Search and filter within the tree
-- [ ] Table DDL viewer and ER diagrams
+- [x] Search and filter within the tree (matches schema, object, and column names)
+- [x] Table DDL viewer (right-click an object → **Show DDL…**)
+- [ ] ER diagrams
 
 ### Query workspace
 
@@ -81,8 +82,8 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] DDL and DML support with affected-row counts and timings
 - [x] SQL syntax highlighting with per-dialect parsing (CodeMirror 6)
 - [x] Schema-aware autocompletion for schemas, tables, views, and columns
-- [ ] SQL formatting
-- [ ] Query history and saved queries
+- [x] SQL formatting (`Shift+Alt+F`, or the **Format** button)
+- [x] Query history and saved queries
 - [ ] Explicit transaction control and query cancellation
 - [ ] Multi-statement scripts and per-statement results
 
@@ -97,7 +98,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
 - [x] Pluggable column types and data viewers via the contribution registry
 - [ ] Transactional commit mode (currently auto-commit per statement)
-- [ ] Column sorting and per-column filters from the grid header
+- [x] Column sorting and per-column filters from the grid header
 
 ### Selection, copy, and paste
 
@@ -107,7 +108,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Copy as SQL Inserts, SQL Updates, or a Where Clause
 - [x] Optional **Include header** toggle (off by default)
 - [x] Paste a single value into every selected cell, or tile a block across the range
-- [ ] Export a full result set to a file
+- [x] Export a full result set to a file (CSV, TSV, JSON, or SQL inserts)
 - [ ] Import from CSV into a table
 
 ## Getting started
@@ -180,6 +181,7 @@ until you submit them.
 | Shortcut | Context | Action |
 | --- | --- | --- |
 | `Cmd/Ctrl + Enter` | SQL editor | Run the buffer, or the current selection |
+| `Shift + Alt + F` | SQL editor | Format the buffer, or the current selection |
 | `Cmd/Ctrl + C` | Any grid | Copy the selection using the active extractor |
 | `Cmd/Ctrl + V` | Data editor | Paste into the selected range |
 | `Enter` | Cell editor | Commit the cell |

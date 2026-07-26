@@ -43,6 +43,15 @@ import {
   columnTypeIcon,
   primaryKeyColumns,
 } from "../lib/sql";
+import { safetyOf } from "../lib/connectionGuard";
+import {
+  ColumnFilter,
+  ColumnSort,
+  buildOrderByClause,
+  buildWhereClause,
+  nextSort,
+} from "../lib/gridFilter";
+import { ColumnHeader } from "./grid/ColumnHeader";
 import { ConnectionProfile } from "../types/connection";
 import { QueryResult } from "../types/query";
 import { ColumnNode, TableNode } from "../types/schema";
@@ -63,7 +72,9 @@ interface TableDataEditorProps {
   tableMeta: TableNode | null;
   /** Rows per page; defaults to driver max (500). */
   pageSize?: number;
-  execute: (sql: string) => Promise<QueryResult>;
+  execute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  /** Asks the user to approve a batch on a guarded connection. */
+  confirmWrites?: (preview: string) => Promise<boolean>;
 }
 
 function parseCellInput(raw: string): unknown {
@@ -103,9 +114,12 @@ export function TableDataEditor({
   tableMeta,
   pageSize = 500,
   execute,
+  confirmWrites,
 }: TableDataEditorProps) {
   const [where, setWhere] = useState("");
   const [orderBy, setOrderBy] = useState("");
+  const [headerSort, setHeaderSort] = useState<ColumnSort | null>(null);
+  const [headerFilters, setHeaderFilters] = useState<ColumnFilter[]>([]);
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<EditorRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -156,18 +170,31 @@ export function TableDataEditor({
   const hasMore = truncated || loadedCount >= pageSize;
   const displayEnd = page * pageSize + loadedCount;
 
-  async function load(nextPage = page) {
+  /**
+   * Header sort/filter changes call this with explicit overrides, since the
+   * corresponding state updates have not been applied yet at that point.
+   */
+  async function load(
+    nextPage = page,
+    overrides?: {
+      where?: string;
+      orderBy?: string;
+      filters?: ColumnFilter[];
+    },
+  ) {
     setBusy(true);
     setError("");
     setEditing(null);
     setCellRange(null);
     try {
+      const manualWhere = overrides?.where ?? where;
+      const activeFilters = overrides?.filters ?? headerFilters;
       const sql = buildTableSelect({
         driver: profile.driver,
         schema,
         table,
-        where,
-        orderBy,
+        where: buildWhereClause(profile.driver, activeFilters, manualWhere),
+        orderBy: overrides?.orderBy ?? orderBy,
         limit: pageSize,
         offset: nextPage * pageSize,
       });
@@ -219,9 +246,30 @@ export function TableDataEditor({
   }
 
   useEffect(() => {
-    void load(0);
+    setHeaderSort(null);
+    setHeaderFilters([]);
+    void load(0, { filters: [] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema, table, profile.id]);
+
+  function toggleHeaderSort(column: string) {
+    const next = nextSort(headerSort, column);
+    const clause = buildOrderByClause(profile.driver, next);
+    setHeaderSort(next);
+    setOrderBy(clause);
+    void load(0, { orderBy: clause });
+  }
+
+  function headerFilterFor(column: string): ColumnFilter | null {
+    return headerFilters.find((item) => item.column === column) ?? null;
+  }
+
+  function setHeaderFilter(column: string, filter: ColumnFilter | null) {
+    const rest = headerFilters.filter((item) => item.column !== column);
+    const next = filter ? [...rest, filter] : rest;
+    setHeaderFilters(next);
+    void load(0, { filters: next });
+  }
 
   useEffect(() => {
     function onMouseUp() {
@@ -473,43 +521,69 @@ export function TableDataEditor({
       return;
     }
 
-    setBusy(true);
-    setError("");
-    try {
-      for (const row of rows) {
-        if (row.status === "inserted") {
-          await execute(
-            buildInsertSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              values: row.values,
-            }),
-          );
-        } else if (row.status === "deleted") {
-          await execute(
-            buildDeleteSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              pkColumns: pkNames,
-              original: row.original,
-            }),
-          );
-        } else if (row.status === "modified") {
-          const sql = buildUpdateSql({
+    // Build the whole batch first so a guarded connection can approve it in
+    // one prompt rather than once per row.
+    const statements: string[] = [];
+    for (const row of rows) {
+      if (row.status === "inserted") {
+        statements.push(
+          buildInsertSql({
+            driver: profile.driver,
+            schema,
+            table,
+            columns,
+            values: row.values,
+          }),
+        );
+      } else if (row.status === "deleted") {
+        statements.push(
+          buildDeleteSql({
             driver: profile.driver,
             schema,
             table,
             columns,
             pkColumns: pkNames,
             original: row.original,
-            next: row.values,
-          });
-          if (sql) await execute(sql);
-        }
+          }),
+        );
+      } else if (row.status === "modified") {
+        const sql = buildUpdateSql({
+          driver: profile.driver,
+          schema,
+          table,
+          columns,
+          pkColumns: pkNames,
+          original: row.original,
+          next: row.values,
+        });
+        if (sql) statements.push(sql);
+      }
+    }
+    if (statements.length === 0) return;
+
+    const safety = safetyOf(profile);
+    if (safety === "readOnly") {
+      setError(
+        `“${profile.name}” is marked read-only. No changes were submitted.`,
+      );
+      return;
+    }
+
+    let approved = safety !== "confirm";
+    if (!approved) {
+      if (!confirmWrites) {
+        setError("This connection requires confirmation, which is unavailable.");
+        return;
+      }
+      approved = await confirmWrites(statements.join("\n"));
+      if (!approved) return;
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      for (const sql of statements) {
+        await execute(sql, true);
       }
       await load(page);
     } catch (nextError) {
@@ -678,6 +752,20 @@ export function TableDataEditor({
               if (event.key === "Enter") void load(0);
             }}
           />
+          {headerFilters.length > 0 && (
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer rounded-[3px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-1.5 py-0.5 text-[9px] text-[#c9c2ff] hover:border-accent hover:text-white"
+              title="Clear column filters"
+              onClick={() => {
+                setHeaderFilters([]);
+                void load(0, { filters: [] });
+              }}
+            >
+              +{headerFilters.length} column filter
+              {headerFilters.length === 1 ? "" : "s"} ×
+            </button>
+          )}
         </label>
         <label className="flex min-w-0 items-center gap-[7px] px-2.5 text-[10px] text-[#7d8694]">
           <ArrowDownUp size={13} />
@@ -689,7 +777,10 @@ export function TableDataEditor({
             value={orderBy}
             placeholder="column"
             spellCheck={false}
-            onChange={(event) => setOrderBy(event.target.value)}
+            onChange={(event) => {
+              setOrderBy(event.target.value);
+              setHeaderSort(null);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") void load(0);
             }}
@@ -733,15 +824,25 @@ export function TableDataEditor({
                 {columns.map((column, index) => {
                   const meta = columnMeta[index];
                   return (
-                    <th key={`${column}-${index}`}>
-                      <span className="inline-flex items-center gap-[5px] [&>svg]:text-[#6e7787]">
-                        <TypeIcon dataType={meta?.dataType ?? ""} />
-                        {meta?.primaryKey && (
-                          <KeyRound size={11} className="!text-pk" />
-                        )}
-                        {column}
-                      </span>
-                    </th>
+                    <ColumnHeader
+                      key={`${column}-${index}`}
+                      column={column}
+                      className={thClass}
+                      sort={headerSort}
+                      filter={headerFilterFor(column)}
+                      adornment={
+                        <>
+                          <TypeIcon dataType={meta?.dataType ?? ""} />
+                          {meta?.primaryKey && (
+                            <KeyRound size={11} className="!text-pk" />
+                          )}
+                        </>
+                      }
+                      onSortToggle={() => toggleHeaderSort(column)}
+                      onFilterChange={(filter) =>
+                        setHeaderFilter(column, filter)
+                      }
+                    />
                   );
                 })}
               </tr>
