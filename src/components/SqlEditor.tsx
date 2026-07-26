@@ -47,10 +47,16 @@ import {
 import { dialectFor } from "../lib/completionSchema";
 import { formatSql } from "../lib/sqlFormat";
 import { ContextMenu } from "./ContextMenu";
+import { useExtensionMenu } from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 
 export interface SqlEditorHandle {
   /** Selected text when there is a selection, otherwise the whole document. */
   getSqlToRun: () => string;
+  getSql: () => string;
+  getSelectedSql: () => string;
+  insertSql: (sql: string) => void;
+  replaceSelection: (sql: string) => void;
   /** Pretty-print the selection, or the whole buffer when nothing is selected. */
   format: () => void;
   focus: () => void;
@@ -195,6 +201,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
   ) {
     const hostRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
+    const extensionMenu = useExtensionMenu("editor/context");
     const languageRef = useRef(new Compartment());
     const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
     const [hasSelection, setHasSelection] = useState(false);
@@ -283,6 +290,33 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
     useImperativeHandle(ref, () => ({
       getSqlToRun: () =>
         viewRef.current ? sqlToRun(viewRef.current) : "",
+      getSql: () => viewRef.current?.state.doc.toString() ?? "",
+      getSelectedSql: () => {
+        const view = viewRef.current;
+        if (!view) return "";
+        const { from, to } = view.state.selection.main;
+        return from === to ? "" : view.state.sliceDoc(from, to);
+      },
+      insertSql: (sql) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const position = view.state.selection.main.to;
+        view.dispatch({
+          changes: { from: position, insert: sql },
+          selection: { anchor: position + sql.length },
+        });
+        view.focus();
+      },
+      replaceSelection: (sql) => {
+        const view = viewRef.current;
+        if (!view) return;
+        const { from, to } = view.state.selection.main;
+        view.dispatch({
+          changes: { from, to, insert: sql },
+          selection: { anchor: from + sql.length },
+        });
+        view.focus();
+      },
       format: () => {
         if (viewRef.current) formatDoc(viewRef.current);
       },
@@ -513,6 +547,33 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
                 Run script
               </button>
             )}
+            {extensionMenu.length > 0 && (
+              <div className="my-1 h-px bg-border" />
+            )}
+            {extensionMenu.map((item) => (
+              <button
+                type="button"
+                key={`${item.source}:${item.command}`}
+                onClick={() => {
+                  const view = viewRef.current;
+                  const selectedSql = view
+                    ? (() => {
+                        const { from, to } = view.state.selection.main;
+                        return from === to ? "" : view.state.sliceDoc(from, to);
+                      })()
+                    : "";
+                  extensionRegistry.executeCommand(item.command, {
+                    sql: view?.state.doc.toString() ?? "",
+                    selectedSql,
+                    driver,
+                  });
+                  closeMenu();
+                }}
+              >
+                <WandSparkles size={14} />
+                {item.title}
+              </button>
+            ))}
           </ContextMenu>
         )}
       </>

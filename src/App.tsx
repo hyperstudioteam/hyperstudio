@@ -39,9 +39,10 @@ import { ConnectionProfile, DriverInfo } from "./types/connection";
 import { ColumnNode, SchemaInfo } from "./types/schema";
 import { ImportCsvModal } from "./components/ImportCsvModal";
 import { collectConnections, collectFolderOptions } from "./lib/tree";
-import { databaseApi } from "./api/database";
+import { databaseApi, pluginsApi } from "./api/database";
 import { cacheDriverGroups } from "./lib/driverGroups";
 import { syncPluginColumnTypes } from "./plugins/init";
+import { extensionRegistry } from "./extensions/registry";
 import "./styles/app.css";
 
 function App() {
@@ -99,12 +100,12 @@ function App() {
   const completionPrefetched = useRef<string | null>(null);
 
   const refreshDrivers = () => {
-    void databaseApi
-      .listDrivers()
-      .then((list) => {
-        setDrivers(list);
-        syncPluginColumnTypes(list);
-        cacheDriverGroups(list);
+    void Promise.all([databaseApi.listDrivers(), pluginsApi.list()])
+      .then(([driverList, pluginList]) => {
+        setDrivers(driverList);
+        syncPluginColumnTypes(driverList);
+        cacheDriverGroups(driverList);
+        extensionRegistry.sync(pluginList);
       })
       .catch(() => undefined);
   };

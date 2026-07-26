@@ -22,7 +22,11 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; frame-src asset: http://asset.localhost; img-src 'self' asset: http://asset.localhost data: https:; script-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline' asset: http://asset.localhost; connect-src ipc: http://ipc.localhost https:",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/plugins/**"]
+      }
     }
   },
   "bundle": {

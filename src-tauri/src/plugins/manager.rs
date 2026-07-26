@@ -7,7 +7,7 @@ use serde_json::Value;
 use crate::drivers::DriverRegistry;
 use crate::models::InstalledPluginInfo;
 use crate::plugins::driver::PluginDriver;
-use crate::plugins::manifest::PluginManifest;
+use crate::plugins::manifest::{PluginManifest, PluginType};
 
 pub fn plugins_dir(app_data: &Path) -> PathBuf {
     app_data.join("plugins")
@@ -34,6 +34,27 @@ fn load_manifest_at(plugin_dir: &Path, require_folder_match: bool) -> Result<Plu
     let manifest: PluginManifest = serde_json::from_str(&raw)
         .map_err(|error| format!("Invalid manifest in {}: {error}", path.display()))?;
     manifest.validate()?;
+    for entry_path in manifest
+        .contributes
+        .views
+        .iter()
+        .map(|view| &view.entry)
+        .chain(
+            manifest
+                .contributes
+                .viewers
+                .iter()
+                .map(|viewer| &viewer.entry),
+        )
+    {
+        let entry = plugin_dir.join(entry_path);
+        if !entry.is_file() {
+            return Err(format!(
+                "Plugin view entry missing: {}",
+                entry.display()
+            ));
+        }
+    }
     if require_folder_match
         && plugin_dir
             .file_name()
@@ -101,7 +122,14 @@ pub async fn register_plugin_dir(
     if !manifest.is_enabled() {
         return Err(format!("Plugin '{}' is disabled.", manifest.id));
     }
-    let exe = plugin_dir.join(&manifest.executable);
+    if manifest.plugin_type != PluginType::Driver {
+        return Ok(manifest.id);
+    }
+    let executable = manifest
+        .executable
+        .as_ref()
+        .ok_or_else(|| format!("Driver plugin '{}' has no executable.", manifest.id))?;
+    let exe = plugin_dir.join(executable);
     if !exe.exists() {
         return Err(format!(
             "Plugin executable missing: {}",
@@ -137,8 +165,15 @@ pub fn list_installed(app_data: &Path) -> Result<Vec<InstalledPluginInfo>, Strin
                     name: manifest.name,
                     version: manifest.version,
                     description: manifest.description,
+                    kind: match manifest.plugin_type {
+                        PluginType::Driver => "driver",
+                        PluginType::Extension => "extension",
+                    }
+                    .into(),
                     enabled,
                     path: path.display().to_string(),
+                    contributes: serde_json::to_value(&manifest.contributes)
+                        .unwrap_or(serde_json::Value::Null),
                 });
             }
             Err(error) => eprintln!("Invalid plugin at {}: {error}", path.display()),

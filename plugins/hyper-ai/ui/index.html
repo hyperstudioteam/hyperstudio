@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hyper AI</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: "Avenir Next", "Segoe UI", sans-serif;
+        background: #101318;
+        color: #d8dde6;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 80% 0%, #173c3b 0, transparent 38%), #101318; }
+      main { display: grid; grid-template-rows: auto 1fr auto; min-height: 100vh; }
+      header { padding: 18px 16px 12px; border-bottom: 1px solid #292e36; }
+      h1 { margin: 0; color: #f2f5f8; font-size: 20px; letter-spacing: -0.04em; }
+      header p { margin: 5px 0 0; color: #7f8998; font-size: 11px; line-height: 1.45; }
+      #messages { display: flex; flex-direction: column; gap: 12px; overflow: auto; padding: 16px; }
+      .message { max-width: 92%; font-size: 12px; line-height: 1.55; white-space: pre-wrap; }
+      .user { align-self: flex-end; padding: 9px 11px; border-radius: 8px 8px 2px 8px; background: #225957; color: #f2ffff; }
+      .assistant { color: #c8d0db; }
+      .sql { margin-top: 8px; overflow: auto; border-left: 2px solid #50a7a1; background: #0b0e12; padding: 10px; color: #bde2dd; font: 11px/1.55 "SFMono-Regular", Consolas, monospace; }
+      .insert { margin-top: 8px; border: 1px solid #3d736f; border-radius: 5px; background: transparent; padding: 6px 8px; color: #9fd5d0; cursor: pointer; font-size: 10px; }
+      form { display: grid; grid-template-columns: 1fr auto; gap: 8px; border-top: 1px solid #292e36; padding: 12px; background: #12161b; }
+      textarea { min-height: 38px; max-height: 120px; resize: vertical; border: 1px solid #343b45; border-radius: 6px; outline: none; background: #0d1014; padding: 9px; color: #e1e6ed; font: inherit; }
+      textarea:focus { border-color: #478b87; }
+      form button { align-self: end; height: 38px; border: 0; border-radius: 6px; background: #397d78; padding: 0 12px; color: white; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Hyper AI</h1>
+        <p>Ask about the active query, then insert the suggested SQL directly into the editor.</p>
+      </header>
+      <section id="messages">
+        <div class="message assistant">I can see the SQL editor context. What would you like to change?</div>
+      </section>
+      <form id="composer">
+        <textarea id="prompt" aria-label="Message" placeholder="Optimize this query…"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

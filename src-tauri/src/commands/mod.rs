@@ -2,6 +2,7 @@ mod keychain;
 
 use std::path::PathBuf;
 
+use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
 
 use crate::db::AppState;
@@ -14,6 +15,8 @@ use crate::plugins::{
     discover_and_register, install_from_path, list_installed, register_plugin_dir, uninstall,
     write_enabled,
 };
+use crate::plugins::manager::{load_manifest, load_settings};
+use crate::plugins::process::PluginProcess;
 
 pub use keychain::{keychain_available, keychain_delete, keychain_get, keychain_set};
 
@@ -312,6 +315,69 @@ pub async fn list_plugins(app: AppHandle) -> Result<Vec<InstalledPluginInfo>, St
 }
 
 #[tauri::command]
+pub async fn resolve_plugin_asset(
+    app: AppHandle,
+    plugin_id: String,
+    entry: String,
+) -> Result<String, String> {
+    let data = app_data_dir(&app)?;
+    if plugin_id.trim().is_empty()
+        || plugin_id.contains("..")
+        || plugin_id.contains('/')
+        || plugin_id.contains('\\')
+    {
+        return Err("Invalid plugin id.".into());
+    }
+    let relative = std::path::Path::new(&entry);
+    if entry.trim().is_empty() || relative.is_absolute() || entry.contains("..") {
+        return Err("Plugin asset must be a safe relative path.".into());
+    }
+    let plugin_dir = data.join("plugins").join(&plugin_id);
+    let root = plugin_dir
+        .canonicalize()
+        .map_err(|error| format!("Plugin directory unavailable: {error}"))?;
+    let asset = plugin_dir
+        .join(relative)
+        .canonicalize()
+        .map_err(|error| format!("Plugin asset unavailable: {error}"))?;
+    if !asset.starts_with(&root) || !asset.is_file() {
+        return Err("Plugin asset is outside its plugin directory.".into());
+    }
+    Ok(asset.display().to_string())
+}
+
+#[tauri::command]
+pub async fn extension_rpc(
+    app: AppHandle,
+    plugin_id: String,
+    method: String,
+    params: Value,
+) -> Result<Value, String> {
+    let data = app_data_dir(&app)?;
+    if plugin_id.trim().is_empty()
+        || plugin_id.contains("..")
+        || plugin_id.contains('/')
+        || plugin_id.contains('\\')
+    {
+        return Err("Invalid plugin id.".into());
+    }
+    if method.trim().is_empty() {
+        return Err("RPC method is required.".into());
+    }
+    let plugin_dir = data.join("plugins").join(&plugin_id);
+    let manifest = load_manifest(&plugin_dir)?;
+    if !manifest.is_enabled() {
+        return Err(format!("Plugin '{}' is disabled.", manifest.id));
+    }
+    let executable = manifest
+        .executable
+        .ok_or_else(|| format!("Extension '{}' has no backend executable.", manifest.id))?;
+    let settings = load_settings(&plugin_dir);
+    let process = PluginProcess::spawn(plugin_dir.join(executable), settings).await?;
+    process.call(&method, params).await
+}
+
+#[tauri::command]
 pub async fn install_plugin(
     app: AppHandle,
     state: State<'_, AppState>,
@@ -353,7 +419,7 @@ pub async fn set_plugin_enabled(
     if enabled {
         register_plugin_dir(&state.registry, &plugin_dir).await?;
     } else {
-        state.registry.unregister(&plugin_id).await?;
+        let _ = state.registry.unregister(&plugin_id).await;
     }
     Ok(())
 }

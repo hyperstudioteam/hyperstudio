@@ -3,6 +3,8 @@ import { Check, Copy, X } from "lucide-react";
 import { cn } from "../lib/cn";
 import { CellContext, defaultFormat } from "../plugins/contributions";
 import { useCellViewers } from "../plugins/useContributions";
+import { useExtensionDataViewers } from "../extensions/hooks";
+import { ExtensionDataViewer } from "../extensions/ExtensionDataViewer";
 
 interface CellViewerProps {
   context: CellContext;
@@ -17,19 +19,27 @@ export function CellViewer({
   onClose,
 }: CellViewerProps) {
   const viewers = useCellViewers(context);
+  const extensionViewers = useExtensionDataViewers(context.typeName);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const active = useMemo(() => {
-    if (viewers.length === 0) return null;
+    if (viewers.length === 0 && extensionViewers.length === 0) return null;
     const byActive = activeId
-      ? viewers.find((viewer) => viewer.id === activeId)
+      ? [...viewers, ...extensionViewers].find(
+          (viewer) => viewer.id === activeId,
+        )
       : undefined;
     const byPreferred = preferredViewer
-      ? viewers.find((viewer) => viewer.id === preferredViewer)
+      ? [...viewers, ...extensionViewers].find(
+          (viewer) => viewer.id === preferredViewer,
+        )
       : undefined;
-    return byActive ?? byPreferred ?? viewers[0];
-  }, [viewers, activeId, preferredViewer]);
+    return byActive ?? byPreferred ?? viewers[0] ?? extensionViewers[0];
+  }, [viewers, extensionViewers, activeId, preferredViewer]);
+  const activeExtension = extensionViewers.find(
+    (viewer) => viewer.id === active?.id,
+  );
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -78,6 +88,21 @@ export function CellViewer({
                 {viewer.label}
               </button>
             ))}
+            {extensionViewers.map((viewer) => (
+              <button
+                key={`${viewer.source}:${viewer.id}`}
+                type="button"
+                className={cn(
+                  "h-[26px] cursor-pointer rounded-[5px] border border-border bg-[#15181e] px-2.5 text-[11px] text-muted hover:border-border-bright hover:text-text",
+                  active?.id === viewer.id &&
+                    "border-[rgba(139,124,246,.6)] bg-accent-soft text-[#d5d0ff]",
+                )}
+                onClick={() => setActiveId(viewer.id)}
+                title={`From extension: ${viewer.source}`}
+              >
+                {viewer.label}
+              </button>
+            ))}
           </div>
           <div className="flex gap-1">
             <button
@@ -105,7 +130,12 @@ export function CellViewer({
           )}
         </div>
         <div className="flex-1 overflow-auto p-3">
-          {active ? (
+          {activeExtension ? (
+            <ExtensionDataViewer
+              viewer={activeExtension}
+              context={context}
+            />
+          ) : active && "render" in active ? (
             active.render(context)
           ) : (
             <div className="p-5 text-center text-[12px] text-muted">
