@@ -22,6 +22,8 @@ interface ConnectionSidebarProps {
   selection: Selection;
   expanded: Set<string>;
   connectedId: string | null;
+  /** Connection ids with an open pool (may be more than one). */
+  liveConnectionIds: ReadonlySet<string>;
   selected: ConnectionProfile | null;
   busy: "connect" | "query" | "schema" | null;
   busyDetail: Parameters<typeof SchemaBrowser>[0]["busyDetail"];
@@ -49,6 +51,7 @@ interface ConnectionSidebarProps {
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
   onShowEr: (schema: string) => void;
+  onNewConsole: () => void;
   onImportCsv: Parameters<typeof SchemaBrowser>[0]["onImportCsv"];
   schemaReadonly?: boolean;
   findConnection: (id: string) => ConnectionProfile | null;
@@ -137,7 +140,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
           nodes={props.tree}
           selection={props.selection}
           expanded={props.expanded}
-          connectedId={props.connectedId}
+          liveConnectionIds={props.liveConnectionIds}
           onSelect={props.onSelect}
           onToggle={props.onToggleFolder}
           onConnect={(id) => {
@@ -152,7 +155,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
       {props.selected && (
         <SchemaBrowser
           profile={props.selected}
-          live={props.connectedId === props.selected.id}
+          live={props.liveConnectionIds.has(props.selected.id)}
           hasCache={props.hasSchemaCache}
           busy={props.busy}
           busyDetail={props.busyDetail}
@@ -172,6 +175,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
           onViewTable={props.onViewTable}
           onEditTable={props.onEditTable}
           onShowEr={props.onShowEr}
+          onNewConsole={props.onNewConsole}
           onImportCsv={props.onImportCsv}
           readonly={props.schemaReadonly}
         />
@@ -241,7 +245,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
               >
                 <Plug size={14} /> Connect
               </button>
-              {props.connectedId === contextMenu.target.id && (
+              {props.liveConnectionIds.has(contextMenu.target.id) && (
                 <button
                   type="button"
                   onClick={() => {

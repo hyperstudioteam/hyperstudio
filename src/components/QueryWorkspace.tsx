@@ -35,7 +35,7 @@ import {
   parseExplainResult,
   wrapExplainSql,
 } from "../lib/explain";
-import { getSchemaCache } from "../lib/schemaCache";
+import { getSchemaCache, toSchemaNodes } from "../lib/schemaCache";
 import {
   buildTableQuery,
   defaultMaxRows,
@@ -43,7 +43,7 @@ import {
   PagedQueryPlan,
   sqlForPage,
 } from "../lib/sql";
-import { ConnectionProfile } from "../types/connection";
+import { ConnectionProfile, DriverInfo } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
 import {
   SchemaNode,
@@ -90,6 +90,7 @@ export type WorkspaceOpen =
   | { kind: "view"; schema: string; table: string; nonce: number }
   | { kind: "edit"; schema: string; table: string; nonce: number }
   | { kind: "er"; schema: string; nonce: number }
+  | { kind: "console"; nonce: number }
   | null;
 
 type QueryTab = {
@@ -97,6 +98,8 @@ type QueryTab = {
   kind: "query";
   title: string;
   sql: string;
+  /** Connection this console was created on; user may switch later. */
+  connectionId: string;
 };
 
 type EditTab = {
@@ -118,30 +121,40 @@ type WorkspaceTab = QueryTab | EditTab | ErTab;
 
 interface QueryWorkspaceProps {
   selected: ConnectionProfile | null;
+  /** All saved connections, for the per-console picker. */
+  connections: ConnectionProfile[];
+  /** Connection ids with an open pool. */
+  liveConnectionIds: ReadonlySet<string>;
   connectedId: string | null;
   connectionInfo: ConnectionInfo | null;
   busy: "connect" | "query" | "schema" | null;
   result: QueryResult | null;
   error: string;
-  /** Cached metadata for the active connection, used for autocompletion. */
+  /** Cached metadata for the sidebar-selected connection. */
   schemas: SchemaNode[];
-  /** Driver max rows per SELECT page (from capabilities.maxRows). */
-  maxRows?: number;
+  drivers: DriverInfo[];
   openRequest: WorkspaceOpen;
-  /** Driver supports explicit transactions and cancellation. */
-  sessions?: boolean;
-  /** True while an explicit transaction is open on this connection. */
-  txnOpen?: boolean;
-  onRun: (sql: string) => void;
-  onExecute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  txnOpenById: Record<string, boolean>;
+  onRun: (sql: string, connectionId: string) => void;
+  onExecute: (
+    sql: string,
+    connectionId: string,
+    confirmedWrite?: boolean,
+  ) => Promise<QueryResult>;
   onLoadEr: (schema: string) => Promise<ErDiagram>;
-  onCancel?: () => void;
-  onBeginTransaction?: () => void;
-  onEndTransaction?: (commit: boolean) => void;
+  onCancel?: (connectionId: string) => void;
+  onBeginTransaction?: (connectionId: string) => void;
+  onEndTransaction?: (connectionId: string, commit: boolean) => void;
   /** Set only when the driver can commit a batch atomically. */
-  onExecuteBatch?: (statements: string[]) => Promise<number[]>;
+  onExecuteBatch?: (
+    connectionId: string,
+    statements: string[],
+  ) => Promise<number[]>;
   /** Prompts for a guarded connection; resolves true when the user agrees. */
-  onConfirmWrites?: (preview: string) => Promise<boolean>;
+  onConfirmWrites?: (
+    connectionId: string,
+    preview: string,
+  ) => Promise<boolean>;
 }
 
 function findTableMeta(
@@ -157,16 +170,17 @@ function findTableMeta(
 
 export function QueryWorkspace({
   selected,
+  connections,
+  liveConnectionIds,
   connectedId,
   connectionInfo,
   busy,
   result,
   error,
   schemas,
-  maxRows: maxRowsProp,
+  drivers,
   openRequest,
-  sessions = false,
-  txnOpen = false,
+  txnOpenById,
   onRun,
   onExecute,
   onLoadEr,
@@ -176,9 +190,14 @@ export function QueryWorkspace({
   onExecuteBatch,
   onConfirmWrites,
 }: QueryWorkspaceProps) {
-  const pageSize = defaultMaxRows(maxRowsProp);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
-    { id: "query-1", kind: "query", title: "Query 1", sql: STARTER_QUERY },
+    {
+      id: "query-1",
+      kind: "query",
+      title: "Query 1",
+      sql: STARTER_QUERY,
+      connectionId: "",
+    },
   ]);
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
@@ -211,29 +230,99 @@ export function QueryWorkspace({
   const cancelScript = useRef(false);
   /** SQL awaiting its result so the run can be recorded once it settles. */
   const pendingRunRef = useRef<string | null>(null);
-
-  const completionSchema = useMemo(
-    () => buildCompletionSchema(schemas),
-    [schemas],
-  );
-  const defaultSchema = useMemo(
-    () => (selected ? defaultSchemaFor(selected, schemas) : undefined),
-    [selected, schemas],
-  );
-  const completionReady = useMemo(
-    () => hasCompletionData(schemas),
-    [schemas],
-  );
+  const pendingConnectionRef = useRef<string>("");
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
+  const queryConnectionId =
+    active?.kind === "query" ? active.connectionId : selected?.id ?? "";
+  const queryConnection =
+    connections.find((item) => item.id === queryConnectionId) ??
+    (selected?.id === queryConnectionId ? selected : null);
+  const querySchemas = useMemo(() => {
+    if (active?.kind === "query" && active.connectionId) {
+      return toSchemaNodes(getSchemaCache(active.connectionId));
+    }
+    return schemas;
+  }, [active, schemas]);
+  const queryCaps = drivers.find(
+    (driver) => driver.id === queryConnection?.driver,
+  )?.capabilities;
+  const pageSize = defaultMaxRows(queryCaps?.maxRows);
+  const sessions = Boolean(queryCaps?.sessions);
+  const txnOpen = Boolean(
+    queryConnectionId && txnOpenById[queryConnectionId],
+  );
+  const queryLive = Boolean(
+    queryConnectionId && liveConnectionIds.has(queryConnectionId),
+  );
+
+  const completionSchema = useMemo(
+    () => buildCompletionSchema(querySchemas),
+    [querySchemas],
+  );
+  const defaultSchema = useMemo(
+    () =>
+      queryConnection
+        ? defaultSchemaFor(queryConnection, querySchemas)
+        : undefined,
+    [queryConnection, querySchemas],
+  );
+  const completionReady = useMemo(
+    () => hasCompletionData(querySchemas),
+    [querySchemas],
+  );
+
   const query = active?.kind === "query" ? active.sql : STARTER_QUERY;
   const statementCount = useMemo(
     () => splitStatements(query).length,
     [query],
   );
-  const explainCapable = canVisualizeExplain(selected?.driver);
+  const explainCapable = canVisualizeExplain(queryConnection?.driver);
   const explainDisabled =
-    busy === "query" || !selected || connectedId !== selected.id || !explainCapable;
+    busy === "query" || !queryConnection || !queryLive || !explainCapable;
+
+  // Bind orphan tabs (created before a connection was selected) to the sidebar connection.
+  useEffect(() => {
+    if (!selected) return;
+    setTabs((current) => {
+      let changed = false;
+      const next = current.map((tab) => {
+        if (tab.kind === "query" && !tab.connectionId) {
+          changed = true;
+          return { ...tab, connectionId: selected.id };
+        }
+        return tab;
+      });
+      return changed ? next : current;
+    });
+  }, [selected?.id]);
+
+  function setQueryConnectionId(connectionId: string) {
+    if (!active || active.kind !== "query") return;
+    setTabs((current) =>
+      current.map((tab) =>
+        tab.id === active.id && tab.kind === "query"
+          ? { ...tab, connectionId }
+          : tab,
+      ),
+    );
+  }
+
+  function addQueryTab() {
+    queryCounter.current += 1;
+    const id = `query-${queryCounter.current}`;
+    setTabs((current) => [
+      ...current,
+      {
+        id,
+        kind: "query",
+        title: `Query ${queryCounter.current}`,
+        sql: STARTER_QUERY,
+        connectionId: selected?.id ?? queryConnectionId,
+      },
+    ]);
+    setActiveId(id);
+  }
 
   const pageable = pagePlan?.pageable === true;
   const hasMore =
@@ -253,16 +342,18 @@ export function QueryWorkspace({
     if (!result && !error) return;
 
     pendingRunRef.current = null;
+    const connectionId = pendingConnectionRef.current;
+    pendingConnectionRef.current = "";
     setHistory(
       recordHistory({
         sql,
-        connectionId: selected?.id ?? "",
+        connectionId,
         succeeded: !error,
         elapsedMs: result?.elapsedMs,
         rowCount: result?.columns.length ? result.rows.length : undefined,
       }),
     );
-    // Only react to a settled query; selected is read as a snapshot.
+    // Only react to a settled query; connection is snapshotted at run time.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, error, busy]);
 
@@ -294,6 +385,23 @@ export function QueryWorkspace({
   useEffect(() => {
     if (!openRequest || !selected) return;
 
+    if (openRequest.kind === "console") {
+      queryCounter.current += 1;
+      const id = `query-${queryCounter.current}`;
+      setTabs((current) => [
+        ...current,
+        {
+          id,
+          kind: "query",
+          title: `Console ${queryCounter.current}`,
+          sql: "",
+          connectionId: selected.id,
+        },
+      ]);
+      setActiveId(id);
+      return;
+    }
+
     if (openRequest.kind === "view") {
       const sql = buildTableQuery(
         selected.driver,
@@ -305,7 +413,7 @@ export function QueryWorkspace({
         setTabs((current) =>
           current.map((tab) =>
             tab.id === existingQuery.id && tab.kind === "query"
-              ? { ...tab, sql }
+              ? { ...tab, sql, connectionId: selected.id }
               : tab,
           ),
         );
@@ -320,11 +428,12 @@ export function QueryWorkspace({
             kind: "query",
             title: `Query ${queryCounter.current}`,
             sql,
+            connectionId: selected.id,
           },
         ]);
         setActiveId(id);
       }
-      runSql(sql);
+      runSql(sql, selected.id);
       return;
     }
 
@@ -388,25 +497,38 @@ export function QueryWorkspace({
     );
   }
 
-  function runExplainSql(sql: string, analyze: boolean) {
-    if (!selected || !canVisualizeExplain(selected.driver)) return;
-    const wrapped = wrapExplainSql(selected.driver, sql, { analyze });
+  function runExplainSql(
+    sql: string,
+    analyze: boolean,
+    connectionId = queryConnectionId,
+  ) {
+    const profile =
+      connections.find((item) => item.id === connectionId) ?? queryConnection;
+    if (!profile || !canVisualizeExplain(profile.driver)) return;
+    const wrapped = wrapExplainSql(profile.driver, sql, { analyze });
     pendingExplainRef.current = {
       analyzed: analyze,
       sql: wrapped,
-      driver: selected.driver,
+      driver: profile.driver as "postgres" | "mysql",
     };
     setPagePlan({ pageable: false, sql: wrapped });
     setResultPage(0);
     setExplainPlan(null);
-    onRun(wrapped);
+    pendingConnectionRef.current = connectionId;
+    onRun(wrapped, connectionId);
   }
 
-  function runSql(sql: string) {
+  function runSql(sql: string, connectionId = queryConnectionId) {
     setScriptRuns(null);
-    if (isExplainSql(sql) && selected && canVisualizeExplain(selected.driver)) {
+    const profile =
+      connections.find((item) => item.id === connectionId) ?? queryConnection;
+    if (
+      isExplainSql(sql) &&
+      profile &&
+      canVisualizeExplain(profile.driver)
+    ) {
       const analyze = explainHasAnalyze(sql) || analyzeEnabled;
-      runExplainSql(sql, analyze);
+      runExplainSql(sql, analyze, connectionId);
       return;
     }
 
@@ -417,16 +539,24 @@ export function QueryWorkspace({
     setPagePlan(plan);
     setResultPage(0);
     pendingRunRef.current = sql;
-    onRun(sqlForPage(plan, 0));
+    pendingConnectionRef.current = connectionId;
+    onRun(sqlForPage(plan, 0), connectionId);
   }
 
   function run() {
-    if (!active || active.kind !== "query") return;
-    runSql(editorRef.current?.getSqlToRun() ?? query);
+    if (!active || active.kind !== "query" || !queryConnectionId) return;
+    runSql(editorRef.current?.getSqlToRun() ?? query, queryConnectionId);
   }
 
   async function runScript() {
-    if (!active || active.kind !== "query" || scriptBusy) return;
+    if (
+      !active ||
+      active.kind !== "query" ||
+      scriptBusy ||
+      !queryConnectionId
+    ) {
+      return;
+    }
     const statements = splitStatements(
       editorRef.current?.getSqlToRun() ?? query,
     );
@@ -453,7 +583,10 @@ export function QueryWorkspace({
       setScriptIndex(index);
       publish();
       try {
-        runs[index].result = await onExecute(runs[index].sql);
+        runs[index].result = await onExecute(
+          runs[index].sql,
+          queryConnectionId,
+        );
         runs[index].status = "ok";
       } catch (error) {
         runs[index].status = "error";
@@ -483,15 +616,16 @@ export function QueryWorkspace({
   }
 
   function explain() {
-    if (!active || active.kind !== "query") return;
+    if (!active || active.kind !== "query" || !queryConnectionId) return;
     const sql = editorRef.current?.getSqlToRun() ?? query;
-    runExplainSql(sql, analyzeEnabled);
+    runExplainSql(sql, analyzeEnabled, queryConnectionId);
   }
 
   function loadPage(page: number) {
-    if (!pagePlan?.pageable) return;
+    if (!pagePlan?.pageable || !queryConnectionId) return;
     setResultPage(page);
-    onRun(sqlForPage(pagePlan, page));
+    pendingConnectionRef.current = queryConnectionId;
+    onRun(sqlForPage(pagePlan, page), queryConnectionId);
   }
 
   function useHistorySql(sql: string) {
@@ -500,7 +634,13 @@ export function QueryWorkspace({
       const id = `query-${queryCounter.current}`;
       setTabs((current) => [
         ...current,
-        { id, kind: "query", title: `Query ${queryCounter.current}`, sql },
+        {
+          id,
+          kind: "query",
+          title: `Query ${queryCounter.current}`,
+          sql,
+          connectionId: selected?.id ?? queryConnectionId,
+        },
       ]);
       setActiveId(id);
       return;
@@ -514,12 +654,18 @@ export function QueryWorkspace({
     if (!sql.trim()) return;
     const name = window.prompt("Save query as", active.title);
     if (!name) return;
-    setSaved(saveQuery({ name, sql, connectionId: selected?.id ?? null }));
+    setSaved(
+      saveQuery({
+        name,
+        sql,
+        connectionId: queryConnectionId || selected?.id || null,
+      }),
+    );
     setHistoryOpen(true);
   }
 
   async function runExport(options: ExportOptions) {
-    if (!result || !selected) return;
+    if (!result || !queryConnection) return;
 
     const suggested = `export-${new Date()
       .toISOString()
@@ -549,12 +695,13 @@ export function QueryWorkspace({
 
     const plan = pagePlan;
     const currentRows = result.rows;
+    const connectionId = queryConnection.id;
 
     try {
       const outcome = await exportResultSet({
         path,
         format: options.format,
-        driver: selected.driver,
+        driver: queryConnection.driver,
         target: "exported_rows",
         includeHeader: options.includeHeader,
         pageSize,
@@ -564,7 +711,7 @@ export function QueryWorkspace({
               ? { ...result, rows: currentRows }
               : null;
           }
-          return onExecute(sqlForPage(plan, page));
+          return onExecute(sqlForPage(plan, page), connectionId);
         },
         onProgress: setExportProgress,
       });
@@ -575,21 +722,6 @@ export function QueryWorkspace({
     } finally {
       setExportBusy(false);
     }
-  }
-
-  function addQueryTab() {
-    queryCounter.current += 1;
-    const id = `query-${queryCounter.current}`;
-    setTabs((current) => [
-      ...current,
-      {
-        id,
-        kind: "query",
-        title: `Query ${queryCounter.current}`,
-        sql: STARTER_QUERY,
-      },
-    ]);
-    setActiveId(id);
   }
 
   function closeTab(id: string) {
@@ -660,16 +792,49 @@ export function QueryWorkspace({
           <CirclePlus size={15} />
         </button>
         <div className="ml-auto flex shrink-0 items-center gap-[7px] px-[11px] text-[10px] text-muted">
-          <span
-            className={cn(
-              "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
-              connectedId === selected?.id &&
-                "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
-            )}
-          />
-          {selected
-            ? `${selected.name || selected.database}${connectedId === selected.id ? "" : " · cached"}`
-            : "Not connected"}
+          {active?.kind === "query" ? (
+            <>
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
+                  queryLive && "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
+                )}
+              />
+              <label className="flex items-center gap-1.5 text-[10px] text-muted">
+                <span className="sr-only">Connection</span>
+                <select
+                  className="h-[22px] max-w-[200px] cursor-pointer rounded-[5px] border border-border bg-transparent px-1.5 text-[10px] text-[#c4cad4] outline-none hover:border-border-bright focus:border-accent"
+                  value={queryConnectionId}
+                  disabled={connections.length === 0}
+                  onChange={(event) => setQueryConnectionId(event.target.value)}
+                  title="Run this console against this connection"
+                >
+                  {connections.length === 0 && (
+                    <option value="">No connections</option>
+                  )}
+                  {connections.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name || profile.database || profile.host}
+                      {liveConnectionIds.has(profile.id) ? "" : " · cached"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          ) : (
+            <>
+              <span
+                className={cn(
+                  "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
+                  connectedId === selected?.id &&
+                    "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
+                )}
+              />
+              {selected
+                ? `${selected.name || selected.database}${connectedId === selected.id ? "" : " · cached"}`
+                : "Not connected"}
+            </>
+          )}
         </div>
       </div>
 
@@ -681,9 +846,21 @@ export function QueryWorkspace({
           table={active.table}
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
           pageSize={pageSize}
-          execute={onExecute}
-          executeBatch={onExecuteBatch}
-          confirmWrites={onConfirmWrites}
+          execute={(sql, confirmedWrite) =>
+            onExecute(sql, selected.id, confirmedWrite)
+          }
+          executeBatch={
+            onExecuteBatch &&
+            drivers.find((driver) => driver.id === selected.driver)?.capabilities
+              .transactions
+              ? (statements) => onExecuteBatch(selected.id, statements)
+              : undefined
+          }
+          confirmWrites={
+            onConfirmWrites
+              ? (preview) => onConfirmWrites(selected.id, preview)
+              : undefined
+          }
         />
       ) : active?.kind === "er" ? (
         <ErDiagramView
@@ -712,10 +889,10 @@ export function QueryWorkspace({
                   ⌘↵
                 </kbd>
               </button>
-              {busy === "query" && sessions && (
+              {busy === "query" && sessions && queryConnectionId && (
                 <button
                   className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
-                  onClick={onCancel}
+                  onClick={() => onCancel?.(queryConnectionId)}
                   title="Ask the server to stop this statement"
                 >
                   <Square size={11} fill="currentColor" />
@@ -736,7 +913,9 @@ export function QueryWorkspace({
                       <button
                         className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-green hover:text-white disabled:opacity-60"
                         disabled={busy === "query"}
-                        onClick={() => onEndTransaction?.(true)}
+                        onClick={() =>
+                          onEndTransaction?.(queryConnectionId, true)
+                        }
                       >
                         <Check size={12} />
                         Commit
@@ -744,7 +923,9 @@ export function QueryWorkspace({
                       <button
                         className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-red hover:text-white disabled:opacity-60"
                         disabled={busy === "query"}
-                        onClick={() => onEndTransaction?.(false)}
+                        onClick={() =>
+                          onEndTransaction?.(queryConnectionId, false)
+                        }
                       >
                         <Undo2 size={12} />
                         Rollback
@@ -753,8 +934,8 @@ export function QueryWorkspace({
                   ) : (
                     <button
                       className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
-                      disabled={busy === "query" || !selected}
-                      onClick={onBeginTransaction}
+                      disabled={busy === "query" || !queryConnection}
+                      onClick={() => onBeginTransaction?.(queryConnectionId)}
                       title="Run the next statements inside a transaction"
                     >
                       Begin transaction
@@ -886,12 +1067,18 @@ export function QueryWorkspace({
                 key={active?.id ?? "query"}
                 ref={editorRef}
                 value={query}
-                driver={selected?.driver ?? "postgres"}
+                driver={queryConnection?.driver ?? "postgres"}
                 completionSchema={completionSchema}
                 defaultSchema={defaultSchema}
                 onChange={setQuerySql}
                 onRun={runSql}
                 onFormatError={setFormatError}
+                actionsDisabled={busy === "query" || scriptBusy}
+                onExplain={explain}
+                explainDisabled={explainDisabled}
+                onRunScript={
+                  statementCount > 1 ? () => void runScript() : undefined
+                }
               />
             </div>
           </section>
@@ -1025,7 +1212,7 @@ export function QueryWorkspace({
               <ScriptResults
                 runs={scriptRuns}
                 activeIndex={scriptIndex}
-                driver={selected?.driver}
+                driver={queryConnection?.driver}
                 onSelect={setScriptIndex}
               />
             ) : resultPanel === "plan" && explainPlan ? (
@@ -1055,7 +1242,7 @@ export function QueryWorkspace({
               <ResultGrid
                 result={result}
                 error={error}
-                driver={selected?.driver}
+                driver={queryConnection?.driver}
               />
             )}
           </section>
@@ -1095,7 +1282,7 @@ export function QueryWorkspace({
         <QueryHistoryPanel
           history={history}
           saved={saved}
-          connectionId={selected?.id ?? null}
+          connectionId={queryConnectionId || selected?.id || null}
           onClose={() => setHistoryOpen(false)}
           onUse={useHistorySql}
           onDeleteHistory={(id) => setHistory(removeHistoryEntry(id))}
