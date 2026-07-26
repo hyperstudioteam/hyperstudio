@@ -24,10 +24,12 @@ import {
   MoreHorizontal,
   Network,
   Pencil,
+  Plus,
   Plug,
   RefreshCw,
   Search,
   Server,
+  SquareTerminal,
   Table2,
   X,
   Zap,
@@ -44,7 +46,11 @@ import {
   SchemaNode,
   TABLES_GROUP,
 } from "../types/schema";
-import { ContextMenu } from "./ContextMenu";
+import {
+  ContextMenu,
+  ContextMenuSeparator,
+  ContextMenuSubmenu,
+} from "./ContextMenu";
 import { DdlViewer } from "./DdlViewer";
 import { EditColumnModal } from "./schema-edit/EditColumnModal";
 import { EditTableModal } from "./schema-edit/EditTableModal";
@@ -69,6 +75,14 @@ type BrowserMenu =
       group: ObjectGroupDef;
       object: ObjectNode;
       column: ColumnNode;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "columnsFolder";
+      schema: string;
+      group: ObjectGroupDef;
+      object: ObjectNode;
       x: number;
       y: number;
     }
@@ -115,6 +129,7 @@ type SchemaEditDialog =
       columns: ColumnNode[];
       initialSection?: "columns" | "keys" | "indexes";
       initialName?: string;
+      addNew?: boolean;
     }
   | {
       kind: "column";
@@ -143,6 +158,7 @@ interface SchemaBrowserProps {
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
   onShowEr: (schema: string) => void;
+  onNewConsole: () => void;
   onImportCsv: (schema: string, table: string, columns: ColumnNode[]) => void;
 }
 
@@ -203,6 +219,7 @@ export function SchemaBrowser({
   onViewTable,
   onEditTable,
   onShowEr,
+  onNewConsole,
   onImportCsv,
 }: SchemaBrowserProps) {
   const [menu, setMenu] = useState<BrowserMenu | null>(null);
@@ -493,18 +510,50 @@ export function SchemaBrowser({
       {menu && (
         <ContextMenu x={menu.x} y={menu.y}>
           {menu.kind === "database" && (
-            <button
-              type="button"
-              onClick={() => {
-                onRefreshDatabase();
-                setMenu(null);
-              }}
-            >
-              <RefreshCw size={14} /> Refresh schemas
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onNewConsole();
+                  setMenu(null);
+                }}
+              >
+                <SquareTerminal size={14} /> Query Console
+              </button>
+              <ContextMenuSeparator />
+              <button
+                type="button"
+                onClick={() => {
+                  onEdit();
+                  setMenu(null);
+                }}
+              >
+                <Pencil size={14} /> Edit connection…
+              </button>
+              <ContextMenuSeparator />
+              <button
+                type="button"
+                onClick={() => {
+                  onRefreshDatabase();
+                  setMenu(null);
+                }}
+              >
+                <RefreshCw size={14} /> Refresh schemas
+              </button>
+            </>
           )}
           {menu.kind === "schema" && (
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  onNewConsole();
+                  setMenu(null);
+                }}
+              >
+                <SquareTerminal size={14} /> Query Console
+              </button>
+              <ContextMenuSeparator />
               <button
                 type="button"
                 onClick={() => {
@@ -514,6 +563,7 @@ export function SchemaBrowser({
               >
                 <Network size={14} /> Show ER diagram
               </button>
+              <ContextMenuSeparator />
               <button
                 type="button"
                 onClick={() => {
@@ -526,33 +576,109 @@ export function SchemaBrowser({
             </>
           )}
           {menu.kind === "group" && (
-            <button
-              type="button"
-              onClick={() => {
-                onRefreshGroup(menu.schema, menu.group.id);
-                setMenu(null);
-              }}
-            >
-              <RefreshCw size={14} /> Refresh {menu.group.label.toLowerCase()}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onNewConsole();
+                  setMenu(null);
+                }}
+              >
+                <SquareTerminal size={14} /> Query Console
+              </button>
+              <ContextMenuSeparator />
+              <button
+                type="button"
+                onClick={() => {
+                  onRefreshGroup(menu.schema, menu.group.id);
+                  setMenu(null);
+                }}
+              >
+                <RefreshCw size={14} /> Refresh {menu.group.label.toLowerCase()}
+              </button>
+            </>
           )}
           {menu.kind === "object" && (
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  onNewConsole();
+                  setMenu(null);
+                }}
+              >
+                <SquareTerminal size={14} /> Query Console
+              </button>
+              <ContextMenuSeparator />
               {canMutate &&
                 objectActions(menu.group, menu.object).includes("editTable") && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openEdit({
-                        kind: "table",
-                        schema: menu.schema,
-                        table: menu.object.name,
-                        columns: menu.object.children ?? [],
-                      })
-                    }
-                  >
-                    <Pencil size={14} /> Edit Table…
-                  </button>
+                  <>
+                    <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openEdit({
+                            kind: "table",
+                            schema: menu.schema,
+                            table: menu.object.name,
+                            columns: menu.object.children ?? [],
+                            initialSection: "columns",
+                            addNew: true,
+                          })
+                        }
+                      >
+                        <Columns3 size={14} /> Column
+                      </button>
+                      {objectActions(menu.group, menu.object).includes(
+                        "editKey",
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openEdit({
+                              kind: "table",
+                              schema: menu.schema,
+                              table: menu.object.name,
+                              columns: menu.object.children ?? [],
+                              initialSection: "keys",
+                              addNew: true,
+                            })
+                          }
+                        >
+                          <KeyRound size={14} /> Unique Key
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openEdit({
+                            kind: "table",
+                            schema: menu.schema,
+                            table: menu.object.name,
+                            columns: menu.object.children ?? [],
+                            initialSection: "indexes",
+                            addNew: true,
+                          })
+                        }
+                      >
+                        <ListTree size={14} /> Index
+                      </button>
+                    </ContextMenuSubmenu>
+                    <ContextMenuSeparator />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openEdit({
+                          kind: "table",
+                          schema: menu.schema,
+                          table: menu.object.name,
+                          columns: menu.object.children ?? [],
+                        })
+                      }
+                    >
+                      <Pencil size={14} /> Modify Table…
+                    </button>
+                  </>
                 )}
               {objectActions(menu.group, menu.object).includes("editData") && (
                 <button
@@ -606,6 +732,7 @@ export function SchemaBrowser({
                   <FileCode2 size={14} /> Show DDL…
                 </button>
               )}
+              <ContextMenuSeparator />
               <button
                 type="button"
                 onClick={() => {
@@ -617,46 +744,146 @@ export function SchemaBrowser({
               </button>
             </>
           )}
+          {menu.kind === "columnsFolder" &&
+            canMutate &&
+            objectActions(menu.group, menu.object).includes("editTable") && (
+              <>
+                <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEdit({
+                        kind: "table",
+                        schema: menu.schema,
+                        table: menu.object.name,
+                        columns: menu.object.children ?? [],
+                        initialSection: "columns",
+                        addNew: true,
+                      })
+                    }
+                  >
+                    <Columns3 size={14} /> Column
+                  </button>
+                </ContextMenuSubmenu>
+                <ContextMenuSeparator />
+                <button
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      kind: "table",
+                      schema: menu.schema,
+                      table: menu.object.name,
+                      columns: menu.object.children ?? [],
+                      initialSection: "columns",
+                    })
+                  }
+                >
+                  <Pencil size={14} /> Modify Table…
+                </button>
+              </>
+            )}
           {menu.kind === "column" &&
             canMutate &&
             objectActions(menu.group, menu.object).includes("editColumn") && (
-              <button
-                type="button"
-                onClick={() =>
-                  openEdit({
-                    kind: "column",
-                    schema: menu.schema,
-                    table: menu.object.name,
-                    column: menu.column,
-                    supportsDefault: profile.driver !== "typesense",
-                  })
-                }
-              >
-                <Pencil size={14} /> Edit Column…
-              </button>
+              <>
+                {objectActions(menu.group, menu.object).includes("editTable") && (
+                  <>
+                    <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openEdit({
+                            kind: "table",
+                            schema: menu.schema,
+                            table: menu.object.name,
+                            columns: menu.object.children ?? [],
+                            initialSection: "columns",
+                            addNew: true,
+                          })
+                        }
+                      >
+                        <Columns3 size={14} /> Column
+                      </button>
+                    </ContextMenuSubmenu>
+                    <ContextMenuSeparator />
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      kind: "column",
+                      schema: menu.schema,
+                      table: menu.object.name,
+                      column: menu.column,
+                      supportsDefault: profile.driver !== "typesense",
+                    })
+                  }
+                >
+                  <Pencil size={14} /> Modify Column…
+                </button>
+              </>
             )}
           {menu.kind === "keysFolder" &&
             canMutate &&
             objectActions(menu.group, menu.object).includes("editKey") && (
-              <button
-                type="button"
-                onClick={() =>
-                  openEdit({
-                    kind: "table",
-                    schema: menu.schema,
-                    table: menu.object.name,
-                    columns: menu.object.children,
-                    initialSection: "keys",
-                  })
-                }
-              >
-                <Pencil size={14} /> Modify Keys…
-              </button>
+              <>
+                <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEdit({
+                        kind: "table",
+                        schema: menu.schema,
+                        table: menu.object.name,
+                        columns: menu.object.children,
+                        initialSection: "keys",
+                        addNew: true,
+                      })
+                    }
+                  >
+                    <KeyRound size={14} /> Unique Key
+                  </button>
+                </ContextMenuSubmenu>
+                <ContextMenuSeparator />
+                <button
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      kind: "table",
+                      schema: menu.schema,
+                      table: menu.object.name,
+                      columns: menu.object.children,
+                      initialSection: "keys",
+                    })
+                  }
+                >
+                  <Pencil size={14} /> Modify Keys…
+                </button>
+              </>
             )}
           {menu.kind === "key" &&
             canMutate &&
             objectActions(menu.group, menu.object).includes("editKey") && (
               <>
+                <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEdit({
+                        kind: "table",
+                        schema: menu.schema,
+                        table: menu.object.name,
+                        columns: menu.object.children,
+                        initialSection: "keys",
+                        addNew: true,
+                      })
+                    }
+                  >
+                    <KeyRound size={14} /> Unique Key
+                  </button>
+                </ContextMenuSubmenu>
+                <ContextMenuSeparator />
                 <button
                   type="button"
                   onClick={() =>
@@ -670,42 +897,82 @@ export function SchemaBrowser({
                     })
                   }
                 >
-                  <Pencil size={14} /> Edit Key…
+                  <Pencil size={14} /> Modify Key…
                 </button>
               </>
             )}
           {menu.kind === "indexesFolder" && canMutate && (
-            <button
-              type="button"
-              onClick={() =>
-                openEdit({
-                  kind: "table",
-                  schema: menu.schema,
-                  table: menu.object.name,
-                  columns: menu.object.children,
-                  initialSection: "indexes",
-                })
-              }
-            >
-              <Pencil size={14} /> Modify Indexes…
-            </button>
+            <>
+              <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      kind: "table",
+                      schema: menu.schema,
+                      table: menu.object.name,
+                      columns: menu.object.children,
+                      initialSection: "indexes",
+                      addNew: true,
+                    })
+                  }
+                >
+                  <ListTree size={14} /> Index
+                </button>
+              </ContextMenuSubmenu>
+              <ContextMenuSeparator />
+              <button
+                type="button"
+                onClick={() =>
+                  openEdit({
+                    kind: "table",
+                    schema: menu.schema,
+                    table: menu.object.name,
+                    columns: menu.object.children,
+                    initialSection: "indexes",
+                  })
+                }
+              >
+                <Pencil size={14} /> Modify Indexes…
+              </button>
+            </>
           )}
           {menu.kind === "index" && canMutate && (
-            <button
-              type="button"
-              onClick={() =>
-                openEdit({
-                  kind: "table",
-                  schema: menu.schema,
-                  table: menu.object.name,
-                  columns: menu.object.children,
-                  initialSection: "indexes",
-                  initialName: menu.index.name,
-                })
-              }
-            >
-              <Pencil size={14} /> Edit Index…
-            </button>
+            <>
+              <ContextMenuSubmenu label="New" icon={<Plus size={14} />}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      kind: "table",
+                      schema: menu.schema,
+                      table: menu.object.name,
+                      columns: menu.object.children,
+                      initialSection: "indexes",
+                      addNew: true,
+                    })
+                  }
+                >
+                  <ListTree size={14} /> Index
+                </button>
+              </ContextMenuSubmenu>
+              <ContextMenuSeparator />
+              <button
+                type="button"
+                onClick={() =>
+                  openEdit({
+                    kind: "table",
+                    schema: menu.schema,
+                    table: menu.object.name,
+                    columns: menu.object.children,
+                    initialSection: "indexes",
+                    initialName: menu.index.name,
+                  })
+                }
+              >
+                <Pencil size={14} /> Modify Index…
+              </button>
+            </>
           )}
         </ContextMenu>
       )}
@@ -719,6 +986,7 @@ export function SchemaBrowser({
           driver={profile.driver}
           initialSection={editDialog.initialSection}
           initialName={editDialog.initialName}
+          addNew={editDialog.addNew}
           busy={editBusy}
           error={editError}
           onClose={() => !editBusy && setEditDialog(null)}
@@ -974,6 +1242,18 @@ function ObjectGroupBranch({
                             onContextMenu={(event) => {
                               if (canMutate) {
                                 if (
+                                  isColumns &&
+                                  objectActs.includes("editTable")
+                                ) {
+                                  onOpenMenu(event, {
+                                    kind: "columnsFolder",
+                                    schema: schema.name,
+                                    group,
+                                    object,
+                                    x: event.clientX,
+                                    y: event.clientY,
+                                  });
+                                } else if (
                                   isKeys &&
                                   objectActs.includes("editKey")
                                 ) {
