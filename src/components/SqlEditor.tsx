@@ -3,6 +3,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
 import {
   acceptCompletion,
@@ -34,8 +35,18 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import {
+  ClipboardPaste,
+  Copy,
+  GitBranch,
+  ListOrdered,
+  Play,
+  Scissors,
+  WandSparkles,
+} from "lucide-react";
 import { dialectFor } from "../lib/completionSchema";
 import { formatSql } from "../lib/sqlFormat";
+import { ContextMenu } from "./ContextMenu";
 
 export interface SqlEditorHandle {
   /** Selected text when there is a selection, otherwise the whole document. */
@@ -56,6 +67,12 @@ interface SqlEditorProps {
   onRun: (sql: string) => void;
   /** Reports a formatter parse failure so the workspace can surface it. */
   onFormatError?: (message: string) => void;
+  /** Disable Run / Format while a query is in flight. */
+  actionsDisabled?: boolean;
+  onExplain?: () => void;
+  explainDisabled?: boolean;
+  /** Shown only when the buffer has multiple statements. */
+  onRunScript?: () => void;
 }
 
 const highlight = HighlightStyle.define([
@@ -169,21 +186,29 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
       onChange,
       onRun,
       onFormatError,
+      actionsDisabled = false,
+      onExplain,
+      explainDisabled = false,
+      onRunScript,
     },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const languageRef = useRef(new Compartment());
+    const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+    const [hasSelection, setHasSelection] = useState(false);
     // Keep callbacks current without tearing down the editor on every render.
     const onChangeRef = useRef(onChange);
     const onRunRef = useRef(onRun);
     const driverRef = useRef(driver);
     const onFormatErrorRef = useRef(onFormatError);
+    const setMenuRef = useRef(setMenu);
     onChangeRef.current = onChange;
     onRunRef.current = onRun;
     driverRef.current = driver;
     onFormatErrorRef.current = onFormatError;
+    setMenuRef.current = setMenu;
 
     function sqlToRun(view: EditorView) {
       const { from, to } = view.state.selection.main;
@@ -220,6 +245,41 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
       });
     }
 
+    function selectionText(view: EditorView) {
+      const { from, to } = view.state.selection.main;
+      return from === to ? "" : view.state.sliceDoc(from, to);
+    }
+
+    async function copySelection() {
+      const view = viewRef.current;
+      if (!view) return;
+      const text = selectionText(view);
+      if (!text) return;
+      await navigator.clipboard.writeText(text);
+    }
+
+    async function cutSelection() {
+      const view = viewRef.current;
+      if (!view) return;
+      const { from, to } = view.state.selection.main;
+      if (from === to) return;
+      await navigator.clipboard.writeText(view.state.sliceDoc(from, to));
+      view.dispatch({ changes: { from, to, insert: "" } });
+      view.focus();
+    }
+
+    async function pasteClipboard() {
+      const view = viewRef.current;
+      if (!view) return;
+      const text = await navigator.clipboard.readText();
+      const { from, to } = view.state.selection.main;
+      view.dispatch({
+        changes: { from, to, insert: text },
+        selection: { anchor: from + text.length },
+      });
+      view.focus();
+    }
+
     useImperativeHandle(ref, () => ({
       getSqlToRun: () =>
         viewRef.current ? sqlToRun(viewRef.current) : "",
@@ -228,6 +288,17 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
       },
       focus: () => viewRef.current?.focus(),
     }));
+
+    useEffect(() => {
+      if (!menu) return;
+      const close = () => setMenu(null);
+      window.addEventListener("click", close);
+      window.addEventListener("blur", close);
+      return () => {
+        window.removeEventListener("click", close);
+        window.removeEventListener("blur", close);
+      };
+    }, [menu]);
 
     useEffect(() => {
       if (!hostRef.current) return;
@@ -277,6 +348,18 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
             ]),
             languageRef.current.of([]),
             theme,
+            EditorView.domEventHandlers({
+              contextmenu(event) {
+                event.preventDefault();
+                const target = viewRef.current;
+                if (target) {
+                  const { from, to } = target.state.selection.main;
+                  setHasSelection(from !== to);
+                }
+                setMenuRef.current({ x: event.clientX, y: event.clientY });
+                return true;
+              },
+            }),
             EditorView.updateListener.of((update) => {
               if (update.docChanged) {
                 onChangeRef.current(update.state.doc.toString());
@@ -320,6 +403,119 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
       });
     }, [value]);
 
-    return <div className="flex-1 min-w-0 overflow-hidden" ref={hostRef} />;
+    function closeMenu() {
+      setMenu(null);
+    }
+
+    return (
+      <>
+        <div className="flex-1 min-w-0 overflow-hidden" ref={hostRef} />
+        {menu && (
+          <ContextMenu x={menu.x} y={menu.y}>
+            <button
+              type="button"
+              disabled={!hasSelection}
+              onClick={() => {
+                void cutSelection();
+                closeMenu();
+              }}
+            >
+              <Scissors size={14} />
+              Cut
+              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                ⌘X
+              </kbd>
+            </button>
+            <button
+              type="button"
+              disabled={!hasSelection}
+              onClick={() => {
+                void copySelection();
+                closeMenu();
+              }}
+            >
+              <Copy size={14} />
+              Copy
+              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                ⌘C
+              </kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void pasteClipboard();
+                closeMenu();
+              }}
+            >
+              <ClipboardPaste size={14} />
+              Paste
+              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                ⌘V
+              </kbd>
+            </button>
+
+            <div className="my-1 h-px bg-border" />
+
+            <button
+              type="button"
+              disabled={actionsDisabled}
+              onClick={() => {
+                if (viewRef.current) formatDoc(viewRef.current);
+                closeMenu();
+              }}
+            >
+              <WandSparkles size={14} />
+              Format
+              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                ⇧⌥F
+              </kbd>
+            </button>
+
+            <div className="my-1 h-px bg-border" />
+
+            {onExplain && (
+              <button
+                type="button"
+                disabled={explainDisabled}
+                onClick={() => {
+                  onExplain();
+                  closeMenu();
+                }}
+              >
+                <GitBranch size={14} />
+                Explain
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={actionsDisabled}
+              onClick={() => {
+                if (viewRef.current) onRun(sqlToRun(viewRef.current));
+                closeMenu();
+              }}
+            >
+              <Play size={14} fill="currentColor" />
+              Run
+              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                ⌘↵
+              </kbd>
+            </button>
+            {onRunScript && (
+              <button
+                type="button"
+                disabled={actionsDisabled}
+                onClick={() => {
+                  onRunScript();
+                  closeMenu();
+                }}
+              >
+                <ListOrdered size={14} />
+                Run script
+              </button>
+            )}
+          </ContextMenu>
+        )}
+      </>
+    );
   },
 );

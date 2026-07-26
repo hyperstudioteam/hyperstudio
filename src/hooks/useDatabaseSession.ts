@@ -72,11 +72,17 @@ function parseSubgroupKey(key: string) {
 export function useDatabaseSession() {
   /** Currently selected connection in the UI. */
   const [activeId, setActiveId] = useState<string | null>(null);
-  /** Connection with a live DB pool. */
+  /** Most recently used live connection (status / cancel fallback). */
   const [liveId, setLiveId] = useState<string | null>(null);
+  /** All connection ids with an open pool. */
+  const [liveIds, setLiveIds] = useState<Set<string>>(() => new Set());
   /** Mirrors liveId so long-running background work can observe disconnects. */
   const liveIdRef = useRef(liveId);
   liveIdRef.current = liveId;
+  const liveIdsRef = useRef(liveIds);
+  liveIdsRef.current = liveIds;
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
   const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo | null>(
     null,
   );
@@ -89,8 +95,8 @@ export function useDatabaseSession() {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<SessionBusy>(null);
-  /** True while an explicit transaction is open on the live connection. */
-  const [txnOpen, setTxnOpen] = useState(false);
+  /** Open transactions keyed by connection id. */
+  const [txnOpenById, setTxnOpenById] = useState<Record<string, boolean>>({});
 
   const syncFromCache = useCallback((connectionId: string) => {
     setSchemas(toSchemaNodes(getSchemaCache(connectionId)));
@@ -99,13 +105,14 @@ export function useDatabaseSession() {
   function clearSession() {
     setActiveId(null);
     setLiveId(null);
+    setLiveIds(new Set());
     setConnectionInfo(null);
     setSchemas([]);
     setAvailableSchemas([]);
     setSchemaExpanded(new Set());
     setObjectSubgroups({});
     setResult(null);
-    setTxnOpen(false);
+    setTxnOpenById({});
   }
 
   /** Show cached schemas without opening a DB pool. */
@@ -122,20 +129,25 @@ export function useDatabaseSession() {
       setAvailableSchemas([]);
       setSchemas([]);
     }
-    if (liveId !== profile.id) {
+    if (!liveIdsRef.current.has(profile.id)) {
       setConnectionInfo(null);
     }
   }
 
   async function ensureLive(profile: ConnectionProfile) {
-    if (liveId === profile.id) return;
+    if (liveIdsRef.current.has(profile.id)) {
+      setLiveId(profile.id);
+      return;
+    }
     const ready = await withResolvedPassword(profile);
     const info = await databaseApi.connect(ready);
+    setLiveIds((current) => new Set(current).add(profile.id));
     setLiveId(profile.id);
-    setActiveId(profile.id);
-    setConnectionInfo(info);
-    // A fresh pool cannot have a transaction parked against it.
-    setTxnOpen(false);
+    // Keep sidebar selection intact when a console runs against another connection.
+    if (activeIdRef.current === profile.id) {
+      setConnectionInfo(info);
+    }
+    setTxnOpenById((current) => ({ ...current, [profile.id]: false }));
   }
 
   function isVaultAuthError(error: unknown) {
@@ -347,10 +359,11 @@ export function useDatabaseSession() {
   }
 
   /** Ask the server to abandon the statement in flight. */
-  async function cancelQuery() {
-    if (!liveIdRef.current) return;
+  async function cancelQuery(connectionId?: string) {
+    const id = connectionId ?? liveIdRef.current;
+    if (!id) return;
     try {
-      await databaseApi.cancelQuery(liveIdRef.current);
+      await databaseApi.cancelQuery(id);
     } catch (nextError) {
       setError(errorMessage(nextError));
     }
@@ -359,12 +372,12 @@ export function useDatabaseSession() {
   async function beginTransaction(profile: ConnectionProfile) {
     await ensureLive(profile);
     await databaseApi.beginTransaction(profile.id);
-    setTxnOpen(true);
+    setTxnOpenById((current) => ({ ...current, [profile.id]: true }));
   }
 
   async function endTransaction(profile: ConnectionProfile, commit: boolean) {
     await databaseApi.endTransaction(profile.id, commit);
-    setTxnOpen(false);
+    setTxnOpenById((current) => ({ ...current, [profile.id]: false }));
   }
 
   /** Commit several statements atomically (for the table editor). */
@@ -454,6 +467,17 @@ export function useDatabaseSession() {
 
   function onDeleted(id: string) {
     clearConnectionCache(id);
+    setLiveIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setTxnOpenById((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
     if (activeId === id || liveId === id) clearSession();
   }
 
@@ -473,6 +497,7 @@ export function useDatabaseSession() {
     connectedId: liveId,
     activeId,
     liveId,
+    liveIds,
     connectionInfo,
     schemas,
     availableSchemas,
@@ -495,7 +520,8 @@ export function useDatabaseSession() {
     executeSql,
     loadErDiagram,
     cancelQuery,
-    txnOpen,
+    txnOpen: liveId ? Boolean(txnOpenById[liveId]) : false,
+    txnOpenById,
     beginTransaction,
     endTransaction,
     executeBatch,

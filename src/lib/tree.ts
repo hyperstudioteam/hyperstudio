@@ -42,6 +42,19 @@ export function firstConnectionId(nodes: TreeNode[]): string | null {
   return null;
 }
 
+/** Flatten the tree into a list of connection profiles (depth-first). */
+export function collectConnections(nodes: TreeNode[]): ConnectionProfile[] {
+  const connections: ConnectionProfile[] = [];
+  for (const node of nodes) {
+    if (node.kind === "connection") {
+      connections.push(node.profile);
+    } else {
+      connections.push(...collectConnections(node.children));
+    }
+  }
+  return connections;
+}
+
 export function insertIntoFolder(
   nodes: TreeNode[],
   folderId: string | null,
