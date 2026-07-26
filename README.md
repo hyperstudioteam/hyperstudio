@@ -81,7 +81,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] DDL and DML support with affected-row counts and timings
 - [x] SQL syntax highlighting with per-dialect parsing (CodeMirror 6)
 - [x] Schema-aware autocompletion for schemas, tables, views, and columns
-- [ ] SQL formatting
+- [x] SQL formatting (`Shift+Alt+F`, or the **Format** button)
 - [ ] Query history and saved queries
 - [ ] Explicit transaction control and query cancellation
 - [ ] Multi-statement scripts and per-statement results
@@ -180,6 +180,7 @@ until you submit them.
 | Shortcut | Context | Action |
 | --- | --- | --- |
 | `Cmd/Ctrl + Enter` | SQL editor | Run the buffer, or the current selection |
+| `Shift + Alt + F` | SQL editor | Format the buffer, or the current selection |
 | `Cmd/Ctrl + C` | Any grid | Copy the selection using the active extractor |
 | `Cmd/Ctrl + V` | Data editor | Paste into the selected range |
 | `Enter` | Cell editor | Commit the cell |
