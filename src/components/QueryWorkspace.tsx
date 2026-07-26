@@ -78,6 +78,12 @@ import { ResultGrid } from "./ResultGrid";
 import { ScriptResults } from "./ScriptResults";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
+import { ExtensionView } from "../extensions/ExtensionView";
+import {
+  useActiveExtensionView,
+  useExtensionStatusItems,
+} from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 
 type ResultPanel = "results" | "plan" | "messages";
 
@@ -226,6 +232,8 @@ export function QueryWorkspace({
     driver: "postgres" | "mysql";
   } | null>(null);
   const editorRef = useRef<SqlEditorHandle>(null);
+  const activeExtensionView = useActiveExtensionView();
+  const extensionStatusItems = useExtensionStatusItems();
   const queryCounter = useRef(1);
   const cancelScript = useRef(false);
   /** SQL awaiting its result so the run can be recorded once it settles. */
@@ -1272,13 +1280,53 @@ export function QueryWorkspace({
         {txnOpen && (
           <span className="ml-2 text-warn">Transaction open · uncommitted</span>
         )}
+        {extensionStatusItems
+          .filter((item) => (item.alignment ?? "left") === "left")
+          .map((item) => (
+            <button
+              type="button"
+              key={`${item.source}:${item.id}`}
+              className="ml-2 border-0 bg-transparent p-0 text-inherit hover:text-text"
+              onClick={() =>
+                item.command &&
+                extensionRegistry.executeCommand(item.command, {
+                  sql: editorRef.current?.getSql() ?? query,
+                  selectedSql: editorRef.current?.getSelectedSql() ?? "",
+                  driver: queryConnection?.driver,
+                  connectionId: queryConnectionId || null,
+                })
+              }
+            >
+              {item.text}
+            </button>
+          ))}
         <span className="ml-auto flex gap-[13px]">
+          {extensionStatusItems
+            .filter((item) => item.alignment === "right")
+            .map((item) => (
+              <button
+                type="button"
+                key={`${item.source}:${item.id}`}
+                className="border-0 bg-transparent p-0 text-inherit hover:text-text"
+                onClick={() =>
+                  item.command &&
+                  extensionRegistry.executeCommand(item.command, {
+                    sql: editorRef.current?.getSql() ?? query,
+                    selectedSql: editorRef.current?.getSelectedSql() ?? "",
+                    driver: queryConnection?.driver,
+                    connectionId: queryConnectionId || null,
+                  })
+                }
+              >
+                {item.text}
+              </button>
+            ))}
           UTF-8 <span>LF</span> SQL
         </span>
       </footer>
     </main>
 
-      {historyOpen && (
+      {historyOpen && !activeExtensionView && (
         <QueryHistoryPanel
           history={history}
           saved={saved}
@@ -1288,6 +1336,23 @@ export function QueryWorkspace({
           onDeleteHistory={(id) => setHistory(removeHistoryEntry(id))}
           onClearHistory={() => setHistory(clearHistory())}
           onDeleteSaved={(id) => setSaved(removeSavedQuery(id))}
+        />
+      )}
+      {activeExtensionView && (
+        <ExtensionView
+          view={activeExtensionView.view}
+          context={{
+            ...activeExtensionView.context,
+            sql: editorRef.current?.getSql() ?? query,
+            selectedSql: editorRef.current?.getSelectedSql() ?? "",
+            driver: queryConnection?.driver,
+            connectionId: queryConnectionId || null,
+          }}
+          onClose={() => extensionRegistry.closeView()}
+          getEditorSql={() => editorRef.current?.getSql() ?? query}
+          getSelectedSql={() => editorRef.current?.getSelectedSql() ?? ""}
+          insertEditorSql={(sql) => editorRef.current?.insertSql(sql)}
+          replaceSelection={(sql) => editorRef.current?.replaceSelection(sql)}
         />
       )}
     </div>

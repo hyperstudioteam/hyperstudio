@@ -32,8 +32,12 @@ impl PluginDriver {
         }
     }
 
-    fn executable_path(&self) -> PathBuf {
-        self.plugin_dir.join(&self.manifest.executable)
+    fn executable_path(&self) -> Result<PathBuf, String> {
+        self.manifest
+            .executable
+            .as_ref()
+            .map(|executable| self.plugin_dir.join(executable))
+            .ok_or_else(|| format!("Plugin '{}' has no executable.", self.manifest.id))
     }
 
     async fn session(&self, connection_id: &str) -> Result<Arc<PluginProcess>, String> {
@@ -46,7 +50,8 @@ impl PluginDriver {
     }
 
     async fn spawn_session(&self, connection_id: &str) -> Result<Arc<PluginProcess>, String> {
-        let process = PluginProcess::spawn(self.executable_path(), self.settings.clone()).await?;
+        let process =
+            PluginProcess::spawn(self.executable_path()?, self.settings.clone()).await?;
         let process = Arc::new(process);
         self.sessions
             .write()
@@ -109,7 +114,7 @@ impl DatabaseDriver for PluginDriver {
     async fn test_connection(&self, cfg: &ConnectionConfig) -> Result<ConnectionInfo, String> {
         cfg.validate()?;
         let process =
-            PluginProcess::spawn(self.executable_path(), self.settings.clone()).await?;
+            PluginProcess::spawn(self.executable_path()?, self.settings.clone()).await?;
         let result = process
             .call("test_connection", Self::connection_params(cfg))
             .await?;

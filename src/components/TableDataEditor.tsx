@@ -13,6 +13,7 @@ import {
   LoaderCircle,
   Minus,
   Plus,
+  Puzzle,
   RefreshCw,
   Search,
   Settings,
@@ -22,10 +23,12 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/cn";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
-import { ContextMenu } from "./ContextMenu";
+import { ContextMenu, ContextMenuSeparator } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
 import { errorMessage } from "../lib/format";
 import { presentCell } from "../plugins/contributions";
+import { useExtensionMenu } from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 import {
   CellRange,
   ExtractorId,
@@ -119,6 +122,7 @@ export function TableDataEditor({
   executeBatch,
   confirmWrites,
 }: TableDataEditorProps) {
+  const extensionMenu = useExtensionMenu("tableData/context");
   const [where, setWhere] = useState("");
   const [orderBy, setOrderBy] = useState("");
   const [headerSort, setHeaderSort] = useState<ColumnSort | null>(null);
@@ -1077,6 +1081,28 @@ export function TableDataEditor({
           >
             Paste
           </button>
+          {extensionMenu.length > 0 && <ContextMenuSeparator />}
+          {extensionMenu.map((item) => (
+            <button
+              type="button"
+              key={`${item.source}:${item.command}`}
+              onClick={() => {
+                const focus = cellRange?.focus;
+                const row = focus ? visibleRows[focus.row] : undefined;
+                extensionRegistry.executeCommand(item.command, {
+                  connectionId: profile.id,
+                  driver: profile.driver,
+                  schema,
+                  object: table,
+                  column: focus ? columns[focus.col] : undefined,
+                  value: focus && row ? row.values[focus.col] : undefined,
+                });
+                setContextMenu(null);
+              }}
+            >
+              <Puzzle size={14} /> {item.title}
+            </button>
+          ))}
         </ContextMenu>
       )}
       <CopyAsMenu

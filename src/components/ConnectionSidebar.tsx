@@ -4,18 +4,21 @@ import {
   FolderPlus,
   Pencil,
   Plug,
+  Puzzle,
   RefreshCw,
   Trash2,
 } from "lucide-react";
 import { ConnectionTree } from "./ConnectionTree";
 import { SchemaBrowser } from "./SchemaBrowser";
-import { ContextMenu } from "./ContextMenu";
+import { ContextMenu, ContextMenuSeparator } from "./ContextMenu";
 import {
   ConnectionProfile,
   DropPosition,
   Selection,
   TreeNode,
 } from "../types/connection";
+import { useExtensionMenu } from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 
 interface ConnectionSidebarProps {
   tree: TreeNode[];
@@ -68,6 +71,7 @@ const contextDangerClass =
   "text-danger hover:bg-[rgba(239,107,115,0.1)]";
 
 export function ConnectionSidebar(props: ConnectionSidebarProps) {
+  const extensionMenu = useExtensionMenu("connection/context");
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -283,6 +287,24 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
               </button>
             </>
           )}
+          {extensionMenu.length > 0 && <ContextMenuSeparator />}
+          {extensionMenu.map((item) => (
+            <button
+              type="button"
+              key={`${item.source}:${item.command}`}
+              onClick={() => {
+                extensionRegistry.executeCommand(item.command, {
+                  connectionId:
+                    contextMenu.target?.kind === "connection"
+                      ? contextMenu.target.id
+                      : null,
+                });
+                setContextMenu(null);
+              }}
+            >
+              <Puzzle size={14} /> {item.title}
+            </button>
+          ))}
         </ContextMenu>
       )}
     </aside>

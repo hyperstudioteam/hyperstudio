@@ -1,0 +1,46 @@
+{
+  "id": "hyper-ai",
+  "name": "Hyper AI",
+  "version": "0.1.0",
+  "description": "Example UI extension that adds an AI assistant to the SQL editor.",
+  "type": "extension",
+  "contributes": {
+    "commands": [
+      {
+        "id": "hyper-ai.openChat",
+        "title": "Ask Hyper AI",
+        "opensView": "hyper-ai.chat"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "hyper-ai.openChat",
+          "group": "ai"
+        }
+      ],
+      "activity": [
+        {
+          "command": "hyper-ai.openChat",
+          "group": "tools"
+        }
+      ]
+    },
+    "views": [
+      {
+        "id": "hyper-ai.chat",
+        "name": "Hyper AI",
+        "location": "panel.right",
+        "entry": "ui/index.html"
+      }
+    ],
+    "statusBar": [
+      {
+        "id": "hyper-ai.status",
+        "text": "Hyper AI",
+        "command": "hyper-ai.openChat",
+        "alignment": "right"
+      }
+    ]
+  }
+}

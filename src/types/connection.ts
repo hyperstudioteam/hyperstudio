@@ -1,4 +1,5 @@
 import { ObjectGroupDef } from "./schema";
+import type { ExtensionContributions } from "../extensions/types";
 
 export type Driver = string;
 
@@ -69,8 +70,10 @@ export interface InstalledPluginInfo {
   name: string;
   version: string;
   description: string;
+  kind: "driver" | "extension";
   enabled: boolean;
   path: string;
+  contributes: ExtensionContributions;
 }
 
 export type SshAuth = "password" | "key" | "agent";

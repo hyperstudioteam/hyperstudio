@@ -26,6 +26,7 @@ import {
   Pencil,
   Plus,
   Plug,
+  Puzzle,
   RefreshCw,
   Search,
   Server,
@@ -54,6 +55,8 @@ import {
 import { DdlViewer } from "./DdlViewer";
 import { EditColumnModal } from "./schema-edit/EditColumnModal";
 import { EditTableModal } from "./schema-edit/EditTableModal";
+import { useExtensionMenu } from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 
 type BusyDetail = SessionBusy;
 
@@ -222,6 +225,7 @@ export function SchemaBrowser({
   onNewConsole,
   onImportCsv,
 }: SchemaBrowserProps) {
+  const extensionMenu = useExtensionMenu("schema/context");
   const [menu, setMenu] = useState<BrowserMenu | null>(null);
   const [editDialog, setEditDialog] = useState<SchemaEditDialog | null>(null);
   const [editBusy, setEditBusy] = useState(false);
@@ -974,6 +978,29 @@ export function SchemaBrowser({
               </button>
             </>
           )}
+          {extensionMenu.length > 0 && <ContextMenuSeparator />}
+          {extensionMenu.map((item) => (
+            <button
+              type="button"
+              key={`${item.source}:${item.command}`}
+              onClick={() => {
+                extensionRegistry.executeCommand(item.command, {
+                  connectionId: profile.id,
+                  schema:
+                    menu.kind === "schema"
+                      ? menu.name
+                      : "schema" in menu
+                        ? menu.schema
+                        : undefined,
+                  object: "object" in menu ? menu.object.name : undefined,
+                  column: menu.kind === "column" ? menu.column.name : undefined,
+                });
+                setMenu(null);
+              }}
+            >
+              <Puzzle size={14} /> {item.title}
+            </button>
+          ))}
         </ContextMenu>
       )}
 
