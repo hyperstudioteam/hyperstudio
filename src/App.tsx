@@ -20,7 +20,14 @@ import {
 import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
-import { getVaultSecret, isVaultUnlocked } from "./lib/vault";
+import {
+  getVaultSecret,
+  isVaultUnlocked,
+  onVaultLocked,
+  touchVaultActivity,
+  vaultExists,
+} from "./lib/vault";
+import { VaultSettingsModal } from "./components/connection-modal/VaultSettingsModal";
 import { ConnectionProfile, DriverInfo } from "./types/connection";
 import { SchemaInfo } from "./types/schema";
 import { collectFolderOptions } from "./lib/tree";
@@ -48,6 +55,27 @@ function App() {
     null,
   );
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [vaultSettingsOpen, setVaultSettingsOpen] = useState(false);
+  const [vaultUnlocked, setVaultUnlocked] = useState(() => isVaultUnlocked());
+  const [hasVault, setHasVault] = useState(() => vaultExists());
+
+  // Any interaction defers auto-lock; locking flips the indicator.
+  useEffect(() => {
+    const events = ["mousedown", "keydown", "wheel"] as const;
+    const onActivity = () => {
+      if (isVaultUnlocked()) touchVaultActivity();
+    };
+    for (const event of events) {
+      window.addEventListener(event, onActivity, { passive: true });
+    }
+    const stop = onVaultLocked(() => setVaultUnlocked(false));
+    return () => {
+      for (const event of events) {
+        window.removeEventListener(event, onActivity);
+      }
+      stop();
+    };
+  }, []);
   const vaultRetry = useRef<(() => void) | null>(null);
   const completionPrefetched = useRef<string | null>(null);
 
@@ -173,6 +201,8 @@ function App() {
           active="databases"
           onSelect={() => undefined}
           onOpenPlugins={() => setPluginsOpen(true)}
+          vaultUnlocked={hasVault ? vaultUnlocked : null}
+          onOpenVault={() => setVaultSettingsOpen(true)}
         />
         <ConnectionSidebar
           tree={tree.tree}
@@ -308,6 +338,8 @@ function App() {
         <VaultCreateModal
           onCreated={() => {
             setVaultPrompt(null);
+            setVaultUnlocked(true);
+            setHasVault(true);
             vaultRetry.current?.();
             vaultRetry.current = null;
           }}
@@ -321,12 +353,24 @@ function App() {
         <VaultUnlockModal
           onUnlocked={() => {
             setVaultPrompt(null);
+            setVaultUnlocked(true);
+            setHasVault(true);
             vaultRetry.current?.();
             vaultRetry.current = null;
           }}
           onClose={() => {
             setVaultPrompt(null);
             vaultRetry.current = null;
+          }}
+        />
+      )}
+
+      {vaultSettingsOpen && (
+        <VaultSettingsModal
+          onClose={() => {
+            setVaultSettingsOpen(false);
+            setVaultUnlocked(isVaultUnlocked());
+            setHasVault(vaultExists());
           }}
         />
       )}
