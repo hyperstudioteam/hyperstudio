@@ -92,6 +92,12 @@ export const databaseApi = {
   executeBatch(connectionId: string, statements: string[]) {
     return invoke<number[]>("execute_batch", { connectionId, statements });
   },
+  tableDdl(connectionId: string, schema: string, table: string) {
+    return invoke<string>("table_ddl", { connectionId, schema, table });
+  },
+  writeExportChunk(path: string, contents: string, append: boolean) {
+    return invoke<void>("write_export_chunk", { path, contents, append });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },
