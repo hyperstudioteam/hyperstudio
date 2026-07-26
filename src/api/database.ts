@@ -102,6 +102,29 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  beginTransaction(connectionId: string) {
+    return invoke<void>("begin_transaction", { connectionId });
+  },
+  endTransaction(connectionId: string, commit: boolean) {
+    return invoke<void>("end_transaction", { connectionId, commit });
+  },
+  transactionOpen(connectionId: string) {
+    return invoke<boolean>("transaction_open", { connectionId });
+  },
+  /** Resolves false when nothing was running to cancel. */
+  cancelQuery(connectionId: string) {
+    return invoke<boolean>("cancel_query", { connectionId });
+  },
+  /** Runs every statement in one transaction; resolves to affected rows each. */
+  executeBatch(connectionId: string, statements: string[]) {
+    return invoke<number[]>("execute_batch", { connectionId, statements });
+  },
+  tableDdl(connectionId: string, schema: string, table: string) {
+    return invoke<string>("table_ddl", { connectionId, schema, table });
+  },
+  writeExportChunk(path: string, contents: string, append: boolean) {
+    return invoke<void>("write_export_chunk", { path, contents, append });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },

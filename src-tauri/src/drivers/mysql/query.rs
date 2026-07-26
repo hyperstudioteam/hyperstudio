@@ -1,12 +1,12 @@
 //! MySQL query execution with dialect-aware LIMIT capping.
 
 use futures_util::TryStreamExt;
-use sqlx::{Column, MySqlPool, Row};
+use sqlx::{Column, MySqlConnection, MySqlPool, Row};
 
 use crate::drivers::mysql::values::decode;
 use crate::drivers::query_common::{
-    TrailingLimit, is_row_query, parse_standard_limit, probe_one_extra, read_usize_back,
-    require_keyword_back, skip_spaces_back, split_trailing_semi, with_semi,
+    TrailingLimit, is_explain_query, is_row_query, parse_standard_limit, probe_one_extra,
+    read_usize_back, require_keyword_back, skip_spaces_back, split_trailing_semi, with_semi,
 };
 use crate::models::QueryResult;
 
@@ -43,7 +43,7 @@ fn parse_limit(body: &str) -> Option<TrailingLimit> {
 /// Cap SELECT-like statements at `max_rows` using MySQL LIMIT forms
 /// (`LIMIT n`, `LIMIT n OFFSET m`, `LIMIT offset, count`).
 pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
-    if max_rows == 0 || !is_row_query(sql) {
+    if max_rows == 0 || !is_row_query(sql) || is_explain_query(sql) {
         return sql.to_string();
     }
 
@@ -55,7 +55,28 @@ pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
     with_semi(rewritten, trailing_semi)
 }
 
-pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<QueryResult, String> {
+/// Server-side id of this session, used to cancel its running statement.
+pub async fn connection_id(conn: &mut MySqlConnection) -> Result<u64, String> {
+    sqlx::query_scalar::<_, u64>("SELECT CONNECTION_ID()")
+        .fetch_one(conn)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Kill only the running statement, leaving the session itself alive.
+pub async fn kill_query(pool: &MySqlPool, session_id: u64) -> Result<bool, String> {
+    sqlx::query(&format!("KILL QUERY {session_id}"))
+        .execute(pool)
+        .await
+        .map(|_| true)
+        .map_err(|error| error.to_string())
+}
+
+pub async fn execute_on(
+    conn: &mut MySqlConnection,
+    sql: &str,
+    max_rows: usize,
+) -> Result<QueryResult, String> {
     if sql.trim().is_empty() {
         return Err("Enter a SQL statement first.".into());
     }
@@ -66,7 +87,7 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
 
     if !is_row_query(&sql) {
         let affected_rows = sqlx::query(&sql)
-            .execute(pool)
+            .execute(&mut *conn)
             .await
             .map_err(|error| error.to_string())?
             .rows_affected();
@@ -79,7 +100,7 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
         });
     }
 
-    let mut stream = sqlx::query(&sql).fetch(pool);
+    let mut stream = sqlx::query(&sql).fetch(&mut *conn);
     let mut rows = Vec::new();
     let mut columns = Vec::new();
     while let Some(row) = stream.try_next().await.map_err(|error| error.to_string())? {
@@ -104,6 +125,25 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
         elapsed_ms: started.elapsed().as_millis(),
         truncated,
     })
+}
+
+/// Run every statement inside one transaction, rolling back on the first error.
+/// DDL still commits implicitly in MySQL, so callers should keep batches to DML.
+pub async fn execute_batch(pool: &MySqlPool, statements: &[String]) -> Result<Vec<u64>, String> {
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let mut affected = Vec::with_capacity(statements.len());
+    for (index, statement) in statements.iter().enumerate() {
+        let outcome = sqlx::query(statement).execute(&mut *tx).await;
+        match outcome {
+            Ok(done) => affected.push(done.rows_affected()),
+            Err(error) => {
+                let _ = tx.rollback().await;
+                return Err(format!("Statement {} failed: {error}", index + 1));
+            }
+        }
+    }
+    tx.commit().await.map_err(|error| error.to_string())?;
+    Ok(affected)
 }
 
 #[cfg(test)]
@@ -155,6 +195,14 @@ mod tests {
         assert_eq!(
             enforce_select_limit("DELETE FROM users", 500),
             "DELETE FROM users"
+        );
+    }
+
+    #[test]
+    fn leaves_explain_alone() {
+        assert_eq!(
+            enforce_select_limit("EXPLAIN FORMAT=JSON SELECT * FROM users", 500),
+            "EXPLAIN FORMAT=JSON SELECT * FROM users"
         );
     }
 }

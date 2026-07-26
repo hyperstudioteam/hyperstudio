@@ -52,7 +52,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Lazy connect — cached connections open a pool only when you run something
 - [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
 - [x] SSH tunnels
-- [ ] Connection color coding and read-only / production guards
+- [x] Connection colour coding and read-only / production guards
 
 ### Password storage
 
@@ -60,8 +60,8 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] **Raw** — stored in plain text on this device
 - [x] **Vault** — AES-GCM encrypted, key derived from a master password with PBKDF2-SHA256
 - [x] Unlock prompt appears on demand when a locked vault is needed
-- [ ] OS keychain integration (macOS Keychain, Windows Credential Manager, libsecret)
-- [ ] Vault auto-lock after inactivity and master password rotation
+- [x] OS keychain integration (macOS Keychain, Windows Credential Manager, Secret Service)
+- [x] Vault auto-lock after inactivity and master password rotation
 
 ### Schema browser
 
@@ -70,8 +70,9 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Manual refresh at the database and schema level
 - [x] Column types, nullability, and primary-key markers
 - [ ] Indexes, foreign keys, constraints, and triggers
-- [ ] Search and filter within the tree
-- [ ] Table DDL viewer and ER diagrams
+- [x] Search and filter within the tree (matches schema, object, and column names)
+- [x] Table DDL viewer (right-click an object → **Show DDL…**)
+- [ ] ER diagrams
 
 ### Query workspace
 
@@ -81,10 +82,10 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] DDL and DML support with affected-row counts and timings
 - [x] SQL syntax highlighting with per-dialect parsing (CodeMirror 6)
 - [x] Schema-aware autocompletion for schemas, tables, views, and columns
-- [ ] SQL formatting
-- [ ] Query history and saved queries
-- [ ] Explicit transaction control and query cancellation
-- [ ] Multi-statement scripts and per-statement results
+- [x] SQL formatting (`Shift+Alt+F`, or the **Format** button)
+- [x] Query history and saved queries
+- [x] Explicit transaction control (**Begin** / **Commit** / **Rollback**) and query cancellation
+- [x] Multi-statement scripts and per-statement results
 
 ### Data editor
 
@@ -95,9 +96,10 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Insert and delete rows, then submit or revert as a batch
 - [x] Primary-key-aware `UPDATE` / `DELETE` statement generation
 - [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
+- [x] Import a CSV into a table with header detection and column mapping
 - [x] Pluggable column types and data viewers via the contribution registry
-- [ ] Transactional commit mode (currently auto-commit per statement)
-- [ ] Column sorting and per-column filters from the grid header
+- [x] Transactional commit mode (**Tx: Atomic**), or auto-commit per statement
+- [x] Column sorting and per-column filters from the grid header
 
 ### Selection, copy, and paste
 
@@ -107,7 +109,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Copy as SQL Inserts, SQL Updates, or a Where Clause
 - [x] Optional **Include header** toggle (off by default)
 - [x] Paste a single value into every selected cell, or tile a block across the range
-- [ ] Export a full result set to a file
+- [x] Export a full result set to a file (CSV, TSV, JSON, or SQL inserts)
 - [ ] Import from CSV into a table
 
 ## Getting started
@@ -157,8 +159,9 @@ cd src-tauri && cargo check
 introspection to the schemas you care about, which keeps large servers fast.
 
 **2. Decide how the password is stored.** Leave **Save password** off to keep it in memory
-for the session, or turn it on and choose **Into vault** or **Raw password**. The first vault
-save walks you through creating a master password.
+for the session, or turn it on and choose **Into vault**, **OS credential store**, or
+**Raw password**. The first vault save walks you through creating a master password; the OS
+credential store needs no master password and is greyed out where the system has none.
 
 **2b. Optional SSH tunnel.** On the **SSH** tab, enable a tunnel through a bastion host.
 Authenticate with a password, a private key file (`~/.ssh/…` is expanded), or the local
@@ -176,7 +179,29 @@ first query, refresh, or edit.
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
 
-**5. Move data around.** Drag across cells to select a range, then copy with your chosen
+**5. Control the transaction.** **Begin transaction** parks a connection for your session so
+every following statement, including data-editor writes, runs inside it. The badge stays on
+**Tx: Open** until you **Commit** or **Rollback**; disconnecting rolls back. While a statement
+is running, **Cancel** asks the server to abandon it (`pg_cancel_backend` on PostgreSQL,
+`KILL QUERY` on MySQL) without dropping the session.
+
+**6. Run a script.** When the buffer holds more than one statement, a **Run script** button
+appears next to **Run**. Statements execute in order, each result is listed on the left of
+the results pane, and clicking one shows its grid or error. Scripts stop at the first
+failure unless you clear **Stop on error**, and **Stop** halts after the running statement.
+Semicolons inside strings, comments, and `$$` blocks are left alone by the splitter.
+
+**7. Choose how edits commit.** The **Tx** badge in the data editor toolbar switches between
+**Atomic** (all staged changes go out in one transaction that rolls back on the first error)
+and **Auto** (one statement at a time). Atomic is the default on PostgreSQL and MySQL;
+drivers without transaction support stay on Auto.
+
+**8. Load a CSV.** Right-click a table → **Import CSV…**. The delimiter is sniffed from the
+file, the first row is treated as a header, and columns are matched by name (ignoring case,
+spaces, underscores, and dashes) with a dropdown per column to correct or skip. Rows go out
+in batches of 200, and the progress line reports how many landed if one fails.
+
+**9. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
@@ -185,6 +210,7 @@ until you submit them.
 | Shortcut | Context | Action |
 | --- | --- | --- |
 | `Cmd/Ctrl + Enter` | SQL editor | Run the buffer, or the current selection |
+| `Shift + Alt + F` | SQL editor | Format the buffer, or the current selection |
 | `Cmd/Ctrl + C` | Any grid | Copy the selection using the active extractor |
 | `Cmd/Ctrl + V` | Data editor | Paste into the selected range |
 | `Enter` | Cell editor | Commit the cell |
@@ -201,16 +227,23 @@ HyperStudio stores everything locally; there is no server, telemetry, or sync.
 | Connection profiles | `hyperstudio.connections.v2` | Passwords are stripped unless the mode is **raw** |
 | Schema cache | `hyperstudio.schema-cache.v1` | Names, types, and PK flags only — never row data |
 | Encrypted vault | `hyperstudio.vault.v1` | Salt, verifier, and AES-GCM ciphertext |
+| Keychain secrets | OS credential store | Keyed by connection id under service `com.hyperstudio.app` |
 
 The vault derives a 256-bit AES-GCM key from your master password using PBKDF2-SHA256 with
 310,000 iterations and a random 16-byte salt. The master password itself is never written
-to disk, and secrets are only held in memory while the vault is unlocked.
+to disk, and secrets are only held in memory while the vault is unlocked. The
+vault auto-locks after a configurable idle period (15 minutes by default), and
+the master password can be rotated — which re-derives a new salt and
+re-encrypts every stored secret.
 
 **Caveats you should know about:**
 
 - **Raw** mode is plain text. Use it only on a machine you trust.
-- Local storage is not protected by the OS keychain yet, so an attacker with access to your
-  user account can read raw passwords and attempt an offline attack on the vault.
+- **OS credential store** mode hands the password to macOS Keychain, Windows Credential
+  Manager, or Secret Service, so it is protected by your login session and needs no master
+  password. Access is governed by the OS, which may prompt on first read.
+- Local storage itself is not encrypted, so an attacker with access to your user account can
+  read raw passwords and attempt an offline attack on the vault.
 - Edits in the data editor auto-commit per statement; there is no transactional rollback yet.
 
 ## Architecture
@@ -263,8 +296,8 @@ Key modules worth knowing:
 
 ### v0.2 — Trust the editor
 
-- [ ] Transactional commit mode with an explicit **Commit** / **Rollback** toolbar
-- [ ] Query cancellation and a visible transaction state
+- [x] Transactional commit mode for the data editor (**Atomic** / **Auto**)
+- [x] Explicit transaction control and query cancellation in the query workspace
 - [ ] Column sorting and header filters in both grids
 - [ ] Export a result set or table to CSV, JSON, or SQL
 
@@ -286,7 +319,7 @@ Key modules worth knowing:
 
 ### v1.0 — Ship it
 
-- [ ] OS keychain integration and vault auto-lock
+- [x] OS keychain integration and vault auto-lock
 - [ ] Signed, notarized builds for macOS, Windows, and Linux
 - [ ] Auto-updates
 - [ ] Automated test suite and CI on every pull request
@@ -296,7 +329,6 @@ Key modules worth knowing:
 ### Later
 
 - ER diagrams and schema comparison
-- Import from CSV
 - Scripted extractor plugins and UI slots
 - Themes and layout customization
 
