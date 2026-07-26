@@ -20,6 +20,15 @@ interface EditColumnModalProps {
   onClose: () => void;
 }
 
+const formLabelClass =
+  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+const formInputClass =
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+const checkboxRowClass =
+  "flex flex-row items-center gap-2 text-[#b4bbc6] text-[11px] font-normal cursor-pointer col-span-full";
+const checkboxInputClass =
+  "w-3.5 h-3.5 m-0 p-0 border-0 rounded-none bg-transparent shrink-0 accent-accent cursor-pointer";
+
 export function EditColumnModal({
   schema,
   table,
@@ -50,22 +59,27 @@ export function EditColumnModal({
 
   return (
     <div
-      className="modal-backdrop"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && !busy && onClose()
       }
     >
-      <form className="connection-modal folder-modal" onSubmit={handleSubmit}>
-        <div className="modal-heading">
-          <div>
-            <span className="folder-icon large">
+      <form
+        className="w-[min(420px,100%)] max-h-full overflow-auto p-[18px] border border-border-bright rounded-[10px] bg-surface shadow-[0_24px_70px_rgba(0,0,0,.48)]"
+        onSubmit={handleSubmit}
+      >
+        <div className="flex items-center justify-between mb-[17px]">
+          <div className="flex items-center gap-2.5">
+            <span className="w-7 h-7 shrink-0 rounded-md grid place-items-center text-folder bg-[rgba(201,178,122,.12)]">
               <Columns3 size={17} />
             </span>
-            <h2>Edit column</h2>
+            <h2 className="m-0 text-text-bright text-sm font-[630]">
+              Edit column
+            </h2>
           </div>
           <button
             type="button"
-            className="icon-button"
+            className="w-7 h-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer enabled:hover:text-text enabled:hover:bg-panel-soft disabled:cursor-default disabled:opacity-40"
             aria-label="Close"
             disabled={busy}
             onClick={onClose}
@@ -73,32 +87,35 @@ export function EditColumnModal({
             <X size={17} />
           </button>
         </div>
-        <p className="modal-subtitle">
+        <p className="-mt-2 mb-3.5 text-muted text-[11px]">
           {schema}.{table}.{column.name}
         </p>
-        <div className="form-grid">
-          <label className="full">
+        <div className="grid grid-cols-[1fr_120px] gap-3">
+          <label className={`${formLabelClass} col-span-full`}>
             Name
             <input
               required
               autoFocus
+              className={formInputClass}
               value={name}
               disabled={busy}
               onChange={(event) => setName(event.target.value)}
             />
           </label>
-          <label className="full">
+          <label className={`${formLabelClass} col-span-full`}>
             Type
             <input
               required
+              className={formInputClass}
               value={dataType}
               disabled={busy}
               onChange={(event) => setDataType(event.target.value)}
             />
           </label>
-          <label className="full checkbox-row">
+          <label className={checkboxRowClass}>
             <input
               type="checkbox"
+              className={checkboxInputClass}
               checked={nullable}
               disabled={busy}
               onChange={(event) => setNullable(event.target.checked)}
@@ -107,18 +124,20 @@ export function EditColumnModal({
           </label>
           {supportsDefault && (
             <>
-              <label className="full">
+              <label className={`${formLabelClass} col-span-full`}>
                 Default
                 <input
+                  className={formInputClass}
                   value={defaultValue}
                   disabled={busy || clearDefault}
                   placeholder="e.g. CURRENT_TIMESTAMP or 'value'"
                   onChange={(event) => setDefaultValue(event.target.value)}
                 />
               </label>
-              <label className="full checkbox-row">
+              <label className={checkboxRowClass}>
                 <input
                   type="checkbox"
+                  className={checkboxInputClass}
                   checked={clearDefault}
                   disabled={busy}
                   onChange={(event) => setClearDefault(event.target.checked)}
@@ -128,19 +147,27 @@ export function EditColumnModal({
             </>
           )}
         </div>
-        {error && <p className="form-error">{error}</p>}
-        <div className="modal-actions">
+        {error && (
+          <p className="mt-2.5 mb-0 text-danger text-[11px] [overflow-wrap:anywhere]">
+            {error}
+          </p>
+        )}
+        <div className="mt-[18px] pt-3.5 border-t border-border flex items-center justify-between gap-2">
           <div />
-          <div>
+          <div className="flex gap-[7px]">
             <button
               type="button"
-              className="ghost-button"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border-0 text-muted bg-transparent hover:text-white hover:bg-panel-soft disabled:opacity-40 disabled:cursor-default"
               disabled={busy}
               onClick={onClose}
             >
               Cancel
             </button>
-            <button type="submit" className="primary-button" disabled={busy}>
+            <button
+              type="submit"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40 disabled:cursor-default"
+              disabled={busy}
+            >
               {busy ? "Saving…" : "Save"}
             </button>
           </div>

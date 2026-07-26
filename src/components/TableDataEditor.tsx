@@ -20,6 +20,7 @@ import {
   Type,
   ToggleLeft,
 } from "lucide-react";
+import { cn } from "../lib/cn";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
@@ -87,6 +88,13 @@ function TypeIcon({ dataType }: { dataType: string }) {
   if (kind === "bool") return <ToggleLeft size={11} />;
   return <Type size={11} />;
 }
+
+const iconButtonClass =
+  "grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text disabled:cursor-default disabled:opacity-40";
+const thClass =
+  "sticky top-0 z-[1] h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-[#aeb5c1] bg-grid-head";
+const tdClass =
+  "h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left whitespace-nowrap overflow-hidden text-ellipsis text-[#b9c0cb] select-none cursor-cell";
 
 export function TableDataEditor({
   profile,
@@ -512,17 +520,17 @@ export function TableDataEditor({
   }
 
   return (
-    <section className="table-editor">
-      <div className="data-toolbar">
-        <div className="data-toolbar-group">
-          <span className="page-range">
+    <section className="grid min-h-0 grid-rows-[34px_32px_auto_1fr_22px] overflow-hidden">
+      <div className="flex items-center gap-1.5 border-b border-border bg-[#14171b] px-2">
+        <div className="flex items-center gap-0.5">
+          <span className="min-w-[72px] px-1 font-mono text-[10px] text-[#9aa3b0] tabular-nums">
             {loadedCount === 0 && dirtyCount === 0
               ? "0 of 0"
               : `${rangeStart}-${Math.max(rangeStart, displayEnd)}${hasMore ? "+" : ""}`}
           </span>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="First page"
             disabled={busy || page === 0}
             onClick={() => void load(0)}
@@ -531,7 +539,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Previous page"
             disabled={busy || page === 0}
             onClick={() => void load(page - 1)}
@@ -540,7 +548,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Next page"
             disabled={busy || !hasMore}
             onClick={() => void load(page + 1)}
@@ -549,7 +557,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Last page"
             disabled
           >
@@ -557,21 +565,21 @@ export function TableDataEditor({
           </button>
         </div>
 
-        <span className="toolbar-separator" />
+        <span className="h-4 w-px bg-border" />
 
-        <div className="data-toolbar-group">
+        <div className="flex items-center gap-0.5">
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Refresh"
             disabled={busy}
             onClick={() => void load(page)}
           >
-            <RefreshCw size={14} className={busy ? "spin" : ""} />
+            <RefreshCw size={14} className={busy ? "animate-spin-slow" : ""} />
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Add row"
             disabled={busy || columns.length === 0}
             onClick={addRow}
@@ -580,7 +588,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Delete selected"
             disabled={busy || (selected.size === 0 && !cellRange)}
             onClick={deleteSelected}
@@ -589,7 +597,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Submit changes"
             disabled={busy || dirtyCount === 0}
             onClick={() => void commit()}
@@ -598,7 +606,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             title="Revert changes"
             disabled={busy || dirtyCount === 0}
             onClick={revertAll}
@@ -607,20 +615,24 @@ export function TableDataEditor({
           </button>
         </div>
 
-        <span className="toolbar-separator" />
-        <span className="tx-badge">Tx: Auto</span>
+        <span className="h-4 w-px bg-border" />
+        <span className="rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3]">
+          Tx: Auto
+        </span>
         {pkNames.length === 0 && columns.length > 0 && (
-          <span className="muted-meta">No primary key · update/delete limited</span>
+          <span className="text-[9px] text-subtle">
+            No primary key · update/delete limited
+          </span>
         )}
 
-        <div className="data-toolbar-right">
+        <div className="ml-auto flex items-center gap-1.5">
           {dirtyCount > 0 && (
-            <span className="dirty-badge">
+            <span className="text-[10px] text-warn">
               {dirtyCount} change{dirtyCount === 1 ? "" : "s"}
             </span>
           )}
           {elapsedMs != null && (
-            <span className="muted-meta">{elapsedMs} ms</span>
+            <span className="text-[9px] text-subtle">{elapsedMs} ms</span>
           )}
           <ExtractorToolbar
             activeExtractor={extractor}
@@ -633,20 +645,31 @@ export function TableDataEditor({
             onIncludeHeaderChange={setIncludeHeader}
             onCopy={() => void handleCopy()}
           />
-          <button type="button" className="icon-button" title="Search" disabled>
+          <button
+            type="button"
+            className={iconButtonClass}
+            title="Search"
+            disabled
+          >
             <Search size={14} />
           </button>
-          <button type="button" className="icon-button" title="Settings" disabled>
+          <button
+            type="button"
+            className={iconButtonClass}
+            title="Settings"
+            disabled
+          >
             <Settings size={14} />
           </button>
         </div>
       </div>
 
-      <div className="filter-bar">
-        <label className="filter-field">
+      <div className="grid grid-cols-[1.4fr_1fr] border-b border-border bg-grid-row">
+        <label className="flex min-w-0 items-center gap-[7px] border-r border-border px-2.5 text-[10px] text-[#7d8694]">
           <Filter size={13} />
-          <span>WHERE</span>
+          <span className="shrink-0 font-semibold tracking-[0.02em]">WHERE</span>
           <input
+            className="h-[30px] min-w-0 flex-1 border-0 bg-transparent font-mono text-[11px] leading-[1.3] text-[#d2d7df] outline-0 placeholder:text-[#4a5260]"
             value={where}
             placeholder="condition"
             spellCheck={false}
@@ -656,10 +679,13 @@ export function TableDataEditor({
             }}
           />
         </label>
-        <label className="filter-field">
+        <label className="flex min-w-0 items-center gap-[7px] px-2.5 text-[10px] text-[#7d8694]">
           <ArrowDownUp size={13} />
-          <span>ORDER BY</span>
+          <span className="shrink-0 font-semibold tracking-[0.02em]">
+            ORDER BY
+          </span>
           <input
+            className="h-[30px] min-w-0 flex-1 border-0 bg-transparent font-mono text-[11px] leading-[1.3] text-[#d2d7df] outline-0 placeholder:text-[#4a5260]"
             value={orderBy}
             placeholder="column"
             spellCheck={false}
@@ -672,40 +698,46 @@ export function TableDataEditor({
       </div>
 
       {error && (
-        <div className="error-state table-editor-error">
+        <div className="m-2 flex gap-[9px] rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-3 text-[11px] text-red">
           <div>
-            <strong>Edit Data failed</strong>
-            <p>{error}</p>
+            <strong className="text-[11px]">Edit Data failed</strong>
+            <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-[#c79599]">
+              {error}
+            </p>
           </div>
         </div>
       )}
 
       <div
-        className="grid-scroll edit-grid"
+        className="scrollbar-thin-app flex-1 overflow-auto bg-grid-row"
         ref={gridRef}
         onMouseLeave={() => {
           dragging.current = false;
         }}
       >
         {busy && rows.length === 0 ? (
-          <div className="result-placeholder">
-            <LoaderCircle className="spin" size={16} /> Loading…
+          <div className="flex flex-1 items-center justify-center gap-2 text-[11px] text-subtle">
+            <LoaderCircle className="animate-spin-slow" size={16} /> Loading…
           </div>
         ) : columns.length === 0 ? (
-          <div className="result-placeholder">No data</div>
+          <div className="flex flex-1 items-center justify-center gap-2 text-[11px] text-subtle">
+            No data
+          </div>
         ) : (
-          <table className="selectable-grid">
+          <table className="min-w-full table-auto border-separate border-spacing-0 font-mono text-[10px] leading-[1.35]">
             <thead>
               <tr>
-                <th className="row-number">#</th>
+                <th className={cn(thClass, "w-[42px] min-w-[42px] text-right")}>
+                  #
+                </th>
                 {columns.map((column, index) => {
                   const meta = columnMeta[index];
                   return (
                     <th key={`${column}-${index}`}>
-                      <span className="col-head">
+                      <span className="inline-flex items-center gap-[5px] [&>svg]:text-[#6e7787]">
                         <TypeIcon dataType={meta?.dataType ?? ""} />
                         {meta?.primaryKey && (
-                          <KeyRound size={11} className="pk-icon" />
+                          <KeyRound size={11} className="!text-pk" />
                         )}
                         {column}
                       </span>
@@ -718,16 +750,18 @@ export function TableDataEditor({
               {visibleRows.map((row, rowIndex) => (
                 <tr
                   key={row.id}
-                  className={[
-                    selected.has(row.id) ? "selected-row" : "",
-                    row.status === "modified" ? "dirty-row" : "",
-                    row.status === "inserted" ? "inserted-row" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
+                  className={cn(
+                    "group",
+                    selected.has(row.id) && "[&>td]:!bg-[#1d2430]",
+                    row.status === "inserted" && "[&>td]:!bg-[#15241c]",
+                  )}
                 >
                   <td
-                    className="row-number"
+                    className={cn(
+                      tdClass,
+                      "w-[42px] min-w-[42px] bg-row-num! text-right text-[#596272]",
+                      row.status === "modified" && "text-pk",
+                    )}
                     onClick={(event) => {
                       setCellRange(null);
                       setSelected((current) => {
@@ -764,15 +798,19 @@ export function TableDataEditor({
                     return (
                       <td
                         key={colIndex}
-                        className={[
-                          value === null ? "null-value" : "",
+                        className={cn(
+                          tdClass,
+                          rowIndex % 2 === 1 ? "bg-grid-alt" : "bg-grid-row",
+                          "group-hover:bg-grid-hover",
+                          value === null && "text-[#686f7c] italic",
                           cell.className,
-                          `align-${cell.align}`,
-                          dirty ? "dirty-cell" : "",
-                          inSelection ? "cell-selected" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
+                          cell.align === "right" && "text-right",
+                          cell.align === "center" && "text-center",
+                          dirty &&
+                            "shadow-[inset_2px_0_0_#c9a227]",
+                          inSelection &&
+                            "bg-cell-select! text-[#e8eef8] shadow-[inset_0_0_0_1px_rgba(96,150,230,.55)]",
+                        )}
                         title={cell.text}
                         onMouseDown={(event) => {
                           if (event.button !== 0) return;
@@ -797,7 +835,7 @@ export function TableDataEditor({
                       >
                         {isEditing ? (
                           <input
-                            className="cell-editor"
+                            className="-mx-2.5 h-full min-h-[27px] w-full border border-accent bg-[#0f1218] px-2.5 text-[#e8ecf3] outline-0"
                             autoFocus
                             defaultValue={
                               value === null ? "" : cellDisplay(value)
@@ -831,13 +869,14 @@ export function TableDataEditor({
         )}
       </div>
 
-      <div className="selection-statusbar">
-        {copyFlash && <span className="copy-flash">{copyFlash}</span>}
+      <div className="flex h-[22px] items-center justify-end gap-3.5 border-t border-border bg-surface-deep px-2.5 text-[10px] text-[#8b93a1]">
+        {copyFlash && <span className="text-[#72c99d]">{copyFlash}</span>}
         {stats.cells > 0 ? (
           <>
             {stats.sum != null && <span>SUM: {stats.sum}</span>}
             <span>
-              {stats.cells} cell{stats.cells === 1 ? "" : "s"}, {stats.rows} row
+              {stats.cells} cell{stats.cells === 1 ? "" : "s"}, {stats.rows}{" "}
+              row
               {stats.rows === 1 ? "" : "s"}
             </span>
             <span>{stats.coord}</span>

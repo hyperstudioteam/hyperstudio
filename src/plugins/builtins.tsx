@@ -60,7 +60,7 @@ export function registerBuiltinContributions() {
     typeNames: ["json", "jsonb"],
     matchValue: (value) => value !== null && typeof value === "object",
     format: (ctx) => defaultFormat(ctx.value),
-    className: "cell-json",
+    className: "text-[#9fd0c2]",
     defaultViewer: "builtin.json",
     priority: 5,
   });
@@ -86,7 +86,7 @@ export function registerBuiltinContributions() {
     matchPrefix: true,
     matchValue: (value) => typeof value === "number",
     align: "right",
-    className: "cell-number",
+    className: "tabular-nums text-[#d7c9a8]",
   });
 
   contributions.registerColumnType({
@@ -108,7 +108,7 @@ export function registerBuiltinContributions() {
     id: "builtin.uuid",
     source: BUILT_IN,
     typeNames: ["uuid"],
-    className: "cell-mono",
+    className: "font-mono text-[11px]",
   });
 
   contributions.registerColumnType({
@@ -117,7 +117,7 @@ export function registerBuiltinContributions() {
     typeNames: ["bytea", "blob", "binary", "varbinary"],
     matchPrefix: true,
     matchValue: (value) => typeof value === "string" && BYTES_RE.test(value),
-    className: "cell-mono cell-binary",
+    className: "font-mono text-[11px] text-subtle italic",
     defaultViewer: "builtin.text",
   });
 

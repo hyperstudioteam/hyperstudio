@@ -166,9 +166,9 @@ function App() {
     : false;
 
   return (
-    <div className="app-shell">
+    <div className="h-full w-full bg-bg">
       <TitleBar />
-      <div className="app-body">
+      <div className="grid h-[calc(100%-38px)] grid-cols-[44px_250px_minmax(0,1fr)] max-[760px]:grid-cols-[42px_210px_minmax(420px,1fr)]">
         <ActivityBar
           active="databases"
           onSelect={() => undefined}

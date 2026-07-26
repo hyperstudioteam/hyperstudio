@@ -5,6 +5,7 @@ import {
   Database,
   Folder,
 } from "lucide-react";
+import { cn } from "../lib/cn";
 import {
   DragPayload,
   DropPosition,
@@ -56,6 +57,35 @@ function dropPositionFor(
   return ratio < 0.5 ? "before" : "after";
 }
 
+function connectionRowClass({
+  selected,
+  drop,
+  folder,
+}: {
+  selected: boolean;
+  drop: DropPosition | null;
+  folder?: boolean;
+}) {
+  return cn(
+    "w-full border-0 rounded-md py-1 px-[7px] flex items-center gap-2 bg-transparent text-left cursor-default select-none hover:bg-white/[0.025]",
+    folder ? "min-h-9" : "min-h-[42px]",
+    selected && "bg-panel-soft",
+    drop === "before" && "shadow-[inset_0_2px_0_#4c8dff]",
+    drop === "after" && "shadow-[inset_0_-2px_0_#4c8dff]",
+    drop === "into" &&
+      "outline outline-1 outline-[rgba(76,141,255,0.85)] bg-[rgba(76,141,255,0.14)]",
+    "[&[draggable=true]]:cursor-grab [&[draggable=true]:active]:cursor-grabbing",
+  );
+}
+
+function dbIconClass(driver: string) {
+  return cn(
+    "size-[27px] shrink-0 rounded-md grid place-items-center",
+    driver === "postgres" && "text-[#8fb9e8] bg-[rgba(72,128,186,0.16)]",
+    driver === "mysql" && "text-[#e0a367] bg-[rgba(216,132,55,0.14)]",
+  );
+}
+
 export function ConnectionTree({
   nodes,
   selection,
@@ -96,12 +126,17 @@ export function ConnectionTree({
         const isDrop =
           dropTarget?.id === node.id ? dropTarget.position : null;
         return (
-          <div key={node.id} className="tree-branch">
+          <div key={node.id} className="flex flex-col">
             <div
               draggable
               role="button"
               tabIndex={0}
-              className={`connection folder-row ${selected ? "selected" : ""} ${isDrop ? `drop-${isDrop}` : ""}`}
+              data-connection-row
+              className={connectionRowClass({
+                selected,
+                drop: isDrop,
+                folder: true,
+              })}
               style={{ paddingLeft: 7 + depth * 12 }}
               onClick={() => {
                 onSelect({ kind: "folder", id: node.id });
@@ -149,12 +184,16 @@ export function ConnectionTree({
               }}
             >
               {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              <span className="folder-icon">
+              <span className="size-[27px] shrink-0 rounded-md grid place-items-center text-folder bg-[rgba(201,178,122,0.12)]">
                 <Folder size={15} />
               </span>
-              <span className="connection-copy">
-                <strong>{node.name}</strong>
-                <small>{node.children.length} items</small>
+              <span className="flex flex-1 min-w-0 flex-col gap-0.5">
+                <strong className="text-[#cdd3de] text-xs font-[560] truncate">
+                  {node.name}
+                </strong>
+                <small className="text-subtle text-[10px] font-mono truncate">
+                  {node.children.length} items
+                </small>
               </span>
             </div>
             {open && renderNodes(node.children, depth + 1)}
@@ -174,7 +213,8 @@ export function ConnectionTree({
           draggable
           role="button"
           tabIndex={0}
-          className={`connection ${selected ? "selected" : ""} ${isDrop ? `drop-${isDrop}` : ""}`}
+          data-connection-row
+          className={connectionRowClass({ selected, drop: isDrop })}
           style={{ paddingLeft: 7 + depth * 12 }}
           onClick={() => onSelect({ kind: "connection", id: profile.id })}
           onDoubleClick={() => onConnect(profile.id)}
@@ -221,12 +261,14 @@ export function ConnectionTree({
             onMove(payload.id, profile.id, position);
           }}
         >
-          <span className={`db-icon ${profile.driver}`}>
+          <span className={dbIconClass(profile.driver)}>
             <Database size={15} />
           </span>
-          <span className="connection-copy">
-            <strong>{profile.name || profile.database || "Untitled"}</strong>
-            <small>
+          <span className="flex flex-1 min-w-0 flex-col gap-0.5">
+            <strong className="text-[#cdd3de] text-xs font-[560] truncate">
+              {profile.name || profile.database || "Untitled"}
+            </strong>
+            <small className="text-subtle text-[10px] font-mono truncate">
               {profile.host}:{profile.port}
               {!profile.allSchemas && profile.schemas.length
                 ? ` · ${profile.schemas.length} schema${profile.schemas.length > 1 ? "s" : ""}`
@@ -234,7 +276,12 @@ export function ConnectionTree({
             </small>
           </span>
           <span
-            className={`status-dot ${connectedId === profile.id ? "online" : ""}`}
+            className={cn(
+              "size-1.5 shrink-0 rounded-full",
+              connectedId === profile.id
+                ? "bg-green shadow-[0_0_7px_rgba(73,201,137,0.4)]"
+                : "bg-[#4e5664]",
+            )}
           />
         </div>
       );
@@ -243,7 +290,7 @@ export function ConnectionTree({
 
   return (
     <div
-      className="connections"
+      className="px-[7px] pb-[5px] max-h-[42%] overflow-auto scrollbar-thin-app"
       onDragOver={(event) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
@@ -254,7 +301,9 @@ export function ConnectionTree({
         endDrag();
         if (!payload || nodes.length === 0) return;
         // Only treat as root append when not dropped onto a child target.
-        if ((event.target as HTMLElement).closest(".connection")) return;
+        if ((event.target as HTMLElement).closest("[data-connection-row]")) {
+          return;
+        }
         const last = nodes[nodes.length - 1];
         const lastId = last.kind === "folder" ? last.id : last.profile.id;
         onMove(payload.id, lastId, "after");

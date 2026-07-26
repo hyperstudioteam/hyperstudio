@@ -31,6 +31,7 @@ import {
   TableNode,
   tableFromObject,
 } from "../types/schema";
+import { cn } from "../lib/cn";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
@@ -250,24 +251,37 @@ export function QueryWorkspace({
 
   return (
     <main
-      className={`workspace ${active?.kind === "edit" ? "table-edit-mode" : ""}`}
+      className={cn(
+        "min-w-0 grid overflow-hidden bg-bg",
+        active?.kind === "edit"
+          ? "grid-rows-[36px_1fr_23px]"
+          : "grid-rows-[36px_minmax(190px,42%)_1fr_23px]",
+      )}
     >
-      <div className="tabbar">
+      <div className="flex items-stretch overflow-x-auto border-b border-border bg-titlebar">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={`editor-tab ${tab.id === activeId ? "active" : ""}`}
+            className={cn(
+              "flex max-w-[200px] min-w-[120px] cursor-pointer items-center gap-[7px] border-0 border-r border-border bg-transparent px-2.5 pl-2.5 text-[11px] text-muted",
+              tab.id === activeId &&
+                "border-t border-accent bg-bg text-[#d8dde6]",
+            )}
             onClick={() => setActiveId(tab.id)}
           >
             {tab.kind === "query" ? (
-              <span className="sql-badge">SQL</span>
+              <span className="text-[8px] font-extrabold tracking-[0.02em] text-accent-bright">
+                SQL
+              </span>
             ) : (
-              <Table2 size={12} className="tab-table-icon" />
+              <Table2 size={12} className="shrink-0 text-[#7db7ff]" />
             )}
-            <span className="tab-title">{tab.title}</span>
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+              {tab.title}
+            </span>
             <span
-              className="tab-close"
+              className="ml-auto grid place-items-center rounded-[3px] text-subtle hover:bg-panel-soft hover:text-text"
               role="button"
               tabIndex={-1}
               aria-label={`Close ${tab.title}`}
@@ -281,16 +295,20 @@ export function QueryWorkspace({
           </button>
         ))}
         <button
-          className="new-tab"
+          className="grid w-[35px] cursor-pointer place-items-center border-0 bg-transparent text-subtle hover:bg-panel-soft hover:text-text"
           aria-label="New query"
           type="button"
           onClick={addQueryTab}
         >
           <CirclePlus size={15} />
         </button>
-        <div className="connection-context">
+        <div className="ml-auto flex shrink-0 items-center gap-[7px] px-[11px] text-[10px] text-muted">
           <span
-            className={`status-dot ${connectedId === selected?.id ? "online" : ""}`}
+            className={cn(
+              "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
+              connectedId === selected?.id &&
+                "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
+            )}
           />
           {selected
             ? `${selected.name || selected.database}${connectedId === selected.id ? "" : " · cached"}`
@@ -310,30 +328,34 @@ export function QueryWorkspace({
         />
       ) : (
         <>
-          <section className="editor-pane">
-            <div className="query-toolbar">
+          <section className="flex min-h-0 flex-col border-b border-border">
+            <div className="flex h-9 shrink-0 items-center gap-[9px] border-b border-border bg-[#14171b] px-[9px]">
               <button
-                className="run-button"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-2 text-[10px] font-semibold text-[#c9c2ff] hover:border-accent hover:bg-[rgba(139,124,246,.22)] hover:text-white disabled:opacity-60"
                 disabled={busy === "query"}
                 onClick={run}
               >
                 {busy === "query" ? (
-                  <LoaderCircle className="spin" size={14} />
+                  <LoaderCircle className="animate-spin-slow" size={14} />
                 ) : (
                   <Play size={14} fill="currentColor" />
                 )}
                 Run
-                <kbd>⌘↵</kbd>
+                <kbd className="rounded-[3px] border border-[#403a67] bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-[#857cad]">
+                  ⌘↵
+                </kbd>
               </button>
-              <span className="toolbar-separator" />
-              <span className="query-hint">Run selection or current query</span>
-              <span className="completion-hint">
+              <span className="h-4 w-px bg-border" />
+              <span className="text-[9px] text-subtle">
+                Run selection or current query
+              </span>
+              <span className="ml-auto pr-1 text-[9px] text-subtle">
                 {completionReady
                   ? "⌃Space for tables and columns"
                   : "Expand a schema to enable completions"}
               </span>
             </div>
-            <div className="editor-wrap">
+            <div className="flex min-h-0 flex-1 overflow-hidden bg-bg">
               <SqlEditor
                 key={active?.id ?? "query"}
                 ref={editorRef}
@@ -347,24 +369,28 @@ export function QueryWorkspace({
             </div>
           </section>
 
-          <section className="results-pane">
-            <div className="results-header">
-              <div className="results-tabs">
-                <button className="result-tab active">Results</button>
-                <button className="result-tab">Messages</button>
+          <section className="flex min-h-0 flex-col overflow-hidden">
+            <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-border bg-[#14171b]">
+              <div className="flex">
+                <button className="cursor-pointer border-0 border-b border-accent bg-transparent px-3.5 text-[10px] text-[#d5dae3]">
+                  Results
+                </button>
+                <button className="cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted">
+                  Messages
+                </button>
               </div>
               {result && (
-                <div className="result-meta">
+                <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle [&>span]:flex [&>span]:items-center [&>span]:gap-1">
                   {pageable && result.columns.length > 0 ? (
-                    <div className="result-paging">
-                      <span className="page-range">
+                    <div className="flex items-center gap-0.5">
+                      <span className="min-w-[72px] px-1 font-mono text-[10px] text-[#9aa3b0] tabular-nums">
                         {rangeStart === 0
                           ? "0 of 0"
                           : `${rangeStart}-${rangeEnd}${hasMore ? "+" : ""}`}
                       </span>
                       <button
                         type="button"
-                        className="icon-button"
+                        className="grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text disabled:cursor-default disabled:opacity-40"
                         title="First page"
                         disabled={busy === "query" || resultPage === 0}
                         onClick={() => loadPage(0)}
@@ -373,7 +399,7 @@ export function QueryWorkspace({
                       </button>
                       <button
                         type="button"
-                        className="icon-button"
+                        className="grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text disabled:cursor-default disabled:opacity-40"
                         title="Previous page"
                         disabled={busy === "query" || resultPage === 0}
                         onClick={() => loadPage(resultPage - 1)}
@@ -382,7 +408,7 @@ export function QueryWorkspace({
                       </button>
                       <button
                         type="button"
-                        className="icon-button"
+                        className="grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text disabled:cursor-default disabled:opacity-40"
                         title="Next page"
                         disabled={busy === "query" || !hasMore}
                         onClick={() => loadPage(resultPage + 1)}
@@ -391,7 +417,7 @@ export function QueryWorkspace({
                       </button>
                     </div>
                   ) : (
-                    <span>
+                    <span className="!text-[#74cda0]">
                       <Check size={13} />{" "}
                       {result.rows.length || result.affectedRows}{" "}
                       {result.columns.length ? "rows" : "affected"}
@@ -413,13 +439,13 @@ export function QueryWorkspace({
         </>
       )}
 
-      <footer className="statusbar">
+      <footer className="flex h-[23px] items-center overflow-hidden border-t border-border bg-[#171a20] px-[9px] text-[9px] whitespace-nowrap text-[#687181]">
         <span>
           {active?.kind === "edit"
             ? `Edit Data · ${active.schema}.${active.table}`
             : (connectionInfo?.serverVersion ?? "Hypergrid local session")}
         </span>
-        <span className="statusbar-right">
+        <span className="ml-auto flex gap-[13px]">
           UTF-8 <span>LF</span> SQL
         </span>
       </footer>

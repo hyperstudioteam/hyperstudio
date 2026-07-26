@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { databaseApi } from "../../api/database";
+import { cn } from "../../lib/cn";
 import { ConnectionProfile } from "../../types/connection";
 import {
   AlterTableRequest,
@@ -65,6 +66,19 @@ interface EditTableModalProps {
   onSave: (request: AlterTableRequest) => void;
   onClose: () => void;
 }
+
+const iconButtonClass =
+  "w-7 h-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer enabled:hover:text-text enabled:hover:bg-panel-soft disabled:cursor-default disabled:opacity-40";
+const modifyFormLabelClass =
+  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+const modifyFormInputClass =
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent";
+const modifyFormTextareaClass =
+  "w-full px-[9px] py-2 border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent resize-y min-h-16 font-inherit";
+const modifyCheckboxRowClass =
+  "flex flex-row items-center gap-2 text-[#b4bbc6] text-[11px] font-normal cursor-pointer";
+const modifyCheckboxInputClass =
+  "w-3.5 h-3.5 m-0 shrink-0 accent-accent cursor-pointer";
 
 let draftSeq = 0;
 function nextId(prefix: string) {
@@ -531,7 +545,10 @@ export function EditTableModal({
     return (
       <button
         type="button"
-        className={`modify-folder ${selection?.section === section ? "active" : ""}`}
+        className={cn(
+          "w-full flex items-center gap-[7px] px-2.5 py-[7px] text-muted bg-[#171a20] border-0 text-[11px] border-b border-border text-left cursor-pointer hover:text-[#d8dde6] hover:bg-[#1d2129]",
+          selection?.section === section && "text-[#d8dde6] bg-[#1d2129]",
+        )}
         onClick={() => {
           const first =
             section === "columns"
@@ -544,24 +561,27 @@ export function EditTableModal({
       >
         {icon}
         <span>{label}</span>
-        <em>{count}</em>
+        <em className="ml-auto not-italic text-subtle">{count}</em>
       </button>
     );
   }
 
   return (
     <div
-      className="modal-backdrop"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && !busy && onClose()
       }
     >
-      <form className="modify-modal" onSubmit={handleSubmit}>
-        <div className="modify-toolbar">
-          <div className="modify-toolbar-left">
+      <form
+        className="w-[min(920px,100%)] max-h-[min(720px,100%)] flex flex-col border border-border-bright rounded-[10px] bg-surface shadow-[0_24px_70px_rgba(0,0,0,.5)] overflow-hidden"
+        onSubmit={handleSubmit}
+      >
+        <div className="flex items-center gap-2.5 px-2.5 py-2 border-b border-border bg-[#161920]">
+          <div className="flex gap-0.5">
             <button
               type="button"
-              className="icon-button"
+              className={iconButtonClass}
               title="Add item"
               disabled={busy || metadataLoading}
               onClick={addItem}
@@ -570,7 +590,7 @@ export function EditTableModal({
             </button>
             <button
               type="button"
-              className="icon-button"
+              className={iconButtonClass}
               title="Remove item"
               disabled={busy || !selection?.id}
               onClick={removeSelected}
@@ -579,7 +599,7 @@ export function EditTableModal({
             </button>
             <button
               type="button"
-              className="icon-button"
+              className={iconButtonClass}
               title="Move column up"
               disabled={busy || !selectedColumn}
               onClick={() => moveColumn(-1)}
@@ -588,7 +608,7 @@ export function EditTableModal({
             </button>
             <button
               type="button"
-              className="icon-button"
+              className={iconButtonClass}
               title="Move column down"
               disabled={busy || !selectedColumn}
               onClick={() => moveColumn(1)}
@@ -596,16 +616,16 @@ export function EditTableModal({
               <ChevronDown size={15} />
             </button>
           </div>
-          <div className="modify-toolbar-title">
+          <div className="flex-1 flex items-center gap-2 text-[#d8dde6] text-xs">
             <Table2 size={15} />
             <strong>Modify</strong>
-            <em>
+            <em className="text-muted not-italic text-[11px]">
               {schema}.{table}
             </em>
           </div>
           <button
             type="button"
-            className="icon-button"
+            className={iconButtonClass}
             aria-label="Close"
             disabled={busy}
             onClick={onClose}
@@ -614,11 +634,12 @@ export function EditTableModal({
           </button>
         </div>
 
-        <div className="modify-body">
-          <aside className="modify-sidebar">
-            <div className="modify-table-name">
+        <div className="flex-1 min-h-[360px] grid grid-cols-[240px_1fr] overflow-hidden">
+          <aside className="border-r border-border bg-[#14171d] flex flex-col overflow-hidden">
+            <div className="flex items-center gap-[7px] px-2.5 py-2 border-b border-border text-[#c9d0db]">
               <Table2 size={13} />
               <input
+                className="flex-1 h-[26px] px-1.5 border border-transparent rounded text-[#e0e4eb] bg-transparent text-xs font-semibold focus:border-accent focus:bg-surface-input"
                 value={tableName}
                 disabled={busy}
                 aria-label="Table name"
@@ -632,29 +653,38 @@ export function EditTableModal({
               visibleColumns.length,
               <Columns3 size={13} />,
             )}
-            <div className="modify-column-list modify-group-list">
+            <div className="flex-[0_1_150px] min-h-0 overflow-auto py-1 border-b border-border">
               {visibleColumns.map((draft) => {
                 const icon = columnTypeIcon(draft.dataType);
                 return (
                   <button
                     key={draft.id}
                     type="button"
-                    className={`modify-column-item ${
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-[#c5ccd7] text-left cursor-pointer text-[11px] hover:bg-[rgba(255,255,255,.04)]",
                       selection?.section === "columns" &&
-                      selection.id === draft.id
-                        ? "active"
-                        : ""
-                    }`}
+                        selection.id === draft.id &&
+                        "bg-[rgba(108,122,224,.18)] text-[#e8ecf4]",
+                    )}
                     onClick={() =>
                       setSelection({ section: "columns", id: draft.id })
                     }
                   >
-                    <span className={`type-badge type-${icon}`}>
+                    <span
+                      className={cn(
+                        "w-[18px] h-[18px] rounded-[3px] grid place-items-center text-[9px] font-bold shrink-0 bg-[#252a33] text-[#9aa3b2]",
+                        icon === "number" && "text-[#d7c9a8]",
+                        icon === "date" && "text-[#9fd0c2]",
+                        icon === "bool" && "text-[#ef9f6b]",
+                      )}
+                    >
                       {icon === "number" ? "#" : icon === "date" ? "◷" : "Aa"}
                     </span>
-                    <span className="modify-column-label">
+                    <span className="flex flex-col gap-px min-w-0">
                       {draft.name || "unnamed"}
-                      <em>{draft.dataType}</em>
+                      <em className="text-subtle not-italic text-[10px] overflow-hidden text-ellipsis whitespace-nowrap">
+                        {draft.dataType}
+                      </em>
                     </span>
                   </button>
                 );
@@ -667,22 +697,25 @@ export function EditTableModal({
               visibleKeys.length,
               <KeyRound size={13} />,
             )}
-            <div className="modify-column-list modify-group-list">
+            <div className="flex-[0_1_150px] min-h-0 overflow-auto py-1 border-b border-border">
               {visibleKeys.map((draft) => (
                 <button
                   key={draft.id}
                   type="button"
-                  className={`modify-column-item ${
-                    selection?.section === "keys" && selection.id === draft.id
-                      ? "active"
-                      : ""
-                  }`}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-[#c5ccd7] text-left cursor-pointer text-[11px] hover:bg-[rgba(255,255,255,.04)]",
+                    selection?.section === "keys" &&
+                      selection.id === draft.id &&
+                      "bg-[rgba(108,122,224,.18)] text-[#e8ecf4]",
+                  )}
                   onClick={() => setSelection({ section: "keys", id: draft.id })}
                 >
                   <KeyRound size={13} />
-                  <span className="modify-column-label">
+                  <span className="flex flex-col gap-px min-w-0">
                     {draft.name || draft.kind}
-                    <em>{draft.kind}</em>
+                    <em className="text-subtle not-italic text-[10px] overflow-hidden text-ellipsis whitespace-nowrap">
+                      {draft.kind}
+                    </em>
                   </span>
                 </button>
               ))}
@@ -694,25 +727,25 @@ export function EditTableModal({
               visibleIndexes.length,
               <ListTree size={13} />,
             )}
-            <div className="modify-column-list modify-group-list">
+            <div className="flex-[0_1_150px] min-h-0 overflow-auto py-1 border-b border-border">
               {visibleIndexes.map((draft) => (
                 <button
                   key={draft.id}
                   type="button"
-                  className={`modify-column-item ${
+                  className={cn(
+                    "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-[#c5ccd7] text-left cursor-pointer text-[11px] hover:bg-[rgba(255,255,255,.04)]",
                     selection?.section === "indexes" &&
-                    selection.id === draft.id
-                      ? "active"
-                      : ""
-                  }`}
+                      selection.id === draft.id &&
+                      "bg-[rgba(108,122,224,.18)] text-[#e8ecf4]",
+                  )}
                   onClick={() =>
                     setSelection({ section: "indexes", id: draft.id })
                   }
                 >
                   <ListTree size={13} />
-                  <span className="modify-column-label">
+                  <span className="flex flex-col gap-px min-w-0">
                     {draft.name || "unnamed"}
-                    <em>
+                    <em className="text-subtle not-italic text-[10px] overflow-hidden text-ellipsis whitespace-nowrap">
                       {draft.unique ? "UNIQUE " : ""}
                       {draft.method}
                     </em>
@@ -722,32 +755,34 @@ export function EditTableModal({
             </div>
 
             {metadataLoading && (
-              <div className="modify-metadata-status">
-                <LoaderCircle className="spin" size={12} /> Loading metadata…
+              <div className="flex items-center gap-1.5 px-2.5 py-2 text-muted text-[10px]">
+                <LoaderCircle className="animate-spin-slow" size={12} /> Loading metadata…
               </div>
             )}
           </aside>
 
-          <section className="modify-editor">
+          <section className="flex flex-col overflow-auto px-4 py-3.5">
             {selectedColumn && (
               <>
-                <div className="modify-editor-heading">
+                <div className="flex items-center gap-2 mb-3.5 text-[#e0e4eb] text-[13px]">
                   <Columns3 size={15} />
                   <strong>{selectedColumn.name || "Column"}</strong>
                 </div>
-                <div className="modify-form">
-                  <label>
+                <div className="flex flex-col gap-3 max-w-[520px]">
+                  <label className={modifyFormLabelClass}>
                     Name
                     <input
+                      className={modifyFormInputClass}
                       value={selectedColumn.name}
                       disabled={busy}
                       onChange={(event) => updateColumn({ name: event.target.value })}
                     />
                   </label>
-                  <label>
+                  <label className={modifyFormLabelClass}>
                     Comment
                     <textarea
                       rows={3}
+                      className={modifyFormTextareaClass}
                       value={selectedColumn.comment}
                       disabled={busy}
                       onChange={(event) =>
@@ -755,10 +790,11 @@ export function EditTableModal({
                       }
                     />
                   </label>
-                  <label>
+                  <label className={modifyFormLabelClass}>
                     Data Type
                     <input
                       list="hypergrid-column-types"
+                      className={modifyFormInputClass}
                       value={selectedColumn.dataType}
                       disabled={busy}
                       onChange={(event) =>
@@ -771,10 +807,11 @@ export function EditTableModal({
                       ))}
                     </datalist>
                   </label>
-                  <div className="modify-checks">
-                    <label className="checkbox-row">
+                  <div className="flex flex-wrap gap-3.5">
+                    <label className={modifyCheckboxRowClass}>
                       <input
                         type="checkbox"
+                        className={modifyCheckboxInputClass}
                         checked={!selectedColumn.nullable}
                         disabled={busy}
                         onChange={(event) =>
@@ -784,9 +821,10 @@ export function EditTableModal({
                       <span>Not Null</span>
                     </label>
                     {isMysql && (
-                      <label className="checkbox-row">
+                      <label className={modifyCheckboxRowClass}>
                         <input
                           type="checkbox"
+                          className={modifyCheckboxInputClass}
                           checked={selectedColumn.autoIncrement}
                           disabled={busy}
                           onChange={(event) =>
@@ -797,9 +835,10 @@ export function EditTableModal({
                       </label>
                     )}
                   </div>
-                  <label>
+                  <label className={modifyFormLabelClass}>
                     Default Expression
                     <input
+                      className={modifyFormInputClass}
                       value={selectedColumn.defaultValue}
                       disabled={busy}
                       placeholder="e.g. CURRENT_TIMESTAMP"
@@ -810,9 +849,10 @@ export function EditTableModal({
                   </label>
                   {isMysql && (
                     <>
-                      <label>
+                      <label className={modifyFormLabelClass}>
                         On Update
                         <input
+                          className={modifyFormInputClass}
                           value={selectedColumn.onUpdate}
                           disabled={busy}
                           placeholder="e.g. CURRENT_TIMESTAMP"
@@ -821,9 +861,10 @@ export function EditTableModal({
                           }
                         />
                       </label>
-                      <label>
+                      <label className={modifyFormLabelClass}>
                         Collation
                         <input
+                          className={modifyFormInputClass}
                           value={selectedColumn.collation}
                           disabled={busy}
                           placeholder="e.g. utf8mb4_unicode_ci"
@@ -840,22 +881,24 @@ export function EditTableModal({
 
             {selectedKey && (
               <>
-                <div className="modify-editor-heading">
+                <div className="flex items-center gap-2 mb-3.5 text-[#e0e4eb] text-[13px]">
                   <KeyRound size={15} />
                   <strong>{selectedKey.name || "Key"}</strong>
                 </div>
-                <div className="modify-form">
-                  <label>
+                <div className="flex flex-col gap-3 max-w-[520px]">
+                  <label className={modifyFormLabelClass}>
                     Name
                     <input
+                      className={modifyFormInputClass}
                       value={selectedKey.name}
                       disabled={busy}
                       onChange={(event) => updateKey({ name: event.target.value })}
                     />
                   </label>
-                  <label>
+                  <label className={modifyFormLabelClass}>
                     Kind
                     <select
+                      className={modifyFormInputClass}
                       value={selectedKey.kind}
                       disabled={busy}
                       onChange={(event) =>
@@ -883,14 +926,15 @@ export function EditTableModal({
 
             {selectedIndex && (
               <>
-                <div className="modify-editor-heading">
+                <div className="flex items-center gap-2 mb-3.5 text-[#e0e4eb] text-[13px]">
                   <ListTree size={15} />
                   <strong>{selectedIndex.name || "Index"}</strong>
                 </div>
-                <div className="modify-form">
-                  <label>
+                <div className="flex flex-col gap-3 max-w-[520px]">
+                  <label className={modifyFormLabelClass}>
                     Name
                     <input
+                      className={modifyFormInputClass}
                       value={selectedIndex.name}
                       disabled={busy}
                       onChange={(event) =>
@@ -898,9 +942,10 @@ export function EditTableModal({
                       }
                     />
                   </label>
-                  <label>
+                  <label className={modifyFormLabelClass}>
                     Method
                     <select
+                      className={modifyFormInputClass}
                       value={selectedIndex.method}
                       disabled={busy}
                       onChange={(event) =>
@@ -917,9 +962,10 @@ export function EditTableModal({
                       ))}
                     </select>
                   </label>
-                  <label className="checkbox-row">
+                  <label className={modifyCheckboxRowClass}>
                     <input
                       type="checkbox"
+                      className={modifyCheckboxInputClass}
                       checked={selectedIndex.unique}
                       disabled={busy}
                       onChange={(event) =>
@@ -942,7 +988,7 @@ export function EditTableModal({
             )}
 
             {!selectedColumn && !selectedKey && !selectedIndex && (
-              <div className="modify-empty">
+              <div className="m-auto text-muted text-xs">
                 {metadataLoading
                   ? "Loading table structure…"
                   : "Select a column, key, or index"}
@@ -951,32 +997,34 @@ export function EditTableModal({
           </section>
         </div>
 
-        <div className={`modify-preview ${previewOpen ? "open" : ""}`}>
+        <div className="border-t border-border bg-[#12151b]">
           <button
             type="button"
-            className="modify-preview-toggle"
+            className="w-full h-7 flex items-center gap-1.5 px-3 border-0 bg-transparent text-muted text-[11px] cursor-pointer hover:text-[#d2d7df]"
             onClick={() => setPreviewOpen((open) => !open)}
           >
             {previewOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
             Preview
           </button>
           {previewOpen && (
-            <pre className="modify-preview-sql">
+            <pre className="m-0 px-3.5 pb-3 max-h-[140px] overflow-auto text-[#d2d7df] font-mono text-[11px] leading-[1.55] whitespace-pre-wrap">
               {previewSql || "-- No changes"}
             </pre>
           )}
         </div>
 
         {(error || metadataError) && (
-          <p className="form-error modify-error">{error || metadataError}</p>
+          <p className="mx-3.5 mb-0 mt-2.5 text-danger text-[11px] [overflow-wrap:anywhere]">
+            {error || metadataError}
+          </p>
         )}
 
-        <div className="modal-actions modify-actions">
+        <div className="m-0 px-3.5 py-3 border-t border-border flex items-center justify-between gap-2">
           <div />
-          <div>
+          <div className="flex gap-[7px]">
             <button
               type="button"
-              className="ghost-button"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border-0 text-muted bg-transparent hover:text-white hover:bg-panel-soft disabled:opacity-40 disabled:cursor-default"
               disabled={busy}
               onClick={onClose}
             >
@@ -984,7 +1032,7 @@ export function EditTableModal({
             </button>
             <button
               type="submit"
-              className="primary-button"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40 disabled:cursor-default"
               disabled={busy || !hasChanges || invalidStructure}
             >
               {busy ? "Saving…" : "OK"}
@@ -1006,12 +1054,18 @@ function ColumnPicker({
   onToggle: (column: string) => void;
 }) {
   return (
-    <fieldset className="key-columns modify-column-picker">
-      <legend>Columns</legend>
+    <fieldset className="m-0 p-2.5 px-[11px] border border-border rounded-md bg-[#14171d] flex flex-col gap-1 max-h-[180px] overflow-auto">
+      <legend className="px-1 text-[#9199a7] text-[10px] font-[540]">
+        Columns
+      </legend>
       {columns.map((column) => (
-        <label key={column} className="checkbox-row">
+        <label
+          key={column}
+          className="flex flex-row items-center gap-2 py-[3px] px-0.5 rounded text-[#b4bbc6] text-[11px] font-normal cursor-pointer hover:bg-[rgba(255,255,255,.03)]"
+        >
           <input
             type="checkbox"
+            className={modifyCheckboxInputClass}
             checked={selected.includes(column)}
             onChange={() => onToggle(column)}
           />

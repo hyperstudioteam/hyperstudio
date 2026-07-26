@@ -1,4 +1,5 @@
 import { ComponentType, MouseEvent, useEffect, useState } from "react";
+import { cn } from "../lib/cn";
 import {
   ChevronDown,
   ChevronRight,
@@ -153,6 +154,21 @@ function objectActions(group: ObjectGroupDef, object: ObjectNode): string[] {
   return object.actions ?? group.actions ?? [];
 }
 
+const iconButtonClass =
+  "size-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer hover:enabled:text-text hover:enabled:bg-panel-soft disabled:cursor-default disabled:opacity-40";
+
+const treeRowEmClass =
+  "ml-auto text-subtle text-[9px] not-italic whitespace-nowrap";
+
+const treeRowBaseClass =
+  "w-full h-[26px] border-0 rounded flex items-center gap-[5px] px-1.5 bg-transparent text-[#aeb5c1] text-[11px] text-left cursor-default [&>span]:truncate";
+
+const treeRowMainClass =
+  "min-w-0 flex-1 h-[26px] border-0 rounded flex items-center gap-[5px] pr-1 pl-0 bg-transparent text-inherit text-[11px] text-left cursor-default hover:text-text [&>span]:truncate";
+
+const treeRowActionClass =
+  "size-[22px] shrink-0 opacity-0 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer hover:enabled:text-text hover:enabled:bg-panel-soft disabled:cursor-default disabled:opacity-40";
+
 export function SchemaBrowser({
   profile,
   live,
@@ -225,26 +241,34 @@ export function SchemaBrowser({
 
   return (
     <>
-      <div className="sidebar-divider" />
-      <div className="database-header">
-        <div>
-          <small>Database</small>
-          <strong>{databaseLabel}</strong>
+      <div className="h-px mt-[3px] mx-2.5 bg-border" />
+      <div className="min-h-[52px] py-2 pr-[9px] pl-3.5 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex flex-col gap-px">
+          <small className="text-subtle text-[9px] uppercase tracking-[0.06em]">
+            Database
+          </small>
+          <strong className="text-[#c8ced8] text-[11px] font-[590] overflow-hidden text-ellipsis">
+            {databaseLabel}
+          </strong>
           {!profile.allSchemas && profile.schemas.length > 0 && (
-            <em className="schema-filter-hint">
+            <em className="text-subtle text-[9px] not-italic mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
               Schemas: {profile.schemas.join(", ")}
             </em>
           )}
           {profile.allSchemas && (
-            <em className="schema-filter-hint">All schemas</em>
+            <em className="text-subtle text-[9px] not-italic mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+              All schemas
+            </em>
           )}
           {hasCache && !live && (
-            <em className="schema-filter-hint">Cached · connects on use</em>
+            <em className="text-subtle text-[9px] not-italic mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+              Cached · connects on use
+            </em>
           )}
         </div>
-        <div className="inline-actions">
+        <div className="flex shrink-0">
           <button
-            className="icon-button"
+            className={iconButtonClass}
             aria-label="Refresh schemas"
             title="Refresh schemas"
             disabled={!canInteract || busy === "schema"}
@@ -252,11 +276,11 @@ export function SchemaBrowser({
           >
             <RefreshCw
               size={14}
-              className={refreshingSchemas ? "spin" : ""}
+              className={refreshingSchemas ? "animate-spin-slow" : ""}
             />
           </button>
           <button
-            className="icon-button"
+            className={iconButtonClass}
             aria-label="Connection settings"
             onClick={onEdit}
           >
@@ -266,7 +290,7 @@ export function SchemaBrowser({
       </div>
 
       <div
-        className="tree"
+        className="flex-1 overflow-auto py-px px-1.5 pb-3.5 scrollbar-thin-app"
         onContextMenu={(event) => {
           if (!canInteract) return;
           openMenu(event, {
@@ -277,16 +301,19 @@ export function SchemaBrowser({
         }}
       >
         {showConnect ? (
-          <button className="connect-prompt" onClick={onConnect}>
+          <button
+            className="mx-[7px] my-[7px] py-[7px] px-2.5 w-[calc(100%-14px)] flex justify-center items-center gap-1.5 border border-border-bright rounded-md bg-panel-soft text-[#bac1cc] text-[11px] cursor-pointer hover:border-accent hover:text-white"
+            onClick={onConnect}
+          >
             {busy === "connect" ? (
-              <LoaderCircle className="spin" size={15} />
+              <LoaderCircle className="animate-spin-slow" size={15} />
             ) : (
               <Plug size={15} />
             )}
             Connect
           </button>
         ) : schemas.length === 0 ? (
-          <div className="tree-empty">
+          <div className="p-3 text-center text-subtle text-[11px]">
             {refreshingSchemas ? "Loading schemas…" : "No schemas found"}
           </div>
         ) : (
@@ -296,11 +323,15 @@ export function SchemaBrowser({
             return (
               <div key={schema.name}>
                 <div
-                  className={`tree-row db-schema-row ${schemaOpen ? "open" : ""}`}
+                  className={cn(
+                    treeRowBaseClass,
+                    "pr-0.5 gap-0 group/db-schema",
+                    schemaOpen && "open",
+                  )}
                 >
                   <button
                     type="button"
-                    className="tree-row-main"
+                    className={treeRowMainClass}
                     onClick={() => onToggle(schemaKey)}
                     onContextMenu={(event) =>
                       openMenu(event, {
@@ -319,12 +350,15 @@ export function SchemaBrowser({
                     <Server size={14} />
                     <span>{schema.name}</span>
                     {schema.isSystem && (
-                      <Zap size={11} className="system-schema" />
+                      <Zap size={11} className="text-[#8ea0b8] shrink-0" />
                     )}
                   </button>
                   <button
                     type="button"
-                    className="icon-button tree-row-action"
+                    className={cn(
+                      treeRowActionClass,
+                      "group-hover/db-schema:opacity-100 group-[.open]/db-schema:opacity-100",
+                    )}
                     aria-label={`Refresh ${schema.name}`}
                     title="Refresh schema"
                     disabled={busy === "schema"}
@@ -336,7 +370,9 @@ export function SchemaBrowser({
                     <RefreshCw
                       size={12}
                       className={
-                        refreshingObjects?.schema === schema.name ? "spin" : ""
+                        refreshingObjects?.schema === schema.name
+                          ? "animate-spin-slow"
+                          : ""
                       }
                     />
                   </button>
@@ -654,10 +690,16 @@ function ObjectGroupBranch({
 
   return (
     <div>
-      <div className={`tree-row group-row ${open ? "open" : ""}`}>
+      <div
+        className={cn(
+          treeRowBaseClass,
+          "pl-[18px] pr-0.5 gap-0 group/group-row",
+          open && "open",
+        )}
+      >
         <button
           type="button"
-          className="tree-row-main"
+          className={cn(treeRowMainClass, "pl-1 [&>span]:text-[#9aa3b2] [&>span]:font-medium")}
           onClick={() => onToggle(groupKey)}
           onContextMenu={(event) =>
             onOpenMenu(event, {
@@ -672,11 +714,16 @@ function ObjectGroupBranch({
           {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
           <GroupIcon name={group.icon} />
           <span>{group.label}</span>
-          <em>{refreshing ? "…" : loaded ? objects.length : ""}</em>
+          <em className={treeRowEmClass}>
+            {refreshing ? "…" : loaded ? objects.length : ""}
+          </em>
         </button>
         <button
           type="button"
-          className="icon-button tree-row-action"
+          className={cn(
+            treeRowActionClass,
+            "group-hover/group-row:opacity-100 group-[.open]/group-row:opacity-100",
+          )}
           aria-label={`Refresh ${group.label}`}
           title={`Refresh ${group.label.toLowerCase()}`}
           disabled={busy === "schema"}
@@ -685,13 +732,18 @@ function ObjectGroupBranch({
             onRefreshGroup(schema.name, group.id);
           }}
         >
-          <RefreshCw size={12} className={refreshing ? "spin" : ""} />
+          <RefreshCw size={12} className={refreshing ? "animate-spin-slow" : ""} />
         </button>
       </div>
 
       {open && refreshing && !loaded && (
-        <div className="tree-row column-row loading-row">
-          <LoaderCircle className="spin" size={12} />
+        <div
+          className={cn(
+            treeRowBaseClass,
+            "text-subtle gap-[7px] pl-7",
+          )}
+        >
+          <LoaderCircle className="animate-spin-slow" size={12} />
           <span>Loading {group.label.toLowerCase()}…</span>
         </div>
       )}
@@ -707,7 +759,10 @@ function ObjectGroupBranch({
           return (
             <div key={objectKey}>
               <button
-                className="tree-row table-row"
+                className={cn(
+                  treeRowBaseClass,
+                  "pl-9 hover:bg-panel-soft hover:text-text [&>svg:nth-child(2)]:text-[#b2a7f9]",
+                )}
                 onClick={() => {
                   if (hasChildren) onToggle(objectKey);
                   else if (editable) onEditTable(schema.name, object.name);
@@ -736,11 +791,11 @@ function ObjectGroupBranch({
                     <ChevronRight size={13} />
                   )
                 ) : (
-                  <span className="tree-spacer" />
+                  <span className="w-[13px] shrink-0" />
                 )}
                 <GroupIcon name={group.icon} size={14} />
                 <span>{object.name}</span>
-                {object.detail && <em>{object.detail}</em>}
+                {object.detail && <em className={treeRowEmClass}>{object.detail}</em>}
               </button>
               {objectOpen &&
                 (subgroupDefs.length > 0
@@ -776,7 +831,10 @@ function ObjectGroupBranch({
                         <div key={subgroupKey}>
                           <button
                             type="button"
-                            className="tree-row object-subgroup-row"
+                            className={cn(
+                              treeRowBaseClass,
+                              "pl-[54px] text-[#9aa3b2] [&>svg:nth-child(2)]:text-blue [&>em]:text-[#6f7784]",
+                            )}
                             onClick={() => onToggle(subgroupKey)}
                             onContextMenu={(event) => {
                               if (canMutate) {
@@ -812,18 +870,28 @@ function ObjectGroupBranch({
                             )}
                             <GroupIcon name={subgroup.icon} size={13} />
                             <span>{subgroup.label}</span>
-                            <em>{loading ? "…" : count ?? ""}</em>
+                            <em className={treeRowEmClass}>
+                              {loading ? "…" : count ?? ""}
+                            </em>
                           </button>
                           {subgroupOpen &&
                             (loading && !loadedSub ? (
-                              <div className="tree-row metadata-row loading-row">
-                                <LoaderCircle className="spin" size={12} />
+                              <div
+                                className={cn(
+                                  treeRowBaseClass,
+                                  "text-subtle gap-[7px] pl-7",
+                                )}
+                              >
+                                <LoaderCircle className="animate-spin-slow" size={12} />
                                 <span>Loading…</span>
                               </div>
                             ) : isColumns ? (
                               object.children.map((child) => (
                                 <div
-                                  className="tree-row metadata-row"
+                                  className={cn(
+                                    treeRowBaseClass,
+                                    "pl-20 text-[#818a99] [&>span]:min-w-0 [&>em]:max-w-[110px] [&>em]:truncate",
+                                  )}
                                   key={`${subgroupKey}.${child.name}`}
                                   onContextMenu={(event) => {
                                     if (
@@ -844,13 +912,16 @@ function ObjectGroupBranch({
                                 >
                                   <Columns3 size={12} />
                                   <span>{child.name}</span>
-                                  <em>{child.dataType}</em>
+                                  <em className={treeRowEmClass}>{child.dataType}</em>
                                 </div>
                               ))
                             ) : (
                               items.map((item) => (
                                 <div
-                                  className="tree-row metadata-row"
+                                  className={cn(
+                                    treeRowBaseClass,
+                                    "pl-20 text-[#818a99] [&>span]:min-w-0 [&>em]:max-w-[110px] [&>em]:truncate",
+                                  )}
                                   key={`${subgroupKey}.${item.name}`}
                                   title={item.detail ?? undefined}
                                   onContextMenu={(event) => {
@@ -884,7 +955,9 @@ function ObjectGroupBranch({
                                 >
                                   <GroupIcon name={subgroup.icon} size={12} />
                                   <span>{item.name}</span>
-                                  <em>{item.detail || item.kind}</em>
+                                  <em className={treeRowEmClass}>
+                                    {item.detail || item.kind}
+                                  </em>
                                 </div>
                               ))
                             ))}
@@ -893,7 +966,10 @@ function ObjectGroupBranch({
                     })
                   : object.children.map((child) => (
                       <div
-                        className="tree-row column-row"
+                        className={cn(
+                          treeRowBaseClass,
+                          "pl-16 text-[#818a99] [&>em]:max-w-[74px] [&>em]:truncate",
+                        )}
                         key={`${objectKey}.${child.name}`}
                         onContextMenu={(event) => {
                           if (
@@ -914,7 +990,7 @@ function ObjectGroupBranch({
                       >
                         <Columns3 size={12} />
                         <span>{child.name}</span>
-                        <em>{child.dataType}</em>
+                        <em className={treeRowEmClass}>{child.dataType}</em>
                       </div>
                     )))}
             </div>

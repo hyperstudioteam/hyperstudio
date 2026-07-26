@@ -3,6 +3,7 @@ import { Database, LoaderCircle, X } from "lucide-react";
 import { databaseApi } from "../../api/database";
 import { errorMessage } from "../../lib/format";
 import { withResolvedPassword } from "../../lib/passwords";
+import { cn } from "../../lib/cn";
 import {
   getVaultSecret,
   isVaultUnlocked,
@@ -238,25 +239,35 @@ export function ConnectionModal({
 
   return (
     <div
-      className="modal-backdrop"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
     >
       <form
-        className="connection-modal wide"
+        className="w-[min(560px,100%)] max-h-full overflow-auto p-[18px] border border-border-bright rounded-[10px] bg-surface shadow-[0_24px_70px_rgba(0,0,0,.48)]"
         onSubmit={(e) => void handleSubmit(e)}
       >
-        <div className="modal-heading">
-          <div>
-            <span className={`db-icon ${profile.driver}`}>
+        <div className="flex items-center justify-between mb-[17px]">
+          <div className="flex items-center gap-2.5">
+            <span
+              className={cn(
+                "w-[27px] h-[27px] shrink-0 rounded-md grid place-items-center",
+                profile.driver === "postgres" &&
+                  "text-[#8fb9e8] bg-[rgba(72,128,186,.16)]",
+                profile.driver === "mysql" &&
+                  "text-[#e0a367] bg-[rgba(216,132,55,.14)]",
+              )}
+            >
               <Database size={17} />
             </span>
-            <h2>Database connection</h2>
+            <h2 className="m-0 text-text-bright text-sm font-[630]">
+              Database connection
+            </h2>
           </div>
           <button
             type="button"
-            className="icon-button"
+            className="w-7 h-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer enabled:hover:text-text enabled:hover:bg-panel-soft disabled:cursor-default disabled:opacity-40"
             aria-label="Close"
             onClick={onClose}
           >
@@ -264,10 +275,13 @@ export function ConnectionModal({
           </button>
         </div>
 
-        <div className="modal-tabs">
+        <div className="flex gap-0.5 -mt-1 mb-4 border-b border-border">
           <button
             type="button"
-            className={tab === "general" ? "active" : ""}
+            className={cn(
+              "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
+              tab === "general" && "text-[#d8dde6] border-b-blue",
+            )}
             onClick={() => setTab("general")}
           >
             General
@@ -275,7 +289,10 @@ export function ConnectionModal({
           {supportsSchemas && (
             <button
               type="button"
-              className={tab === "schemas" ? "active" : ""}
+              className={cn(
+                "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
+                tab === "schemas" && "text-[#d8dde6] border-b-blue",
+              )}
               onClick={() => setTab("schemas")}
             >
               Schemas
@@ -305,31 +322,39 @@ export function ConnectionModal({
 
         {testStatus && (
           <div
-            className={`test-status ${testStatus.startsWith("Connected") ? "ok" : ""}`}
+            className={cn(
+              "mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-[#d18b91] bg-[rgba(239,107,115,.08)]",
+              testStatus.startsWith("Connected") &&
+                "text-[#72c99d] bg-[rgba(73,201,137,.08)]",
+            )}
           >
             {testStatus}
           </div>
         )}
 
-        <div className="modal-actions">
+        <div className="mt-[18px] pt-3.5 border-t border-border flex items-center justify-between gap-2">
           <button
             type="button"
-            className="secondary-button"
+            className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer flex items-center gap-1.5 border border-border-bright text-[#b8bfca] bg-[#20242b] hover:text-white hover:border-[#4c5360] disabled:opacity-40 disabled:cursor-default"
             disabled={testing || loadingSchemas || saving}
             onClick={() => void testAndLoadSchemas()}
           >
             {(testing || loadingSchemas) && (
-              <LoaderCircle className="spin" size={14} />
+              <LoaderCircle className="animate-spin-slow" size={14} />
             )}
             Test connection
           </button>
-          <div>
-            <button type="button" className="ghost-button" onClick={onClose}>
+          <div className="flex gap-[7px]">
+            <button
+              type="button"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border-0 text-muted bg-transparent hover:text-white hover:bg-panel-soft"
+              onClick={onClose}
+            >
               Cancel
             </button>
             <button
               type="submit"
-              className="primary-button"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40 disabled:cursor-default"
               disabled={saving}
             >
               {saving ? "Saving…" : "Save connection"}

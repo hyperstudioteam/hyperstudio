@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
+import { cn } from "../lib/cn";
 import { CellContext, defaultFormat } from "../plugins/contributions";
 import { useCellViewers } from "../plugins/useContributions";
 
@@ -50,19 +51,23 @@ export function CellViewer({
 
   return (
     <div
-      className="modal-backdrop nested"
+      className="fixed inset-0 z-30 grid place-items-center bg-[rgba(5,7,10,.55)] p-5 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
     >
-      <div className="cell-viewer">
-        <div className="cell-viewer-head">
-          <div className="cell-viewer-tabs">
+      <div className="flex max-h-[min(560px,100%)] w-[min(680px,100%)] flex-col overflow-hidden rounded-[10px] border border-border-bright bg-surface shadow-[0_24px_70px_rgba(0,0,0,.5)]">
+        <div className="flex items-center justify-between gap-2.5 border-b border-border px-2.5 py-2">
+          <div className="flex flex-wrap gap-1">
             {viewers.map((viewer) => (
               <button
                 key={viewer.id}
                 type="button"
-                className={active?.id === viewer.id ? "active" : ""}
+                className={cn(
+                  "h-[26px] cursor-pointer rounded-[5px] border border-border bg-[#15181e] px-2.5 text-[11px] text-muted hover:border-border-bright hover:text-text",
+                  active?.id === viewer.id &&
+                    "border-[rgba(139,124,246,.6)] bg-accent-soft text-[#d5d0ff]",
+                )}
                 onClick={() => setActiveId(viewer.id)}
                 title={
                   viewer.source === "built-in"
@@ -74,10 +79,10 @@ export function CellViewer({
               </button>
             ))}
           </div>
-          <div className="cell-viewer-actions">
+          <div className="flex gap-1">
             <button
               type="button"
-              className="icon-button"
+              className="grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text"
               aria-label="Copy raw value"
               onClick={() => void copyRaw()}
             >
@@ -85,7 +90,7 @@ export function CellViewer({
             </button>
             <button
               type="button"
-              className="icon-button"
+              className="grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text"
               aria-label="Close viewer"
               onClick={onClose}
             >
@@ -93,12 +98,20 @@ export function CellViewer({
             </button>
           </div>
         </div>
-        <div className="cell-viewer-meta">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-1.5 text-[11px] text-muted">
           {context.columnName && <span>{context.columnName}</span>}
-          {context.typeName && <code>{context.typeName}</code>}
+          {context.typeName && (
+            <code className="text-[10px] text-subtle">{context.typeName}</code>
+          )}
         </div>
-        <div className="cell-viewer-body">
-          {active ? active.render(context) : <div className="viewer-empty">No viewer.</div>}
+        <div className="flex-1 overflow-auto p-3">
+          {active ? (
+            active.render(context)
+          ) : (
+            <div className="p-5 text-center text-[12px] text-muted">
+              No viewer.
+            </div>
+          )}
         </div>
       </div>
     </div>

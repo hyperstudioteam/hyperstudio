@@ -5,6 +5,7 @@ import {
   PasswordStorage,
   SslMode,
 } from "../../types/connection";
+import { cn } from "../../lib/cn";
 import { vaultExists, isVaultUnlocked } from "../../lib/vault";
 
 interface GeneralTabProps {
@@ -25,6 +26,15 @@ const PROFILE_KEYS = new Set([
   "password",
   "sslMode",
 ]);
+
+const formLabelClass =
+  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+const formInputClass =
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+const checkboxRowClass =
+  "flex flex-row items-center gap-2 text-[#b4bbc6] text-[11px] font-normal cursor-pointer";
+const checkboxInputClass =
+  "w-3.5 h-3.5 m-0 p-0 border-0 rounded-none bg-transparent shrink-0 accent-accent cursor-pointer";
 
 export function GeneralTab({
   profile,
@@ -118,12 +128,16 @@ export function GeneralTab({
 
   return (
     <>
-      <div className="driver-picker">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2 mb-[17px]">
         {drivers.map((driver) => (
           <button
             type="button"
             key={driver.id}
-            className={profile.driver === driver.id ? "active" : ""}
+            className={cn(
+              "h-[38px] border border-border rounded-md flex items-center justify-center gap-[7px] text-muted bg-surface-deep text-[11px] cursor-pointer hover:border-border-bright hover:text-text",
+              profile.driver === driver.id &&
+                "text-[#d5d0ff] border-[rgba(139,124,246,.6)] bg-accent-soft",
+            )}
             onClick={() => onDriverChange(driver.id)}
             title={driver.description}
           >
@@ -132,19 +146,21 @@ export function GeneralTab({
         ))}
       </div>
 
-      <div className="form-grid">
-        <label className="full">
+      <div className="grid grid-cols-[1fr_120px] gap-3">
+        <label className={`${formLabelClass} col-span-full`}>
           Connection name
           <input
             required
+            className={formInputClass}
             value={profile.name}
             placeholder="Production database"
             onChange={(event) => onChange({ name: event.target.value })}
           />
         </label>
-        <label className="full">
+        <label className={`${formLabelClass} col-span-full`}>
           Folder
           <select
+            className={formInputClass}
             value={folderId ?? ""}
             onChange={(event) =>
               onFolderChange(
@@ -161,10 +177,11 @@ export function GeneralTab({
         </label>
 
         {caps?.fileBased && (
-          <label className="full">
+          <label className={`${formLabelClass} col-span-full`}>
             Database file
             <input
               required
+              className={formInputClass}
               value={profile.database}
               placeholder="/path/to/database.db"
               onChange={(event) => onChange({ database: event.target.value })}
@@ -173,10 +190,11 @@ export function GeneralTab({
         )}
 
         {caps?.folderBased && (
-          <label className="full">
+          <label className={`${formLabelClass} col-span-full`}>
             Data folder
             <input
               required
+              className={formInputClass}
               value={profile.database}
               placeholder="/path/to/data"
               onChange={(event) => onChange({ database: event.target.value })}
@@ -212,46 +230,51 @@ export function GeneralTab({
 
         {networkForm && (
           <>
-            <label>
+            <label className={formLabelClass}>
               Host
               <input
                 required
+                className={formInputClass}
                 value={profile.host}
                 onChange={(event) => onChange({ host: event.target.value })}
               />
             </label>
-            <label>
+            <label className={formLabelClass}>
               Port
               <input
                 required
                 type="number"
+                className={formInputClass}
                 value={profile.port}
                 onChange={(event) =>
                   onChange({ port: Number(event.target.value) })
                 }
               />
             </label>
-            <label className="full">
+            <label className={`${formLabelClass} col-span-full`}>
               Database
               <input
                 required
+                className={formInputClass}
                 value={profile.database}
                 placeholder="database_name"
                 onChange={(event) => onChange({ database: event.target.value })}
               />
             </label>
-            <label>
+            <label className={formLabelClass}>
               Username
               <input
                 required
+                className={formInputClass}
                 value={profile.username}
                 onChange={(event) => onChange({ username: event.target.value })}
               />
             </label>
-            <label>
+            <label className={formLabelClass}>
               Password
               <input
                 type="password"
+                className={formInputClass}
                 value={profile.password}
                 placeholder={passwordPlaceholder}
                 onChange={(event) => onChange({ password: event.target.value })}
@@ -267,9 +290,10 @@ export function GeneralTab({
               onStorage={setStorage}
             />
 
-            <label className="full">
+            <label className={`${formLabelClass} col-span-full`}>
               SSL mode
               <select
+                className={formInputClass}
                 value={profile.sslMode}
                 onChange={(event) =>
                   onChange({
@@ -286,7 +310,7 @@ export function GeneralTab({
         )}
 
         {caps?.noConnectionRequired && (
-          <p className="full muted-hint">
+          <p className="m-0 text-muted text-xs leading-[1.45] col-span-full">
             This driver does not require host or credentials.
           </p>
         )}
@@ -307,14 +331,15 @@ function CustomConnectionField({
   onChange: (raw: string) => void;
 }) {
   const full = field.width !== "half";
-  const className = full ? "full" : undefined;
+  const labelClass = cn(formLabelClass, full && "col-span-full");
 
   if (field.options && field.options.length > 0) {
     return (
-      <label className={className}>
+      <label className={labelClass}>
         {field.label}
         <select
           required={field.required}
+          className={formInputClass}
           value={String(value)}
           onChange={(event) => onChange(event.target.value)}
         >
@@ -326,17 +351,20 @@ function CustomConnectionField({
           ))}
         </select>
         {field.description && (
-          <span className="field-hint">{field.description}</span>
+          <span className="block mt-1 text-subtle text-[10px] font-normal leading-[1.4]">
+            {field.description}
+          </span>
         )}
       </label>
     );
   }
 
   return (
-    <label className={className}>
+    <label className={labelClass}>
       {field.label}
       <input
         required={field.required}
+        className={formInputClass}
         type={
           field.key === "port"
             ? "number"
@@ -353,7 +381,9 @@ function CustomConnectionField({
         onChange={(event) => onChange(event.target.value)}
       />
       {field.description && (
-        <span className="field-hint">{field.description}</span>
+        <span className="block mt-1 text-subtle text-[10px] font-normal leading-[1.4]">
+          {field.description}
+        </span>
       )}
     </label>
   );
@@ -375,10 +405,11 @@ function PasswordStorageBlock({
   onStorage: (mode: PasswordStorage) => void;
 }) {
   return (
-    <div className="full password-storage">
-      <label className="checkbox-row">
+    <div className="col-span-full flex flex-col gap-2.5">
+      <label className={checkboxRowClass}>
         <input
           type="checkbox"
+          className={checkboxInputClass}
           checked={savePassword}
           onChange={(event) => onToggleSave(event.target.checked)}
         />
@@ -387,20 +418,23 @@ function PasswordStorageBlock({
 
       {savePassword && (
         <div
-          className="storage-options"
+          className="flex flex-col gap-2 p-2.5 px-[11px] border border-border rounded-md bg-[#14171d]"
           role="radiogroup"
           aria-label="Secret storage"
         >
-          <label className="radio-row">
+          <label className="flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer">
             <input
               type="radio"
               name="password-storage"
+              className="w-3.5 h-3.5 m-0 shrink-0 accent-accent cursor-pointer"
               checked={passwordStorage === "vault"}
               onChange={() => onStorage("vault")}
             />
-            <span>
-              <strong>Into vault</strong>
-              <em>
+            <span className="flex flex-col gap-0.5">
+              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+                Into vault
+              </strong>
+              <em className="text-[#6f7785] text-[10px] not-italic">
                 {vaultReady
                   ? vaultOpen
                     ? "Encrypted · vault unlocked"
@@ -409,16 +443,21 @@ function PasswordStorageBlock({
               </em>
             </span>
           </label>
-          <label className="radio-row">
+          <label className="flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer">
             <input
               type="radio"
               name="password-storage"
+              className="w-3.5 h-3.5 m-0 shrink-0 accent-accent cursor-pointer"
               checked={passwordStorage === "raw"}
               onChange={() => onStorage("raw")}
             />
-            <span>
-              <strong>Raw</strong>
-              <em>Stored as plain text on this device</em>
+            <span className="flex flex-col gap-0.5">
+              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+                Raw
+              </strong>
+              <em className="text-[#6f7785] text-[10px] not-italic">
+                Stored as plain text on this device
+              </em>
             </span>
           </label>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ClipboardCopy } from "lucide-react";
+import { cn } from "../lib/cn";
 import {
   COPY_AS_OPTIONS,
   ExtractorId,
@@ -16,6 +17,9 @@ interface ExtractorMenuBodyProps {
   onIncludeHeaderChange: (value: boolean) => void;
 }
 
+const menuButtonClass =
+  "flex h-7 w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 text-left text-[11px] text-[#c4cad4] hover:bg-[#2a3344] hover:text-white";
+
 function ExtractorMenuBody({
   activeExtractor,
   includeHeader,
@@ -24,7 +28,9 @@ function ExtractorMenuBody({
 }: ExtractorMenuBodyProps) {
   return (
     <>
-      <div className="extractor-menu-title">Data Extractors</div>
+      <div className="px-3 pt-1 pb-2 text-[11px] font-semibold text-[#d5dae3]">
+        Data Extractors
+      </div>
       {(["built-in", "csv", "scripted"] as const).map((groupId) => {
         const options = COPY_AS_OPTIONS.filter(
           (option) => option.group === groupId,
@@ -36,16 +42,21 @@ function ExtractorMenuBody({
               ? "CSV"
               : "Scripted";
         return (
-          <div key={groupId} className="extractor-group">
-            <div className="extractor-group-label">{labelText}</div>
+          <div key={groupId}>
+            <div className="px-3 pt-2 pb-1 text-[9px] font-semibold tracking-[0.04em] text-[#6f7785] uppercase">
+              {labelText}
+            </div>
             {options.map((option) => (
               <button
                 key={option.id}
                 type="button"
-                className={option.id === activeExtractor ? "active" : ""}
+                className={cn(
+                  menuButtonClass,
+                  option.id === activeExtractor && "bg-[#2a3344] text-white",
+                )}
                 onClick={() => onSelect(option.id)}
               >
-                <span className="extractor-check">
+                <span className="grid w-3.5 place-items-center text-[#72c99d]">
                   {option.id === activeExtractor ? <Check size={12} /> : null}
                 </span>
                 {option.label}
@@ -54,13 +65,13 @@ function ExtractorMenuBody({
             {groupId === "csv" && (
               <button
                 type="button"
-                className="extractor-toggle"
+                className={cn(menuButtonClass, "text-[#9aa3b0]")}
                 onClick={(event) => {
                   event.stopPropagation();
                   onIncludeHeaderChange(!includeHeader);
                 }}
               >
-                <span className="extractor-check">
+                <span className="grid w-3.5 place-items-center text-[#72c99d]">
                   {includeHeader ? <Check size={12} /> : null}
                 </span>
                 Include header
@@ -84,6 +95,9 @@ interface CopyAsMenuProps {
   onClose: () => void;
 }
 
+const menuPanelClass =
+  "z-40 max-h-[min(420px,70vh)] min-w-[220px] overflow-auto rounded-md border border-border-bright bg-[#1c2028] py-1.5 shadow-[0_12px_40px_rgba(0,0,0,.45)]";
+
 export function CopyAsMenu({
   open,
   x,
@@ -105,7 +119,7 @@ export function CopyAsMenu({
 
   return (
     <div
-      className="extractor-menu"
+      className={cn(menuPanelClass, "fixed")}
       style={{ left: x, top: y }}
       onClick={(event) => event.stopPropagation()}
     >
@@ -155,10 +169,10 @@ export function ExtractorToolbar({
   }, [open]);
 
   return (
-    <div className="extractor-toolbar" ref={rootRef}>
+    <div className="relative flex items-center gap-0.5" ref={rootRef}>
       <button
         type="button"
-        className="extractor-trigger"
+        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded border border-border-bright bg-[#1a1e25] px-[7px] text-[10px] text-[#b8bfca] hover:text-white disabled:cursor-default disabled:opacity-50"
         disabled={disabled}
         title={includeHeader ? "Include header: on" : "Include header: off"}
         onClick={() => setOpen((value) => !value)}
@@ -169,7 +183,7 @@ export function ExtractorToolbar({
       </button>
       <button
         type="button"
-        className="icon-button"
+        className="grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text disabled:cursor-default disabled:opacity-40"
         title="Copy selection"
         disabled={disabled}
         onClick={onCopy}
@@ -177,7 +191,7 @@ export function ExtractorToolbar({
         <ClipboardCopy size={14} />
       </button>
       {open && (
-        <div className="extractor-menu anchored">
+        <div className={cn(menuPanelClass, "absolute top-[calc(100%+4px)] right-0 left-auto")}>
           <ExtractorMenuBody
             activeExtractor={activeExtractor}
             includeHeader={includeHeader}

@@ -56,6 +56,12 @@ interface ConnectionSidebarProps {
   parentOf: (id: string) => string | null;
 }
 
+const iconButtonClass =
+  "size-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer hover:enabled:text-text hover:enabled:bg-panel-soft disabled:cursor-default disabled:opacity-40";
+
+const contextDangerClass =
+  "text-danger hover:bg-[rgba(239,107,115,0.1)]";
+
 export function ConnectionSidebar(props: ConnectionSidebarProps) {
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -79,12 +85,12 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
   }
 
   return (
-    <aside className="sidebar">
-      <div className="panel-heading">
+    <aside className="min-w-0 flex flex-col bg-panel border-r border-border overflow-hidden">
+      <div className="h-11 px-[11px] pl-3.5 flex items-center justify-between text-[#aab1be] text-[10px] font-bold tracking-[0.08em] uppercase">
         <span>Connections</span>
-        <div className="heading-actions">
+        <div className="flex gap-0.5">
           <button
-            className="icon-button"
+            className={iconButtonClass}
             aria-label="New folder"
             title="New folder"
             onClick={() =>
@@ -98,7 +104,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
             <FolderPlus size={16} />
           </button>
           <button
-            className="icon-button"
+            className={iconButtonClass}
             aria-label="New connection"
             title="New connection"
             onClick={() =>
@@ -115,9 +121,9 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
       </div>
 
       {props.tree.length === 0 ? (
-        <div className="connections">
+        <div className="px-[7px] pb-[5px] max-h-[42%] overflow-auto scrollbar-thin-app">
           <button
-            className="empty-connections"
+            className="w-full py-[18px] px-2 border border-dashed border-border-bright text-muted rounded-[7px] bg-transparent flex flex-col items-center gap-[7px] cursor-pointer text-[11px] hover:text-text hover:border-accent hover:bg-accent-soft"
             onClick={() => props.onNewConnection(null)}
           >
             <CirclePlus size={18} />
@@ -207,7 +213,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
               </button>
               <button
                 type="button"
-                className="danger"
+                className={contextDangerClass}
                 onClick={() => {
                   props.onDelete(contextMenu.target!.id);
                   setContextMenu(null);
@@ -259,7 +265,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
               </button>
               <button
                 type="button"
-                className="danger"
+                className={contextDangerClass}
                 onClick={() => {
                   props.onDelete(contextMenu.target!.id);
                   setContextMenu(null);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check } from "lucide-react";
+import { cn } from "../lib/cn";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
@@ -20,6 +21,11 @@ interface ResultGridProps {
   /** Optional SQL type name per result column, aligned to `result.columns`. */
   columnTypes?: (string | undefined)[];
 }
+
+const thClass =
+  "sticky top-0 z-[1] h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-[#aeb5c1] bg-grid-head";
+const tdClass =
+  "h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left whitespace-nowrap overflow-hidden text-ellipsis text-[#b9c0cb] select-none cursor-cell";
 
 export function ResultGrid({
   result,
@@ -134,10 +140,12 @@ export function ResultGrid({
 
   if (error) {
     return (
-      <div className="error-state">
+      <div className="m-3 flex gap-[9px] rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-3 text-[11px] text-red">
         <div>
-          <strong>Query failed</strong>
-          <p>{error}</p>
+          <strong className="text-[11px]">Query failed</strong>
+          <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-[#c79599]">
+            {error}
+          </p>
         </div>
       </div>
     );
@@ -145,7 +153,7 @@ export function ResultGrid({
 
   if (!result) {
     return (
-      <div className="result-placeholder">
+      <div className="flex flex-1 items-center justify-center gap-2 text-[11px] text-subtle">
         <span>Run a query to see results</span>
       </div>
     );
@@ -153,7 +161,7 @@ export function ResultGrid({
 
   if (result.columns.length === 0) {
     return (
-      <div className="success-state">
+      <div className="flex flex-1 items-center justify-center gap-2 text-[11px] text-[#70c99b]">
         <Check size={18} /> Query completed. {result.affectedRows} rows
         affected.
       </div>
@@ -161,8 +169,8 @@ export function ResultGrid({
   }
 
   return (
-    <div className="result-grid-shell">
-      <div className="result-grid-tools">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex h-7 shrink-0 items-center gap-2.5 border-b border-border bg-[#14171b] px-2">
         <ExtractorToolbar
           activeExtractor={extractor}
           includeHeader={includeHeader}
@@ -174,25 +182,29 @@ export function ResultGrid({
           onIncludeHeaderChange={setIncludeHeader}
           onCopy={() => void handleCopy()}
         />
-        {copyFlash && <span className="copy-flash">{copyFlash}</span>}
-        {copyError && <span className="copy-error">{copyError}</span>}
+        {copyFlash && (
+          <span className="text-[#72c99d]">{copyFlash}</span>
+        )}
+        {copyError && <span className="text-red">{copyError}</span>}
         {stats.cells > 0 && (
-          <span className="selection-meta">
+          <span className="ml-auto text-[10px] text-[#8b93a1]">
             {stats.sum != null && <>SUM: {stats.sum} · </>}
             {stats.cells} cells, {stats.rows} rows · {stats.coord}
           </span>
         )}
       </div>
       <div
-        className="grid-scroll"
+        className="scrollbar-thin-app flex-1 overflow-auto"
         onMouseLeave={() => {
           dragging.current = false;
         }}
       >
-        <table className="selectable-grid">
+        <table className="min-w-full table-auto border-separate border-spacing-0 font-mono text-[10px] leading-[1.35]">
           <thead>
             <tr>
-              <th className="row-number">#</th>
+              <th className={cn(thClass, "w-[42px] min-w-[42px] text-right")}>
+                #
+              </th>
               {result.columns.map((column, index) => (
                 <th key={`${column}-${index}`}>{column}</th>
               ))}
@@ -200,8 +212,15 @@ export function ResultGrid({
           </thead>
           <tbody>
             {result.rows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                <td className="row-number">{rowIndex + 1}</td>
+              <tr key={rowIndex} className="group">
+                <td
+                  className={cn(
+                    tdClass,
+                    "w-[42px] min-w-[42px] bg-row-num! text-right text-[#596272]",
+                  )}
+                >
+                  {rowIndex + 1}
+                </td>
                 {row.map((value, columnIndex) => {
                   const cell = presentCell({
                     value,
@@ -209,18 +228,24 @@ export function ResultGrid({
                     columnName: result.columns[columnIndex],
                     driver,
                   });
+                  const selected = isCellInRange(
+                    rowIndex,
+                    columnIndex,
+                    cellRange,
+                  );
                   return (
                     <td
-                      className={[
-                        value === null ? "null-value" : "",
+                      className={cn(
+                        tdClass,
+                        rowIndex % 2 === 1 ? "bg-grid-alt" : "bg-grid-row",
+                        "group-hover:bg-grid-hover",
+                        value === null && "text-[#686f7c] italic",
                         cell.className,
-                        `align-${cell.align}`,
-                        isCellInRange(rowIndex, columnIndex, cellRange)
-                          ? "cell-selected"
-                          : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
+                        cell.align === "right" && "text-right",
+                        cell.align === "center" && "text-center",
+                        selected &&
+                          "bg-cell-select! text-[#e8eef8] shadow-[inset_0_0_0_1px_rgba(96,150,230,.55)]",
+                      )}
                       key={columnIndex}
                       title={cell.text}
                       onMouseDown={(event) => {

@@ -6,7 +6,7 @@ interface JsonTreeProps {
 
 export function JsonTree({ value }: JsonTreeProps) {
   return (
-    <div className="json-tree">
+    <div className="font-mono text-[12px] leading-normal text-[#d2d7df]">
       <JsonNode name={null} value={value} depth={0} defaultOpen />
     </div>
   );
@@ -32,11 +32,14 @@ function JsonNode({ name, value, depth, defaultOpen }: JsonNodeProps) {
 
   if (!isObject) {
     return (
-      <div className="json-row" style={{ paddingLeft: depth * 14 }}>
-        {name !== null && <span className="json-key">{name}:</span>}
-        <span className={`json-scalar ${scalarClass(value)}`}>
-          {scalarText(value)}
-        </span>
+      <div
+        className="flex items-baseline gap-1.5 whitespace-pre-wrap"
+        style={{ paddingLeft: depth * 14 }}
+      >
+        {name !== null && (
+          <span className="text-accent-bright">{name}:</span>
+        )}
+        <span className={scalarClass(value)}>{scalarText(value)}</span>
       </div>
     );
   }
@@ -45,15 +48,17 @@ function JsonNode({ name, value, depth, defaultOpen }: JsonNodeProps) {
   const summary = isArray ? `[${entries.length}]` : `{${entries.length}}`;
 
   return (
-    <div className="json-branch">
+    <div>
       <div
-        className="json-row json-toggle"
+        className="flex cursor-pointer items-baseline gap-1.5 whitespace-pre-wrap select-none hover:bg-panel-soft"
         style={{ paddingLeft: depth * 14 }}
         onClick={() => setOpen((current) => !current)}
       >
-        <span className="json-caret">{open ? "▾" : "▸"}</span>
-        {name !== null && <span className="json-key">{name}:</span>}
-        <span className="json-summary">{summary}</span>
+        <span className="inline-block w-2.5 text-muted">{open ? "▾" : "▸"}</span>
+        {name !== null && (
+          <span className="text-accent-bright">{name}:</span>
+        )}
+        <span className="text-muted">{summary}</span>
       </div>
       {open &&
         entries.map(([key, child]) => (
@@ -64,10 +69,10 @@ function JsonNode({ name, value, depth, defaultOpen }: JsonNodeProps) {
 }
 
 function scalarClass(value: unknown): string {
-  if (value === null) return "json-null";
-  if (typeof value === "number") return "json-number";
-  if (typeof value === "boolean") return "json-bool";
-  return "json-string";
+  if (value === null) return "text-subtle italic";
+  if (typeof value === "number") return "text-[#d7c9a8]";
+  if (typeof value === "boolean") return "text-[#ef9f6b]";
+  return "text-[#9fd0c2]";
 }
 
 function scalarText(value: unknown): string {

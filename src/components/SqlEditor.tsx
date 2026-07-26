@@ -264,6 +264,6 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
       });
     }, [value]);
 
-    return <div className="sql-editor" ref={hostRef} />;
+    return <div className="flex-1 min-w-0 overflow-hidden" ref={hostRef} />;
   },
 );
