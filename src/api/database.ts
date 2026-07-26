@@ -88,6 +88,19 @@ export const databaseApi = {
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
   },
+  beginTransaction(connectionId: string) {
+    return invoke<void>("begin_transaction", { connectionId });
+  },
+  endTransaction(connectionId: string, commit: boolean) {
+    return invoke<void>("end_transaction", { connectionId, commit });
+  },
+  transactionOpen(connectionId: string) {
+    return invoke<boolean>("transaction_open", { connectionId });
+  },
+  /** Resolves false when nothing was running to cancel. */
+  cancelQuery(connectionId: string) {
+    return invoke<boolean>("cancel_query", { connectionId });
+  },
   alterTable(connectionId: string, request: AlterTableRequest) {
     return invoke<void>("alter_table", { connectionId, request });
   },

@@ -1,7 +1,7 @@
 //! PostgreSQL query execution with dialect-aware LIMIT capping.
 
 use futures_util::TryStreamExt;
-use sqlx::{Column, PgPool, Row};
+use sqlx::{Column, PgConnection, PgPool, Row};
 
 use crate::drivers::postgres::values::decode;
 use crate::drivers::query_common::{
@@ -23,7 +23,28 @@ pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
     with_semi(rewritten, trailing_semi)
 }
 
-pub async fn execute(pool: &PgPool, sql: &str, max_rows: usize) -> Result<QueryResult, String> {
+/// Backend process id, used to cancel a statement from another connection.
+pub async fn backend_pid(conn: &mut PgConnection) -> Result<i32, String> {
+    sqlx::query_scalar::<_, i32>("SELECT pg_backend_pid()")
+        .fetch_one(conn)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Ask the server to cancel whatever `pid` is currently running.
+pub async fn cancel_backend(pool: &PgPool, pid: i32) -> Result<bool, String> {
+    sqlx::query_scalar::<_, bool>("SELECT pg_cancel_backend($1)")
+        .bind(pid)
+        .fetch_one(pool)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+pub async fn execute_on(
+    conn: &mut PgConnection,
+    sql: &str,
+    max_rows: usize,
+) -> Result<QueryResult, String> {
     if sql.trim().is_empty() {
         return Err("Enter a SQL statement first.".into());
     }
@@ -34,7 +55,7 @@ pub async fn execute(pool: &PgPool, sql: &str, max_rows: usize) -> Result<QueryR
 
     if !is_row_query(&sql) {
         let affected_rows = sqlx::query(&sql)
-            .execute(pool)
+            .execute(&mut *conn)
             .await
             .map_err(|error| error.to_string())?
             .rows_affected();
@@ -47,7 +68,7 @@ pub async fn execute(pool: &PgPool, sql: &str, max_rows: usize) -> Result<QueryR
         });
     }
 
-    let mut stream = sqlx::query(&sql).fetch(pool);
+    let mut stream = sqlx::query(&sql).fetch(&mut *conn);
     let mut rows = Vec::new();
     let mut columns = Vec::new();
     while let Some(row) = stream.try_next().await.map_err(|error| error.to_string())? {

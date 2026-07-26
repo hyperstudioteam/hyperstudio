@@ -84,6 +84,8 @@ export function useDatabaseSession() {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<SessionBusy>(null);
+  /** True while an explicit transaction is open on the live connection. */
+  const [txnOpen, setTxnOpen] = useState(false);
 
   const syncFromCache = useCallback((connectionId: string) => {
     setSchemas(toSchemaNodes(getSchemaCache(connectionId)));
@@ -98,6 +100,7 @@ export function useDatabaseSession() {
     setSchemaExpanded(new Set());
     setObjectSubgroups({});
     setResult(null);
+    setTxnOpen(false);
   }
 
   /** Show cached schemas without opening a DB pool. */
@@ -126,6 +129,8 @@ export function useDatabaseSession() {
     setLiveId(profile.id);
     setActiveId(profile.id);
     setConnectionInfo(info);
+    // A fresh pool cannot have a transaction parked against it.
+    setTxnOpen(false);
   }
 
   function isVaultAuthError(error: unknown) {
@@ -313,6 +318,27 @@ export function useDatabaseSession() {
     return next;
   }
 
+  /** Ask the server to abandon the statement in flight. */
+  async function cancelQuery() {
+    if (!liveIdRef.current) return;
+    try {
+      await databaseApi.cancelQuery(liveIdRef.current);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    }
+  }
+
+  async function beginTransaction(profile: ConnectionProfile) {
+    await ensureLive(profile);
+    await databaseApi.beginTransaction(profile.id);
+    setTxnOpen(true);
+  }
+
+  async function endTransaction(profile: ConnectionProfile, commit: boolean) {
+    await databaseApi.endTransaction(profile.id, commit);
+    setTxnOpen(false);
+  }
+
   async function toggleSchemaExpanded(
     profile: ConnectionProfile,
     key: string,
@@ -430,6 +456,10 @@ export function useDatabaseSession() {
     prefetchObjects,
     runQuery,
     executeSql,
+    cancelQuery,
+    txnOpen,
+    beginTransaction,
+    endTransaction,
     onDeleted,
     clearSession,
   };

@@ -83,7 +83,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Schema-aware autocompletion for schemas, tables, views, and columns
 - [ ] SQL formatting
 - [ ] Query history and saved queries
-- [ ] Explicit transaction control and query cancellation
+- [x] Explicit transaction control (**Begin** / **Commit** / **Rollback**) and query cancellation
 - [ ] Multi-statement scripts and per-statement results
 
 ### Data editor
@@ -171,7 +171,13 @@ first query, refresh, or edit.
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
 
-**5. Move data around.** Drag across cells to select a range, then copy with your chosen
+**5. Control the transaction.** **Begin transaction** parks a connection for your session so
+every following statement, including data-editor writes, runs inside it. The badge stays on
+**Tx: Open** until you **Commit** or **Rollback**; disconnecting rolls back. While a statement
+is running, **Cancel** asks the server to abandon it (`pg_cancel_backend` on PostgreSQL,
+`KILL QUERY` on MySQL) without dropping the session.
+
+**6. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
@@ -259,7 +265,7 @@ Key modules worth knowing:
 ### v0.2 — Trust the editor
 
 - [ ] Transactional commit mode with an explicit **Commit** / **Rollback** toolbar
-- [ ] Query cancellation and a visible transaction state
+- [x] Query cancellation and a visible transaction state
 - [ ] Column sorting and header filters in both grids
 - [ ] Export a result set or table to CSV, JSON, or SQL
 

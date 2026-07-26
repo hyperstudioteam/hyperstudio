@@ -91,6 +91,9 @@ impl From<&ManifestCapabilities> for DriverCapabilities {
             } else {
                 value.max_rows
             },
+            // The plugin protocol has no session affinity, so a transaction
+            // could not span calls and there is no handle to cancel.
+            sessions: false,
         }
     }
 }
