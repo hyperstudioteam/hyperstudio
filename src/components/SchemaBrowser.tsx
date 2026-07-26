@@ -11,6 +11,7 @@ import {
   KeyRound,
   Layers,
   Link,
+  FileCode2,
   ListTree,
   LoaderCircle,
   MoreHorizontal,
@@ -33,6 +34,7 @@ import {
   TABLES_GROUP,
 } from "../types/schema";
 import { ContextMenu } from "./ContextMenu";
+import { DdlViewer } from "./DdlViewer";
 import { EditColumnModal } from "./schema-edit/EditColumnModal";
 import { EditTableModal } from "./schema-edit/EditTableModal";
 
@@ -192,6 +194,10 @@ export function SchemaBrowser({
   const [editDialog, setEditDialog] = useState<SchemaEditDialog | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [ddlTarget, setDdlTarget] = useState<{
+    schema: string;
+    table: string;
+  } | null>(null);
   const groups = objectGroupsFor(profile.driver);
   const refreshingSchemas = busyDetail?.kind === "schemas";
   const refreshingObjects =
@@ -480,6 +486,20 @@ export function SchemaBrowser({
                   <Table2 size={14} /> View Data
                 </button>
               )}
+              {live && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDdlTarget({
+                      schema: menu.schema,
+                      table: menu.object.name,
+                    });
+                    setMenu(null);
+                  }}
+                >
+                  <FileCode2 size={14} /> Show DDL…
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -603,6 +623,15 @@ export function SchemaBrowser({
               TABLES_GROUP,
             )
           }
+        />
+      )}
+
+      {ddlTarget && (
+        <DdlViewer
+          connectionId={profile.id}
+          schema={ddlTarget.schema}
+          table={ddlTarget.table}
+          onClose={() => setDdlTarget(null)}
         />
       )}
 

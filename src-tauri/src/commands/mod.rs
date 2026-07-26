@@ -134,6 +134,17 @@ pub async fn execute_query(
 }
 
 #[tauri::command]
+pub async fn table_ddl(
+    connection_id: String,
+    schema: String,
+    table: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.table_ddl(&connection_id, &schema, &table).await
+}
+
+#[tauri::command]
 pub async fn alter_table(
     connection_id: String,
     request: AlterTableRequest,
