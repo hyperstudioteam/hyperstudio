@@ -52,7 +52,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Lazy connect — cached connections open a pool only when you run something
 - [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
 - [ ] SSH tunnels
-- [ ] Connection color coding and read-only / production guards
+- [x] Connection colour coding and read-only / production guards
 
 ### Password storage
 
@@ -61,7 +61,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] **Vault** — AES-GCM encrypted, key derived from a master password with PBKDF2-SHA256
 - [x] Unlock prompt appears on demand when a locked vault is needed
 - [ ] OS keychain integration (macOS Keychain, Windows Credential Manager, libsecret)
-- [ ] Vault auto-lock after inactivity and master password rotation
+- [x] Vault auto-lock after inactivity and master password rotation
 
 ### Schema browser
 
@@ -70,8 +70,9 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Manual refresh at the database and schema level
 - [x] Column types, nullability, and primary-key markers
 - [ ] Indexes, foreign keys, constraints, and triggers
-- [ ] Search and filter within the tree
-- [ ] Table DDL viewer and ER diagrams
+- [x] Search and filter within the tree (matches schema, object, and column names)
+- [x] Table DDL viewer (right-click an object → **Show DDL…**)
+- [ ] ER diagrams
 
 ### Query workspace
 
@@ -81,10 +82,10 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] DDL and DML support with affected-row counts and timings
 - [x] SQL syntax highlighting with per-dialect parsing (CodeMirror 6)
 - [x] Schema-aware autocompletion for schemas, tables, views, and columns
-- [ ] SQL formatting
-- [ ] Query history and saved queries
+- [x] SQL formatting (`Shift+Alt+F`, or the **Format** button)
+- [x] Query history and saved queries
 - [x] Explicit transaction control (**Begin** / **Commit** / **Rollback**) and query cancellation
-- [ ] Multi-statement scripts and per-statement results
+- [x] Multi-statement scripts and per-statement results
 
 ### Data editor
 
@@ -95,9 +96,10 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Insert and delete rows, then submit or revert as a batch
 - [x] Primary-key-aware `UPDATE` / `DELETE` statement generation
 - [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
+- [x] Import a CSV into a table with header detection and column mapping
 - [x] Pluggable column types and data viewers via the contribution registry
-- [ ] Transactional commit mode (currently auto-commit per statement)
-- [ ] Column sorting and per-column filters from the grid header
+- [x] Transactional commit mode (**Tx: Atomic**), or auto-commit per statement
+- [x] Column sorting and per-column filters from the grid header
 
 ### Selection, copy, and paste
 
@@ -107,7 +109,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Copy as SQL Inserts, SQL Updates, or a Where Clause
 - [x] Optional **Include header** toggle (off by default)
 - [x] Paste a single value into every selected cell, or tile a block across the range
-- [ ] Export a full result set to a file
+- [x] Export a full result set to a file (CSV, TSV, JSON, or SQL inserts)
 - [ ] Import from CSV into a table
 
 ## Getting started
@@ -177,7 +179,23 @@ every following statement, including data-editor writes, runs inside it. The bad
 is running, **Cancel** asks the server to abandon it (`pg_cancel_backend` on PostgreSQL,
 `KILL QUERY` on MySQL) without dropping the session.
 
-**6. Move data around.** Drag across cells to select a range, then copy with your chosen
+**6. Run a script.** When the buffer holds more than one statement, a **Run script** button
+appears next to **Run**. Statements execute in order, each result is listed on the left of
+the results pane, and clicking one shows its grid or error. Scripts stop at the first
+failure unless you clear **Stop on error**, and **Stop** halts after the running statement.
+Semicolons inside strings, comments, and `$$` blocks are left alone by the splitter.
+
+**7. Choose how edits commit.** The **Tx** badge in the data editor toolbar switches between
+**Atomic** (all staged changes go out in one transaction that rolls back on the first error)
+and **Auto** (one statement at a time). Atomic is the default on PostgreSQL and MySQL;
+drivers without transaction support stay on Auto.
+
+**8. Load a CSV.** Right-click a table → **Import CSV…**. The delimiter is sniffed from the
+file, the first row is treated as a header, and columns are matched by name (ignoring case,
+spaces, underscores, and dashes) with a dropdown per column to correct or skip. Rows go out
+in batches of 200, and the progress line reports how many landed if one fails.
+
+**9. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
@@ -186,6 +204,7 @@ until you submit them.
 | Shortcut | Context | Action |
 | --- | --- | --- |
 | `Cmd/Ctrl + Enter` | SQL editor | Run the buffer, or the current selection |
+| `Shift + Alt + F` | SQL editor | Format the buffer, or the current selection |
 | `Cmd/Ctrl + C` | Any grid | Copy the selection using the active extractor |
 | `Cmd/Ctrl + V` | Data editor | Paste into the selected range |
 | `Enter` | Cell editor | Commit the cell |
@@ -205,7 +224,10 @@ HyperStudio stores everything locally; there is no server, telemetry, or sync.
 
 The vault derives a 256-bit AES-GCM key from your master password using PBKDF2-SHA256 with
 310,000 iterations and a random 16-byte salt. The master password itself is never written
-to disk, and secrets are only held in memory while the vault is unlocked.
+to disk, and secrets are only held in memory while the vault is unlocked. The
+vault auto-locks after a configurable idle period (15 minutes by default), and
+the master password can be rotated — which re-derives a new salt and
+re-encrypts every stored secret.
 
 **Caveats you should know about:**
 
@@ -264,8 +286,8 @@ Key modules worth knowing:
 
 ### v0.2 — Trust the editor
 
-- [ ] Transactional commit mode with an explicit **Commit** / **Rollback** toolbar
-- [x] Query cancellation and a visible transaction state
+- [x] Transactional commit mode for the data editor (**Atomic** / **Auto**)
+- [x] Explicit transaction control and query cancellation in the query workspace
 - [ ] Column sorting and header filters in both grids
 - [ ] Export a result set or table to CSV, JSON, or SQL
 
@@ -297,7 +319,6 @@ Key modules worth knowing:
 ### Later
 
 - ER diagrams and schema comparison
-- Import from CSV
 - Scripted extractor plugins and UI slots
 - Themes and layout customization
 

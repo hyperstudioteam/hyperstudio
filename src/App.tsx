@@ -11,19 +11,33 @@ import { FolderModal } from "./components/connection-modal/FolderModal";
 import { VaultCreateModal } from "./components/connection-modal/VaultCreateModal";
 import { VaultUnlockModal } from "./components/connection-modal/VaultUnlockModal";
 import { PluginsPanel } from "./components/PluginsPanel";
+import { WriteConfirmModal } from "./components/WriteConfirmModal";
 import { useConnectionTree } from "./hooks/useConnectionTree";
 import { useDatabaseSession } from "./hooks/useDatabaseSession";
 import {
   VaultLockedError,
   VaultMissingError,
 } from "./lib/passwords";
-import { completionGroupsFor } from "./lib/completionSchema";
+import {
+  ReadOnlyConnectionError,
+  WriteConfirmationRequiredError,
+  safetyOf,
+} from "./lib/connectionGuard";
 import { errorMessage } from "./lib/format";
+import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
-import { getVaultSecret, isVaultUnlocked } from "./lib/vault";
+import {
+  getVaultSecret,
+  isVaultUnlocked,
+  onVaultLocked,
+  touchVaultActivity,
+  vaultExists,
+} from "./lib/vault";
+import { VaultSettingsModal } from "./components/connection-modal/VaultSettingsModal";
 import { ConnectionProfile, DriverInfo } from "./types/connection";
-import { SchemaInfo } from "./types/schema";
+import { ColumnNode, SchemaInfo } from "./types/schema";
+import { ImportCsvModal } from "./components/ImportCsvModal";
 import { collectFolderOptions } from "./lib/tree";
 import { databaseApi } from "./api/database";
 import { cacheDriverGroups } from "./lib/driverGroups";
@@ -49,6 +63,38 @@ function App() {
     null,
   );
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [importTarget, setImportTarget] = useState<{
+    schema: string;
+    table: string;
+    columns: ColumnNode[];
+  } | null>(null);
+  const [vaultSettingsOpen, setVaultSettingsOpen] = useState(false);
+  const [vaultUnlocked, setVaultUnlocked] = useState(() => isVaultUnlocked());
+  const [hasVault, setHasVault] = useState(() => vaultExists());
+  const [writeGate, setWriteGate] = useState<{
+    connectionName: string;
+    sql: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  } | null>(null);
+
+  // Any interaction defers auto-lock; locking flips the indicator.
+  useEffect(() => {
+    const events = ["mousedown", "keydown", "wheel"] as const;
+    const onActivity = () => {
+      if (isVaultUnlocked()) touchVaultActivity();
+    };
+    for (const event of events) {
+      window.addEventListener(event, onActivity, { passive: true });
+    }
+    const stop = onVaultLocked(() => setVaultUnlocked(false));
+    return () => {
+      for (const event of events) {
+        window.removeEventListener(event, onActivity);
+      }
+      stop();
+    };
+  }, []);
   const vaultRetry = useRef<(() => void) | null>(null);
   const completionPrefetched = useRef<string | null>(null);
 
@@ -131,7 +177,10 @@ function App() {
     }
   }
 
-  function executeWithVault(sql: string): Promise<import("./types/query").QueryResult> {
+  function executeWithVault(
+    sql: string,
+    confirmedWrite = false,
+  ): Promise<import("./types/query").QueryResult> {
     if (!tree.selected) {
       return Promise.reject(
         new Error("Select a connection before running a query."),
@@ -139,9 +188,48 @@ function App() {
     }
     const profile = tree.selected;
     return new Promise((resolve, reject) => {
+      const attempt = (confirmed = confirmedWrite) => {
+        void session
+          .executeSql(profile, sql, confirmed)
+          .then(resolve)
+          .catch((error) => {
+            if (error instanceof VaultLockedError) {
+              vaultRetry.current = () => attempt(confirmed);
+              setVaultPrompt("unlock");
+              return;
+            }
+            if (error instanceof VaultMissingError) {
+              vaultRetry.current = () => attempt(confirmed);
+              setVaultPrompt("create");
+              return;
+            }
+            if (error instanceof WriteConfirmationRequiredError) {
+              setWriteGate({
+                connectionName: error.connectionName,
+                sql: error.sql,
+                onConfirm: () => attempt(true),
+                onCancel: () => reject(error),
+              });
+              return;
+            }
+            reject(error);
+          });
+      };
+      attempt();
+    });
+  }
+
+  function executeBatchWithVault(statements: string[]): Promise<number[]> {
+    if (!tree.selected) {
+      return Promise.reject(
+        new Error("Select a connection before committing changes."),
+      );
+    }
+    const profile = tree.selected;
+    return new Promise((resolve, reject) => {
       const attempt = () => {
         void session
-          .executeSql(profile, sql)
+          .executeBatch(profile, statements)
           .then(resolve)
           .catch((error) => {
             if (error instanceof VaultLockedError) {
@@ -161,6 +249,54 @@ function App() {
     });
   }
 
+  /** Show the write gate for a whole batch and report the user's answer. */
+  function confirmWrites(preview: string): Promise<boolean> {
+    if (!tree.selected) return Promise.resolve(false);
+    const name = tree.selected.name || tree.selected.database;
+    return new Promise((resolve) => {
+      setWriteGate({
+        connectionName: name,
+        sql: preview,
+        onConfirm: () => resolve(true),
+        onCancel: () => resolve(false),
+      });
+    });
+  }
+
+  /** Run a query from the editor, routing guard failures to the right prompt. */
+  function runQueryGuarded(
+    profile: ConnectionProfile,
+    sql: string,
+    confirmed = false,
+  ) {
+    void session.runQuery(profile, sql, confirmed).catch((error) => {
+      if (error instanceof VaultLockedError) {
+        vaultRetry.current = () => runQueryGuarded(profile, sql, confirmed);
+        setVaultPrompt("unlock");
+        return;
+      }
+      if (error instanceof VaultMissingError) {
+        vaultRetry.current = () => runQueryGuarded(profile, sql, confirmed);
+        setVaultPrompt("create");
+        return;
+      }
+      if (error instanceof WriteConfirmationRequiredError) {
+        setWriteGate({
+          connectionName: error.connectionName,
+          sql: error.sql,
+          onConfirm: () => runQueryGuarded(profile, sql, true),
+          onCancel: () => undefined,
+        });
+        return;
+      }
+      if (error instanceof ReadOnlyConnectionError) {
+        session.setError(error.message);
+        return;
+      }
+      session.setError(errorMessage(error));
+    });
+  }
+
   const hasSchemaCacheUi = tree.selected
     ? hasSchemaCache(tree.selected.id) ||
       (session.activeId === tree.selected.id && session.schemas.length > 0)
@@ -174,6 +310,8 @@ function App() {
           active="databases"
           onSelect={() => undefined}
           onOpenPlugins={() => setPluginsOpen(true)}
+          vaultUnlocked={hasVault ? vaultUnlocked : null}
+          onOpenVault={() => setVaultSettingsOpen(true)}
         />
         <ConnectionSidebar
           tree={tree.tree}
@@ -240,9 +378,14 @@ function App() {
               nonce: Date.now(),
             });
           }}
+          onImportCsv={(schema, table, columns) =>
+            setImportTarget({ schema, table, columns })
+          }
           schemaReadonly={
-            drivers.find((driver) => driver.id === tree.selected?.driver)
-              ?.capabilities.readonly ?? false
+            (drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.readonly ??
+              false) ||
+            (tree.selected ? safetyOf(tree.selected) === "readOnly" : false)
           }
           findConnection={tree.findConnection}
           findFolder={tree.findFolder}
@@ -282,11 +425,36 @@ function App() {
               session.setError("Select a connection before running a query.");
               return;
             }
-            void withVaultGate(() => session.runQuery(tree.selected!, sql));
+            runQueryGuarded(tree.selected, sql);
           }}
-          onExecute={(sql) => executeWithVault(sql)}
+          onExecute={(sql, confirmedWrite) =>
+            executeWithVault(sql, confirmedWrite)
+          }
+          onExecuteBatch={
+            drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.transactions
+              ? executeBatchWithVault
+              : undefined
+          }
+          onConfirmWrites={confirmWrites}
         />
       </div>
+
+      {writeGate && (
+        <WriteConfirmModal
+          connectionName={writeGate.connectionName}
+          sql={writeGate.sql}
+          onCancel={() => {
+            writeGate.onCancel();
+            setWriteGate(null);
+          }}
+          onConfirm={() => {
+            const confirm = writeGate.onConfirm;
+            setWriteGate(null);
+            confirm();
+          }}
+        />
+      )}
 
       {modalProfile && (
         <ConnectionModal
@@ -325,6 +493,8 @@ function App() {
         <VaultCreateModal
           onCreated={() => {
             setVaultPrompt(null);
+            setVaultUnlocked(true);
+            setHasVault(true);
             vaultRetry.current?.();
             vaultRetry.current = null;
           }}
@@ -338,12 +508,43 @@ function App() {
         <VaultUnlockModal
           onUnlocked={() => {
             setVaultPrompt(null);
+            setVaultUnlocked(true);
+            setHasVault(true);
             vaultRetry.current?.();
             vaultRetry.current = null;
           }}
           onClose={() => {
             setVaultPrompt(null);
             vaultRetry.current = null;
+          }}
+        />
+      )}
+
+      {importTarget && tree.selected && (
+        <ImportCsvModal
+          profile={tree.selected}
+          schema={importTarget.schema}
+          table={importTarget.table}
+          columns={importTarget.columns}
+          execute={executeWithVault}
+          onImported={() => {
+            setOpenRequest({
+              kind: "view",
+              schema: importTarget.schema,
+              table: importTarget.table,
+              nonce: Date.now(),
+            });
+          }}
+          onClose={() => setImportTarget(null)}
+        />
+      )}
+
+      {vaultSettingsOpen && (
+        <VaultSettingsModal
+          onClose={() => {
+            setVaultSettingsOpen(false);
+            setVaultUnlocked(isVaultUnlocked());
+            setHasVault(vaultExists());
           }}
         />
       )}

@@ -6,6 +6,7 @@ import {
   SslMode,
 } from "../../types/connection";
 import { cn } from "../../lib/cn";
+import { CONNECTION_COLORS, SAFETY_OPTIONS } from "../../lib/connectionGuard";
 import { vaultExists, isVaultUnlocked } from "../../lib/vault";
 
 interface GeneralTabProps {
@@ -157,6 +158,67 @@ export function GeneralTab({
             onChange={(event) => onChange({ name: event.target.value })}
           />
         </label>
+        <div className={`${formLabelClass} col-span-full`}>
+          Colour
+          <div className="flex gap-1.5">
+            {CONNECTION_COLORS.map((swatch) => (
+              <button
+                type="button"
+                key={swatch.id}
+                aria-label={swatch.label}
+                title={swatch.label}
+                className={cn(
+                  "size-[22px] cursor-pointer rounded-full border-2 bg-transparent",
+                  (profile.color ?? "none") === swatch.id
+                    ? "border-white"
+                    : "border-transparent hover:border-border-bright",
+                )}
+                onClick={() => onChange({ color: swatch.id })}
+              >
+                <span
+                  className="block size-full rounded-full border"
+                  style={{
+                    backgroundColor: swatch.dot,
+                    borderColor: swatch.border,
+                  }}
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={`${formLabelClass} col-span-full`}>
+          Safety
+          <div
+            className="flex flex-col gap-2 rounded-md border border-border bg-[#14171d] p-2.5 px-[11px]"
+            role="radiogroup"
+            aria-label="Safety"
+          >
+            {SAFETY_OPTIONS.map((option) => (
+              <label
+                key={option.id}
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-[#b4bbc6]"
+              >
+                <input
+                  type="radio"
+                  name="connection-safety"
+                  className="m-0 size-3.5 shrink-0 cursor-pointer accent-accent"
+                  checked={(profile.safety ?? "none") === option.id}
+                  onChange={() => onChange({ safety: option.id })}
+                />
+                <span className="flex flex-col gap-0.5">
+                  <strong className="text-[11px] font-semibold text-[#d5dae3]">
+                    {option.label}
+                  </strong>
+                  <em className="text-[10px] not-italic text-[#6f7785]">
+                    {option.description}
+                  </em>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <label className={`${formLabelClass} col-span-full`}>
           Folder
           <select

@@ -43,6 +43,15 @@ import {
   columnTypeIcon,
   primaryKeyColumns,
 } from "../lib/sql";
+import { safetyOf } from "../lib/connectionGuard";
+import {
+  ColumnFilter,
+  ColumnSort,
+  buildOrderByClause,
+  buildWhereClause,
+  nextSort,
+} from "../lib/gridFilter";
+import { ColumnHeader } from "./grid/ColumnHeader";
 import { ConnectionProfile } from "../types/connection";
 import { QueryResult } from "../types/query";
 import { ColumnNode, TableNode } from "../types/schema";
@@ -63,7 +72,11 @@ interface TableDataEditorProps {
   tableMeta: TableNode | null;
   /** Rows per page; defaults to driver max (500). */
   pageSize?: number;
-  execute: (sql: string) => Promise<QueryResult>;
+  execute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  /** Present when the driver can commit a batch atomically. */
+  executeBatch?: (statements: string[]) => Promise<number[]>;
+  /** Asks the user to approve a batch on a guarded connection. */
+  confirmWrites?: (preview: string) => Promise<boolean>;
 }
 
 function parseCellInput(raw: string): unknown {
@@ -103,9 +116,13 @@ export function TableDataEditor({
   tableMeta,
   pageSize = 500,
   execute,
+  executeBatch,
+  confirmWrites,
 }: TableDataEditorProps) {
   const [where, setWhere] = useState("");
   const [orderBy, setOrderBy] = useState("");
+  const [headerSort, setHeaderSort] = useState<ColumnSort | null>(null);
+  const [headerFilters, setHeaderFilters] = useState<ColumnFilter[]>([]);
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<EditorRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -128,6 +145,7 @@ export function TableDataEditor({
     y: number;
   } | null>(null);
   const [copyAsOpen, setCopyAsOpen] = useState(false);
+  const [transactional, setTransactional] = useState(Boolean(executeBatch));
   const [viewerCell, setViewerCell] = useState<{
     rowId: string;
     col: number;
@@ -156,18 +174,31 @@ export function TableDataEditor({
   const hasMore = truncated || loadedCount >= pageSize;
   const displayEnd = page * pageSize + loadedCount;
 
-  async function load(nextPage = page) {
+  /**
+   * Header sort/filter changes call this with explicit overrides, since the
+   * corresponding state updates have not been applied yet at that point.
+   */
+  async function load(
+    nextPage = page,
+    overrides?: {
+      where?: string;
+      orderBy?: string;
+      filters?: ColumnFilter[];
+    },
+  ) {
     setBusy(true);
     setError("");
     setEditing(null);
     setCellRange(null);
     try {
+      const manualWhere = overrides?.where ?? where;
+      const activeFilters = overrides?.filters ?? headerFilters;
       const sql = buildTableSelect({
         driver: profile.driver,
         schema,
         table,
-        where,
-        orderBy,
+        where: buildWhereClause(profile.driver, activeFilters, manualWhere),
+        orderBy: overrides?.orderBy ?? orderBy,
         limit: pageSize,
         offset: nextPage * pageSize,
       });
@@ -219,9 +250,30 @@ export function TableDataEditor({
   }
 
   useEffect(() => {
-    void load(0);
+    setHeaderSort(null);
+    setHeaderFilters([]);
+    void load(0, { filters: [] });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema, table, profile.id]);
+
+  function toggleHeaderSort(column: string) {
+    const next = nextSort(headerSort, column);
+    const clause = buildOrderByClause(profile.driver, next);
+    setHeaderSort(next);
+    setOrderBy(clause);
+    void load(0, { orderBy: clause });
+  }
+
+  function headerFilterFor(column: string): ColumnFilter | null {
+    return headerFilters.find((item) => item.column === column) ?? null;
+  }
+
+  function setHeaderFilter(column: string, filter: ColumnFilter | null) {
+    const rest = headerFilters.filter((item) => item.column !== column);
+    const next = filter ? [...rest, filter] : rest;
+    setHeaderFilters(next);
+    void load(0, { filters: next });
+  }
 
   useEffect(() => {
     function onMouseUp() {
@@ -461,6 +513,46 @@ export function TableDataEditor({
     setEditing(null);
   }
 
+  function pendingStatements(): string[] {
+    const statements: string[] = [];
+    for (const row of rows) {
+      if (row.status === "inserted") {
+        statements.push(
+          buildInsertSql({
+            driver: profile.driver,
+            schema,
+            table,
+            columns,
+            values: row.values,
+          }),
+        );
+      } else if (row.status === "deleted") {
+        statements.push(
+          buildDeleteSql({
+            driver: profile.driver,
+            schema,
+            table,
+            columns,
+            pkColumns: pkNames,
+            original: row.original,
+          }),
+        );
+      } else if (row.status === "modified") {
+        const sql = buildUpdateSql({
+          driver: profile.driver,
+          schema,
+          table,
+          columns,
+          pkColumns: pkNames,
+          original: row.original,
+          next: row.values,
+        });
+        if (sql) statements.push(sql);
+      }
+    }
+    return statements;
+  }
+
   async function commit() {
     if (dirtyCount === 0) return;
     const needsPk = rows.some(
@@ -473,47 +565,50 @@ export function TableDataEditor({
       return;
     }
 
+    // Build the whole batch first so a guarded connection can approve it in
+    // one prompt rather than once per row.
+    const statements = pendingStatements();
+    if (statements.length === 0) return;
+
+    const safety = safetyOf(profile);
+    if (safety === "readOnly") {
+      setError(
+        `“${profile.name}” is marked read-only. No changes were submitted.`,
+      );
+      return;
+    }
+
+    let approved = safety !== "confirm";
+    if (!approved) {
+      if (!confirmWrites) {
+        setError("This connection requires confirmation, which is unavailable.");
+        return;
+      }
+      approved = await confirmWrites(statements.join("\n"));
+      if (!approved) return;
+    }
+
     setBusy(true);
     setError("");
     try {
-      for (const row of rows) {
-        if (row.status === "inserted") {
-          await execute(
-            buildInsertSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              values: row.values,
-            }),
-          );
-        } else if (row.status === "deleted") {
-          await execute(
-            buildDeleteSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              pkColumns: pkNames,
-              original: row.original,
-            }),
-          );
-        } else if (row.status === "modified") {
-          const sql = buildUpdateSql({
-            driver: profile.driver,
-            schema,
-            table,
-            columns,
-            pkColumns: pkNames,
-            original: row.original,
-            next: row.values,
-          });
-          if (sql) await execute(sql);
+      if (transactional && executeBatch) {
+        await executeBatch(statements);
+      } else {
+        for (const statement of statements) {
+          await execute(statement, true);
         }
       }
       await load(page);
     } catch (nextError) {
-      setError(errorMessage(nextError));
+      // A rolled-back batch leaves the staged edits intact so they can be
+      // fixed and resubmitted; an auto-commit run may have applied a prefix,
+      // which the reload below would hide, so keep the rows and let the user
+      // refresh deliberately.
+      setError(
+        transactional
+          ? `${errorMessage(nextError)}\nNothing was committed; the transaction rolled back.`
+          : `${errorMessage(nextError)}\nEarlier statements in this batch may already be committed.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -598,7 +693,11 @@ export function TableDataEditor({
           <button
             type="button"
             className={iconButtonClass}
-            title="Submit changes"
+            title={
+              transactional
+                ? "Submit changes in one transaction"
+                : "Submit changes, one statement at a time"
+            }
             disabled={busy || dirtyCount === 0}
             onClick={() => void commit()}
           >
@@ -616,9 +715,24 @@ export function TableDataEditor({
         </div>
 
         <span className="h-4 w-px bg-border" />
-        <span className="rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3]">
-          Tx: Auto
-        </span>
+        <button
+          type="button"
+          className={cn(
+            "cursor-pointer rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3] disabled:cursor-default disabled:opacity-60",
+            transactional && "border-accent text-[#c9c2ff]",
+          )}
+          disabled={!executeBatch || busy}
+          title={
+            executeBatch
+              ? transactional
+                ? "Changes commit as one transaction; click for auto-commit per statement"
+                : "Each statement commits on its own; click to commit as one transaction"
+              : `${profile.driver} does not support transactional commits`
+          }
+          onClick={() => setTransactional((current) => !current)}
+        >
+          Tx: {transactional ? "Atomic" : "Auto"}
+        </button>
         {pkNames.length === 0 && columns.length > 0 && (
           <span className="text-[9px] text-subtle">
             No primary key · update/delete limited
@@ -678,6 +792,20 @@ export function TableDataEditor({
               if (event.key === "Enter") void load(0);
             }}
           />
+          {headerFilters.length > 0 && (
+            <button
+              type="button"
+              className="shrink-0 cursor-pointer rounded-[3px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-1.5 py-0.5 text-[9px] text-[#c9c2ff] hover:border-accent hover:text-white"
+              title="Clear column filters"
+              onClick={() => {
+                setHeaderFilters([]);
+                void load(0, { filters: [] });
+              }}
+            >
+              +{headerFilters.length} column filter
+              {headerFilters.length === 1 ? "" : "s"} ×
+            </button>
+          )}
         </label>
         <label className="flex min-w-0 items-center gap-[7px] px-2.5 text-[10px] text-[#7d8694]">
           <ArrowDownUp size={13} />
@@ -689,7 +817,10 @@ export function TableDataEditor({
             value={orderBy}
             placeholder="column"
             spellCheck={false}
-            onChange={(event) => setOrderBy(event.target.value)}
+            onChange={(event) => {
+              setOrderBy(event.target.value);
+              setHeaderSort(null);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter") void load(0);
             }}
@@ -733,15 +864,25 @@ export function TableDataEditor({
                 {columns.map((column, index) => {
                   const meta = columnMeta[index];
                   return (
-                    <th key={`${column}-${index}`}>
-                      <span className="inline-flex items-center gap-[5px] [&>svg]:text-[#6e7787]">
-                        <TypeIcon dataType={meta?.dataType ?? ""} />
-                        {meta?.primaryKey && (
-                          <KeyRound size={11} className="!text-pk" />
-                        )}
-                        {column}
-                      </span>
-                    </th>
+                    <ColumnHeader
+                      key={`${column}-${index}`}
+                      column={column}
+                      className={thClass}
+                      sort={headerSort}
+                      filter={headerFilterFor(column)}
+                      adornment={
+                        <>
+                          <TypeIcon dataType={meta?.dataType ?? ""} />
+                          {meta?.primaryKey && (
+                            <KeyRound size={11} className="!text-pk" />
+                          )}
+                        </>
+                      }
+                      onSortToggle={() => toggleHeaderSort(column)}
+                      onFilterChange={(filter) =>
+                        setHeaderFilter(column, filter)
+                      }
+                    />
                   );
                 })}
               </tr>
