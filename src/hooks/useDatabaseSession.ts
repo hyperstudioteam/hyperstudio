@@ -313,6 +313,14 @@ export function useDatabaseSession() {
     return next;
   }
 
+  async function loadErDiagram(
+    profile: ConnectionProfile,
+    schema: string,
+  ): Promise<import("../lib/erDiagram").ErDiagram> {
+    await ensureLive(profile);
+    return databaseApi.erDiagram(profile.id, schema);
+  }
+
   async function toggleSchemaExpanded(
     profile: ConnectionProfile,
     key: string,
@@ -430,6 +438,7 @@ export function useDatabaseSession() {
     prefetchObjects,
     runQuery,
     executeSql,
+    loadErDiagram,
     onDeleted,
     clearSession,
   };

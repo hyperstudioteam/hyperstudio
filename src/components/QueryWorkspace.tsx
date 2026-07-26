@@ -6,10 +6,13 @@ import {
   ChevronsLeft,
   CirclePlus,
   LoaderCircle,
+  Network,
   Play,
   Table2,
   X,
 } from "lucide-react";
+import { errorMessage } from "../lib/format";
+import { ErDiagram } from "../lib/erDiagram";
 import {
   buildCompletionSchema,
   defaultSchemaFor,
@@ -32,6 +35,7 @@ import {
   tableFromObject,
 } from "../types/schema";
 import { cn } from "../lib/cn";
+import { ErDiagramView } from "./ErDiagramView";
 import { ResultGrid } from "./ResultGrid";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
@@ -44,6 +48,7 @@ LIMIT 100;`;
 export type WorkspaceOpen =
   | { kind: "view"; schema: string; table: string; nonce: number }
   | { kind: "edit"; schema: string; table: string; nonce: number }
+  | { kind: "er"; schema: string; nonce: number }
   | null;
 
 type QueryTab = {
@@ -61,7 +66,14 @@ type EditTab = {
   table: string;
 };
 
-type WorkspaceTab = QueryTab | EditTab;
+type ErTab = {
+  id: string;
+  kind: "er";
+  title: string;
+  schema: string;
+};
+
+type WorkspaceTab = QueryTab | EditTab | ErTab;
 
 interface QueryWorkspaceProps {
   selected: ConnectionProfile | null;
@@ -77,6 +89,7 @@ interface QueryWorkspaceProps {
   openRequest: WorkspaceOpen;
   onRun: (sql: string) => void;
   onExecute: (sql: string) => Promise<QueryResult>;
+  onLoadEr: (schema: string) => Promise<ErDiagram>;
 }
 
 function findTableMeta(
@@ -102,6 +115,7 @@ export function QueryWorkspace({
   openRequest,
   onRun,
   onExecute,
+  onLoadEr,
 }: QueryWorkspaceProps) {
   const pageSize = defaultMaxRows(maxRowsProp);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
@@ -110,6 +124,9 @@ export function QueryWorkspace({
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
+  const [erDiagram, setErDiagram] = useState<ErDiagram | null>(null);
+  const [erBusy, setErBusy] = useState(false);
+  const [erError, setErError] = useState("");
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
 
@@ -177,6 +194,25 @@ export function QueryWorkspace({
       return;
     }
 
+    if (openRequest.kind === "er") {
+      const id = `er-${openRequest.schema}`;
+      setTabs((current) => {
+        if (current.some((tab) => tab.id === id)) return current;
+        return [
+          ...current,
+          {
+            id,
+            kind: "er",
+            title: `${openRequest.schema} · ER`,
+            schema: openRequest.schema,
+          },
+        ];
+      });
+      setActiveId(id);
+      void loadErDiagram(openRequest.schema);
+      return;
+    }
+
     const id = `edit-${openRequest.schema}.${openRequest.table}`;
     const title = `${openRequest.schema}.${openRequest.table}`;
     setTabs((current) => {
@@ -195,6 +231,19 @@ export function QueryWorkspace({
     setActiveId(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest?.nonce]);
+
+  async function loadErDiagram(schema: string) {
+    setErBusy(true);
+    setErError("");
+    try {
+      setErDiagram(await onLoadEr(schema));
+    } catch (nextError) {
+      setErDiagram(null);
+      setErError(errorMessage(nextError));
+    } finally {
+      setErBusy(false);
+    }
+  }
 
   function setQuerySql(sql: string) {
     if (!active || active.kind !== "query") return;
@@ -253,7 +302,7 @@ export function QueryWorkspace({
     <main
       className={cn(
         "min-w-0 grid overflow-hidden bg-bg",
-        active?.kind === "edit"
+        active?.kind === "edit" || active?.kind === "er"
           ? "grid-rows-[36px_1fr_23px]"
           : "grid-rows-[36px_minmax(190px,42%)_1fr_23px]",
       )}
@@ -274,6 +323,8 @@ export function QueryWorkspace({
               <span className="text-[8px] font-extrabold tracking-[0.02em] text-accent-bright">
                 SQL
               </span>
+            ) : tab.kind === "er" ? (
+              <Network size={12} className="shrink-0 text-[#9d90ff]" />
             ) : (
               <Table2 size={12} className="shrink-0 text-[#7db7ff]" />
             )}
@@ -325,6 +376,14 @@ export function QueryWorkspace({
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
           pageSize={pageSize}
           execute={onExecute}
+        />
+      ) : active?.kind === "er" ? (
+        <ErDiagramView
+          key={active.id}
+          diagram={erDiagram?.schema === active.schema ? erDiagram : null}
+          busy={erBusy}
+          error={erError}
+          onRefresh={() => void loadErDiagram(active.schema)}
         />
       ) : (
         <>
@@ -443,7 +502,9 @@ export function QueryWorkspace({
         <span>
           {active?.kind === "edit"
             ? `Edit Data · ${active.schema}.${active.table}`
-            : (connectionInfo?.serverVersion ?? "HyperStudio local session")}
+            : active?.kind === "er"
+              ? `ER diagram · ${active.schema}`
+              : (connectionInfo?.serverVersion ?? "HyperStudio local session")}
         </span>
         <span className="ml-auto flex gap-[13px]">
           UTF-8 <span>LF</span> SQL

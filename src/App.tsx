@@ -239,6 +239,13 @@ function App() {
               nonce: Date.now(),
             });
           }}
+          onShowEr={(schema) => {
+            setOpenRequest({
+              kind: "er",
+              schema,
+              nonce: Date.now(),
+            });
+          }}
           schemaReadonly={
             drivers.find((driver) => driver.id === tree.selected?.driver)
               ?.capabilities.readonly ?? false
@@ -268,6 +275,35 @@ function App() {
             void withVaultGate(() => session.runQuery(tree.selected!, sql));
           }}
           onExecute={(sql) => executeWithVault(sql)}
+          onLoadEr={(schema) => {
+            if (!tree.selected) {
+              return Promise.reject(
+                new Error("Select a connection before opening an ER diagram."),
+              );
+            }
+            const profile = tree.selected;
+            return new Promise((resolve, reject) => {
+              const attempt = () => {
+                void session
+                  .loadErDiagram(profile, schema)
+                  .then(resolve)
+                  .catch((error) => {
+                    if (error instanceof VaultLockedError) {
+                      vaultRetry.current = attempt;
+                      setVaultPrompt("unlock");
+                      return;
+                    }
+                    if (error instanceof VaultMissingError) {
+                      vaultRetry.current = attempt;
+                      setVaultPrompt("create");
+                      return;
+                    }
+                    reject(error);
+                  });
+              };
+              attempt();
+            });
+          }}
         />
       </div>
 
