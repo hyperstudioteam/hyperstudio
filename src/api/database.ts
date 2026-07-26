@@ -158,4 +158,10 @@ export const pluginsApi = {
   reload() {
     return invoke<string[]>("reload_plugins");
   },
+  resolveAsset(pluginId: string, entry: string) {
+    return invoke<string>("resolve_plugin_asset", { pluginId, entry });
+  },
+  rpc(pluginId: string, method: string, params: Record<string, unknown> = {}) {
+    return invoke<unknown>("extension_rpc", { pluginId, method, params });
+  },
 };

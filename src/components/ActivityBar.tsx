@@ -7,6 +7,8 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "../lib/cn";
+import { useExtensionMenu } from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 
 interface ActivityBarProps {
   active: "databases" | "settings";
@@ -29,6 +31,7 @@ export function ActivityBar({
   vaultUnlocked = null,
   onOpenVault,
 }: ActivityBarProps) {
+  const extensionItems = useExtensionMenu("activity");
   return (
     <aside className="flex flex-col items-center gap-[5px] border-r border-border bg-activity px-[5px] py-2">
       <button
@@ -50,6 +53,18 @@ export function ActivityBar({
       >
         <Search size={19} />
       </button>
+      {extensionItems.map((item) => (
+        <button
+          type="button"
+          key={`${item.source}:${item.command}`}
+          className={activityClass}
+          aria-label={item.title}
+          title={item.title}
+          onClick={() => extensionRegistry.executeCommand(item.command)}
+        >
+          <Puzzle size={18} />
+        </button>
+      ))}
       <div className="flex-1" />
       {vaultUnlocked !== null && onOpenVault && (
         <button

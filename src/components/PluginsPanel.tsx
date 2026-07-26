@@ -108,9 +108,9 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
         </div>
 
         <p className="mb-3.5 text-xs leading-normal text-muted">
-          Install driver plugins from a local folder or zip. Plugins speak
-          JSON-RPC over stdin/stdout and appear in the connection form
-          immediately. Built-in Postgres and MySQL cannot be shadowed.
+          Install driver plugins and UI extensions from a local folder or zip.
+          Extensions can add commands, menus, and sandboxed views. Built-in
+          Postgres and MySQL cannot be shadowed.
         </p>
 
         <div className="mb-4 grid grid-cols-[1fr_auto] items-end gap-2.5">
@@ -154,7 +154,7 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
                   <strong className="block text-[13px]">
                     {plugin.name}{" "}
                     <span className="text-[11px] font-medium text-muted">
-                      v{plugin.version}
+                      v{plugin.version} · {plugin.kind}
                     </span>
                   </strong>
                   <em className="mt-1 block text-xs not-italic text-muted">

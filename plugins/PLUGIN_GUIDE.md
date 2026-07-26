@@ -1,11 +1,13 @@
-# Writing a HyperStudio Driver Plugin
+# Writing HyperStudio Plugins
 
 HyperStudio can load **external database drivers** as separate processes that speak
-**JSON-RPC 2.0** over newline-delimited `stdin` / `stdout` — the same shape used
-by [Tabularis](https://tabularis.dev/plugins).
+**JSON-RPC 2.0** over newline-delimited `stdin` / `stdout`.
 
 Built-in drivers (`postgres`, `mysql`) stay in-process via `sqlx`. Everything else
 ships as a plugin.
+
+HyperStudio also supports **UI extensions**. They contribute commands, menus, docked
+views, activity buttons, and status-bar items without pretending to be database drivers.
 
 ## Architecture
 
@@ -343,9 +345,9 @@ Reference these from `viewer`, or as targets when building your own column types
 ### Data viewers (custom UI)
 
 Custom viewer *components* (e.g. a map for GeoJSON, a diff view) run in the UI process.
-Runtime loading of external viewer bundles is on the roadmap (Tabularis-style IIFE + a
-typed `defineSlot` API). Today, the registry itself is the extension point — built-in
-viewers live in `src/components/viewers/` and register in `src/plugins/builtins.tsx` via:
+Runtime loading of external viewer bundles is on the roadmap. Today, the registry itself
+is the extension point — built-in viewers live in `src/components/viewers/` and register
+in `src/plugins/builtins.tsx` via:
 
 ```ts
 contributions.registerDataViewer({
@@ -358,6 +360,89 @@ contributions.registerDataViewer({
 ```
 
 Users open viewers by double-clicking a cell or via **right-click → View value…**.
+
+## UI extensions
+
+Set `"type": "extension"` to install a plugin that contributes UI but no database
+driver. UI extensions do not require an `executable`. Their HTML runs in a sandboxed
+iframe; extension code never runs in HyperStudio's React tree.
+
+```json
+{
+  "id": "my-assistant",
+  "name": "My Assistant",
+  "version": "0.1.0",
+  "type": "extension",
+  "contributes": {
+    "commands": [
+      {
+        "id": "my-assistant.open",
+        "title": "Ask My Assistant",
+        "opensView": "my-assistant.chat"
+      }
+    ],
+    "menus": {
+      "editor/context": [{ "command": "my-assistant.open", "group": "ai" }],
+      "activity": [{ "command": "my-assistant.open" }]
+    },
+    "views": [
+      {
+        "id": "my-assistant.chat",
+        "name": "My Assistant",
+        "location": "panel.right",
+        "entry": "ui/index.html"
+      }
+    ],
+    "viewers": [
+      {
+        "id": "my-assistant.value",
+        "label": "Assistant",
+        "entry": "ui/viewer.html",
+        "typeNames": ["json", "jsonb"],
+        "priority": 10
+      }
+    ],
+    "statusBar": [
+      {
+        "id": "my-assistant.status",
+        "text": "My Assistant",
+        "command": "my-assistant.open",
+        "alignment": "right"
+      }
+    ]
+  }
+}
+```
+
+Supported menu locations are `editor/context`, `schema/context`, `result/context`,
+`tableData/context`, `connection/context`, and `activity`. Views may use `panel.right`
+or `panel.modal`. A `viewers` entry adds a sandboxed cell viewer; omit `typeNames`
+to make it available for every value.
+
+### Iframe host API
+
+Views communicate with the host using `window.parent.postMessage`. Every message uses
+`protocol: "hyperstudio-extension-v1"`. Send a request with a unique `id`:
+
+```js
+parent.postMessage(
+  {
+    protocol: "hyperstudio-extension-v1",
+    type: "request",
+    id: "1",
+    method: "getEditorSql",
+    params: {}
+  },
+  "*"
+);
+```
+
+The host replies with `{ protocol, type: "response", id, result }` or an `error`.
+Available methods are `getEditorSql`, `getSelectedSql`, `insertEditorSql`,
+`replaceSelection`, `executeCommand`, `showToast`, and `closeView`. On load the host
+sends an `init` event containing the active editor/connection context and theme.
+
+See [`plugins/hyper-ai`](./hyper-ai) for a working context-menu and right-panel example.
 
 ## Trust model
 

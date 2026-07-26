@@ -251,8 +251,7 @@ re-encrypts every stored secret.
 
 The frontend never talks to a database directly. Every operation crosses a typed Tauri
 command boundary into Rust. Built-in Postgres and MySQL use in-process `sqlx` pools.
-Additional engines load as **external plugins** (JSON-RPC over stdin/stdout), inspired by
-[Tabularis](https://tabularis.dev/plugins).
+Additional engines load as **external plugins** (JSON-RPC over stdin/stdout).
 
 ```
 src/

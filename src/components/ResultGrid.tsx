@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, FilterX } from "lucide-react";
+import { Check, FilterX, Puzzle } from "lucide-react";
 import { cn } from "../lib/cn";
 import {
   ColumnFilter,
@@ -9,7 +9,7 @@ import {
 } from "../lib/gridFilter";
 import { ColumnHeader } from "./grid/ColumnHeader";
 import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
-import { ContextMenu } from "./ContextMenu";
+import { ContextMenu, ContextMenuSeparator } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
 import { errorMessage } from "../lib/format";
 import { presentCell } from "../plugins/contributions";
@@ -20,6 +20,8 @@ import {
   selectionStats,
 } from "../lib/extractors";
 import { QueryResult } from "../types/query";
+import { useExtensionMenu } from "../extensions/hooks";
+import { extensionRegistry } from "../extensions/registry";
 
 interface ResultGridProps {
   result: QueryResult | null;
@@ -40,6 +42,7 @@ export function ResultGrid({
   driver = "postgres",
   columnTypes,
 }: ResultGridProps) {
+  const extensionMenu = useExtensionMenu("result/context");
   const [viewerCell, setViewerCell] = useState<{
     row: number;
     col: number;
@@ -378,6 +381,24 @@ export function ResultGrid({
           >
             Copy as…
           </button>
+          {extensionMenu.length > 0 && <ContextMenuSeparator />}
+          {extensionMenu.map((item) => (
+            <button
+              type="button"
+              key={`${item.source}:${item.command}`}
+              onClick={() => {
+                const focus = cellRange?.focus;
+                extensionRegistry.executeCommand(item.command, {
+                  driver,
+                  column: focus ? result?.columns[focus.col] : undefined,
+                  value: focus ? result?.rows[focus.row]?.[focus.col] : undefined,
+                });
+                setContextMenu(null);
+              }}
+            >
+              <Puzzle size={14} /> {item.title}
+            </button>
+          ))}
         </ContextMenu>
       )}
       <CopyAsMenu

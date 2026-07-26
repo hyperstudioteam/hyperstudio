@@ -492,8 +492,10 @@ pub struct InstalledPluginInfo {
     pub name: String,
     pub version: String,
     pub description: String,
+    pub kind: String,
     pub enabled: bool,
     pub path: String,
+    pub contributes: serde_json::Value,
 }
 
 impl ConnectionConfig {
