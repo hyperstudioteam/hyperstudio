@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   Play,
   Table2,
+  WandSparkles,
   X,
 } from "lucide-react";
 import {
@@ -110,6 +111,7 @@ export function QueryWorkspace({
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
+  const [formatError, setFormatError] = useState("");
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
 
@@ -215,6 +217,12 @@ export function QueryWorkspace({
   function run() {
     if (!active || active.kind !== "query") return;
     runSql(editorRef.current?.getSqlToRun() ?? query);
+  }
+
+  function formatQuery() {
+    if (!active || active.kind !== "query") return;
+    setFormatError("");
+    editorRef.current?.format();
   }
 
   function loadPage(page: number) {
@@ -345,9 +353,28 @@ export function QueryWorkspace({
                   ⌘↵
                 </kbd>
               </button>
+              <button
+                type="button"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                disabled={busy === "query"}
+                title="Format selection, or the whole query"
+                onClick={formatQuery}
+              >
+                <WandSparkles size={14} />
+                Format
+                <kbd className="rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                  ⇧⌥F
+                </kbd>
+              </button>
               <span className="h-4 w-px bg-border" />
               <span className="text-[9px] text-subtle">
-                Run selection or current query
+                {formatError ? (
+                  <span className="text-danger">
+                    Cannot format: {formatError}
+                  </span>
+                ) : (
+                  "Run selection or current query"
+                )}
               </span>
               <span className="ml-auto pr-1 text-[9px] text-subtle">
                 {completionReady
@@ -365,6 +392,7 @@ export function QueryWorkspace({
                 defaultSchema={defaultSchema}
                 onChange={setQuerySql}
                 onRun={runSql}
+                onFormatError={setFormatError}
               />
             </div>
           </section>
