@@ -72,7 +72,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [ ] Indexes, foreign keys, constraints, and triggers
 - [x] Search and filter within the tree (matches schema, object, and column names)
 - [x] Table DDL viewer (right-click an object → **Show DDL…**)
-- [ ] ER diagrams
+- [x] ER diagrams
 
 ### Query workspace
 
@@ -178,6 +178,7 @@ first query, refresh, or edit.
 | --- | --- | --- |
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
+| ER diagram | Right-click a schema → **Show ER diagram** | Opens an SVG map of tables and foreign keys |
 
 **5. Control the transaction.** **Begin transaction** parks a connection for your session so
 every following statement, including data-editor writes, runs inside it. The badge stays on
@@ -328,7 +329,8 @@ Key modules worth knowing:
 
 ### Later
 
-- ER diagrams and schema comparison
+- Schema comparison (ER diagrams shipped)
+- Import from CSV
 - Scripted extractor plugins and UI slots
 - Themes and layout customization
 

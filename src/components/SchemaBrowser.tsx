@@ -22,6 +22,7 @@ import {
   ListTree,
   LoaderCircle,
   MoreHorizontal,
+  Network,
   Pencil,
   Plug,
   RefreshCw,
@@ -141,6 +142,7 @@ interface SchemaBrowserProps {
   onToggle: (key: string) => void;
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
+  onShowEr: (schema: string) => void;
   onImportCsv: (schema: string, table: string, columns: ColumnNode[]) => void;
 }
 
@@ -200,6 +202,7 @@ export function SchemaBrowser({
   onToggle,
   onViewTable,
   onEditTable,
+  onShowEr,
   onImportCsv,
 }: SchemaBrowserProps) {
   const [menu, setMenu] = useState<BrowserMenu | null>(null);
@@ -501,15 +504,26 @@ export function SchemaBrowser({
             </button>
           )}
           {menu.kind === "schema" && (
-            <button
-              type="button"
-              onClick={() => {
-                onRefreshSchema(menu.name);
-                setMenu(null);
-              }}
-            >
-              <RefreshCw size={14} /> Refresh schema
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  onShowEr(menu.name);
+                  setMenu(null);
+                }}
+              >
+                <Network size={14} /> Show ER diagram
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onRefreshSchema(menu.name);
+                  setMenu(null);
+                }}
+              >
+                <RefreshCw size={14} /> Refresh schema
+              </button>
+            </>
           )}
           {menu.kind === "group" && (
             <button
