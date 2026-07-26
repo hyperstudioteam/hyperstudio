@@ -70,7 +70,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Manual refresh at the database and schema level
 - [x] Column types, nullability, and primary-key markers
 - [ ] Indexes, foreign keys, constraints, and triggers
-- [ ] Search and filter within the tree
+- [x] Search and filter within the tree (matches schema, object, and column names)
 - [ ] Table DDL viewer and ER diagrams
 
 ### Query workspace
