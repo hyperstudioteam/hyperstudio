@@ -1,4 +1,10 @@
-import { ComponentType, MouseEvent, useEffect, useState } from "react";
+import {
+  ComponentType,
+  MouseEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { cn } from "../lib/cn";
 import {
   ChevronDown,
@@ -18,12 +24,15 @@ import {
   Pencil,
   Plug,
   RefreshCw,
+  Search,
   Server,
   Table2,
+  X,
   Zap,
 } from "lucide-react";
 import { databaseApi } from "../api/database";
 import { objectGroupsFor } from "../lib/driverGroups";
+import { filterSchemaTree } from "../lib/schemaSearch";
 import { treeKeys, type SessionBusy } from "../hooks/useDatabaseSession";
 import { ConnectionProfile } from "../types/connection";
 import {
@@ -198,6 +207,7 @@ export function SchemaBrowser({
     schema: string;
     table: string;
   } | null>(null);
+  const [search, setSearch] = useState("");
   const groups = objectGroupsFor(profile.driver);
   const refreshingSchemas = busyDetail?.kind === "schemas";
   const refreshingObjects =
@@ -206,6 +216,31 @@ export function SchemaBrowser({
   const canInteract = hasCache || live;
   const canMutate = live && !readonly;
   const databaseLabel = profile.database || profile.host || profile.name;
+
+  const filtered = useMemo(
+    () => filterSchemaTree(schemas, groups, search),
+    [schemas, groups, search],
+  );
+
+  // While searching, matches drive expansion so hits are visible immediately.
+  const visibleSchemas = filtered ? filtered.schemas : schemas;
+  const effectiveExpanded = useMemo(() => {
+    if (!filtered) return expanded;
+    const keys = new Set<string>();
+    for (const name of filtered.openSchemas) keys.add(treeKeys.schema(name));
+    for (const item of filtered.openGroups) {
+      keys.add(treeKeys.group(item.schema, item.group));
+    }
+    for (const item of filtered.openObjects) {
+      keys.add(treeKeys.object(item.schema, item.group, item.object));
+    }
+    return keys;
+  }, [filtered, expanded]);
+
+  // Expansion is derived from the query, so toggling is inert until it clears.
+  const handleToggle = filtered ? () => {} : onToggle;
+
+  useEffect(() => setSearch(""), [profile.id]);
 
   useEffect(() => {
     if (!menu) return;
@@ -295,6 +330,40 @@ export function SchemaBrowser({
         </div>
       </div>
 
+      {!showConnect && (
+        <div className="px-2.5 pb-2">
+          <div className="flex h-[26px] items-center gap-1.5 rounded-[5px] border border-border bg-surface-input px-2 focus-within:border-accent">
+            <Search size={12} className="shrink-0 text-subtle" />
+            <input
+              className="min-w-0 flex-1 border-0 bg-transparent text-[11px] text-text outline-none placeholder:text-subtle"
+              placeholder="Filter tables and columns"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setSearch("");
+              }}
+            />
+            {search && (
+              <button
+                type="button"
+                className="grid size-4 shrink-0 cursor-pointer place-items-center rounded-[3px] border-0 bg-transparent p-0 text-subtle hover:text-text"
+                aria-label="Clear filter"
+                onClick={() => setSearch("")}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </div>
+          {filtered && (
+            <div className="mt-1 text-[9px] text-subtle">
+              {filtered.matches === 0
+                ? "No matches in loaded metadata"
+                : `${filtered.matches} match${filtered.matches === 1 ? "" : "es"} · expand a group to search more`}
+            </div>
+          )}
+        </div>
+      )}
+
       <div
         className="flex-1 overflow-auto py-px px-1.5 pb-3.5 scrollbar-thin-app"
         onContextMenu={(event) => {
@@ -318,14 +387,18 @@ export function SchemaBrowser({
             )}
             Connect
           </button>
-        ) : schemas.length === 0 ? (
+        ) : visibleSchemas.length === 0 ? (
           <div className="p-3 text-center text-subtle text-[11px]">
-            {refreshingSchemas ? "Loading schemas…" : "No schemas found"}
+            {filtered
+              ? `No matches for “${search.trim()}”`
+              : refreshingSchemas
+                ? "Loading schemas…"
+                : "No schemas found"}
           </div>
         ) : (
-          schemas.map((schema) => {
+          visibleSchemas.map((schema) => {
             const schemaKey = treeKeys.schema(schema.name);
-            const schemaOpen = expanded.has(schemaKey);
+            const schemaOpen = effectiveExpanded.has(schemaKey);
             return (
               <div key={schema.name}>
                 <div
@@ -338,7 +411,7 @@ export function SchemaBrowser({
                   <button
                     type="button"
                     className={treeRowMainClass}
-                    onClick={() => onToggle(schemaKey)}
+                    onClick={() => handleToggle(schemaKey)}
                     onContextMenu={(event) =>
                       openMenu(event, {
                         kind: "schema",
@@ -389,7 +462,7 @@ export function SchemaBrowser({
                       key={group.id}
                       schema={schema}
                       group={group}
-                      expanded={expanded}
+                      expanded={effectiveExpanded}
                       objectSubgroups={objectSubgroups}
                       busyDetail={busyDetail}
                       busy={busy}
@@ -398,7 +471,7 @@ export function SchemaBrowser({
                         refreshingObjects.group === group.id
                       }
                       canMutate={canMutate}
-                      onToggle={onToggle}
+                      onToggle={handleToggle}
                       onRefreshGroup={onRefreshGroup}
                       onOpenMenu={openMenu}
                       onViewTable={onViewTable}
