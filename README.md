@@ -107,7 +107,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Copy as SQL Inserts, SQL Updates, or a Where Clause
 - [x] Optional **Include header** toggle (off by default)
 - [x] Paste a single value into every selected cell, or tile a block across the range
-- [ ] Export a full result set to a file
+- [x] Export a full result set to a file (CSV, TSV, JSON, or SQL inserts)
 - [ ] Import from CSV into a table
 
 ## Getting started
