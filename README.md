@@ -61,7 +61,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] **Vault** — AES-GCM encrypted, key derived from a master password with PBKDF2-SHA256
 - [x] Unlock prompt appears on demand when a locked vault is needed
 - [ ] OS keychain integration (macOS Keychain, Windows Credential Manager, libsecret)
-- [ ] Vault auto-lock after inactivity and master password rotation
+- [x] Vault auto-lock after inactivity and master password rotation
 
 ### Schema browser
 
@@ -199,7 +199,10 @@ HyperStudio stores everything locally; there is no server, telemetry, or sync.
 
 The vault derives a 256-bit AES-GCM key from your master password using PBKDF2-SHA256 with
 310,000 iterations and a random 16-byte salt. The master password itself is never written
-to disk, and secrets are only held in memory while the vault is unlocked.
+to disk, and secrets are only held in memory while the vault is unlocked. The
+vault auto-locks after a configurable idle period (15 minutes by default), and
+the master password can be rotated — which re-derives a new salt and
+re-encrypts every stored secret.
 
 **Caveats you should know about:**
 
