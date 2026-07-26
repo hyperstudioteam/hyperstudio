@@ -36,7 +36,8 @@ import {
 } from "./lib/vault";
 import { VaultSettingsModal } from "./components/connection-modal/VaultSettingsModal";
 import { ConnectionProfile, DriverInfo } from "./types/connection";
-import { SchemaInfo } from "./types/schema";
+import { ColumnNode, SchemaInfo } from "./types/schema";
+import { ImportCsvModal } from "./components/ImportCsvModal";
 import { collectFolderOptions } from "./lib/tree";
 import { databaseApi } from "./api/database";
 import { cacheDriverGroups } from "./lib/driverGroups";
@@ -62,6 +63,11 @@ function App() {
     null,
   );
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [importTarget, setImportTarget] = useState<{
+    schema: string;
+    table: string;
+    columns: ColumnNode[];
+  } | null>(null);
   const [vaultSettingsOpen, setVaultSettingsOpen] = useState(false);
   const [vaultUnlocked, setVaultUnlocked] = useState(() => isVaultUnlocked());
   const [hasVault, setHasVault] = useState(() => vaultExists());
@@ -372,6 +378,9 @@ function App() {
               nonce: Date.now(),
             });
           }}
+          onImportCsv={(schema, table, columns) =>
+            setImportTarget({ schema, table, columns })
+          }
           schemaReadonly={
             (drivers.find((driver) => driver.id === tree.selected?.driver)
               ?.capabilities.readonly ??
@@ -492,6 +501,25 @@ function App() {
             setVaultPrompt(null);
             vaultRetry.current = null;
           }}
+        />
+      )}
+
+      {importTarget && tree.selected && (
+        <ImportCsvModal
+          profile={tree.selected}
+          schema={importTarget.schema}
+          table={importTarget.table}
+          columns={importTarget.columns}
+          execute={executeWithVault}
+          onImported={() => {
+            setOpenRequest({
+              kind: "view",
+              schema: importTarget.schema,
+              table: importTarget.table,
+              nonce: Date.now(),
+            });
+          }}
+          onClose={() => setImportTarget(null)}
         />
       )}
 
