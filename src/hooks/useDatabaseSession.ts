@@ -1,5 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { databaseApi } from "../api/database";
+import {
+  ReadOnlyConnectionError,
+  WriteConfirmationRequiredError,
+  assertStatementAllowed,
+} from "../lib/connectionGuard";
 import { errorMessage } from "../lib/format";
 import {
   VaultLockedError,
@@ -84,6 +89,8 @@ export function useDatabaseSession() {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<SessionBusy>(null);
+  /** True while an explicit transaction is open on the live connection. */
+  const [txnOpen, setTxnOpen] = useState(false);
 
   const syncFromCache = useCallback((connectionId: string) => {
     setSchemas(toSchemaNodes(getSchemaCache(connectionId)));
@@ -98,6 +105,7 @@ export function useDatabaseSession() {
     setSchemaExpanded(new Set());
     setObjectSubgroups({});
     setResult(null);
+    setTxnOpen(false);
   }
 
   /** Show cached schemas without opening a DB pool. */
@@ -121,16 +129,26 @@ export function useDatabaseSession() {
 
   async function ensureLive(profile: ConnectionProfile) {
     if (liveId === profile.id) return;
-    const ready = withResolvedPassword(profile);
+    const ready = await withResolvedPassword(profile);
     const info = await databaseApi.connect(ready);
     setLiveId(profile.id);
     setActiveId(profile.id);
     setConnectionInfo(info);
+    // A fresh pool cannot have a transaction parked against it.
+    setTxnOpen(false);
   }
 
   function isVaultAuthError(error: unknown) {
     return (
       error instanceof VaultLockedError || error instanceof VaultMissingError
+    );
+  }
+
+  /** Write gates surface as a prompt or a refusal, not an inline query error. */
+  function isWriteGateError(error: unknown) {
+    return (
+      error instanceof WriteConfirmationRequiredError ||
+      error instanceof ReadOnlyConnectionError
     );
   }
 
@@ -285,14 +303,19 @@ export function useDatabaseSession() {
     }
   }
 
-  async function runQuery(profile: ConnectionProfile, sql: string) {
+  async function runQuery(
+    profile: ConnectionProfile,
+    sql: string,
+    confirmedWrite = false,
+  ) {
     setBusy({ kind: "query" });
     setError("");
     try {
+      assertStatementAllowed(profile, sql, confirmedWrite);
       await ensureLive(profile);
       setResult(await databaseApi.executeQuery(profile.id, sql));
     } catch (nextError) {
-      if (isVaultAuthError(nextError)) {
+      if (isVaultAuthError(nextError) || isWriteGateError(nextError)) {
         setBusy(null);
         throw nextError;
       }
@@ -307,7 +330,9 @@ export function useDatabaseSession() {
   async function executeSql(
     profile: ConnectionProfile,
     sql: string,
+    confirmedWrite = false,
   ): Promise<QueryResult> {
+    assertStatementAllowed(profile, sql, confirmedWrite);
     await ensureLive(profile);
     const next = await databaseApi.executeQuery(profile.id, sql);
     return next;
@@ -319,6 +344,36 @@ export function useDatabaseSession() {
   ): Promise<import("../lib/erDiagram").ErDiagram> {
     await ensureLive(profile);
     return databaseApi.erDiagram(profile.id, schema);
+  }
+
+  /** Ask the server to abandon the statement in flight. */
+  async function cancelQuery() {
+    if (!liveIdRef.current) return;
+    try {
+      await databaseApi.cancelQuery(liveIdRef.current);
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    }
+  }
+
+  async function beginTransaction(profile: ConnectionProfile) {
+    await ensureLive(profile);
+    await databaseApi.beginTransaction(profile.id);
+    setTxnOpen(true);
+  }
+
+  async function endTransaction(profile: ConnectionProfile, commit: boolean) {
+    await databaseApi.endTransaction(profile.id, commit);
+    setTxnOpen(false);
+  }
+
+  /** Commit several statements atomically (for the table editor). */
+  async function executeBatch(
+    profile: ConnectionProfile,
+    statements: string[],
+  ): Promise<number[]> {
+    await ensureLive(profile);
+    return databaseApi.executeBatch(profile.id, statements);
   }
 
   async function toggleSchemaExpanded(
@@ -439,6 +494,11 @@ export function useDatabaseSession() {
     runQuery,
     executeSql,
     loadErDiagram,
+    cancelQuery,
+    txnOpen,
+    beginTransaction,
+    endTransaction,
+    executeBatch,
     onDeleted,
     clearSession,
   };

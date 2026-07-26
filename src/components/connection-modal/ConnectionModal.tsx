@@ -2,7 +2,11 @@ import { FormEvent, useEffect, useState } from "react";
 import { Database, LoaderCircle, X } from "lucide-react";
 import { databaseApi } from "../../api/database";
 import { errorMessage } from "../../lib/format";
-import { withResolvedPassword } from "../../lib/passwords";
+import {
+  sshPassphraseVaultKey,
+  sshVaultKey,
+  withResolvedPassword,
+} from "../../lib/passwords";
 import { cn } from "../../lib/cn";
 import {
   getVaultSecret,
@@ -12,6 +16,11 @@ import {
   vaultExists,
 } from "../../lib/vault";
 import {
+  getKeychainSecret,
+  removeKeychainSecret,
+  setKeychainSecret,
+} from "../../lib/keychain";
+import {
   ConnectionProfile,
   DriverInfo,
 } from "../../types/connection";
@@ -20,10 +29,11 @@ import { cacheDriverGroups } from "../../lib/driverGroups";
 import { syncPluginColumnTypes } from "../../plugins/init";
 import { GeneralTab } from "./GeneralTab";
 import { SchemasTab } from "./SchemasTab";
+import { SshTab } from "./SshTab";
 import { VaultCreateModal } from "./VaultCreateModal";
 import { VaultUnlockModal } from "./VaultUnlockModal";
 
-type ModalTab = "general" | "schemas";
+type ModalTab = "general" | "ssh" | "schemas";
 
 interface ConnectionModalProps {
   profile: ConnectionProfile;
@@ -81,6 +91,45 @@ export function ConnectionModal({
         );
       }
     }
+    if (
+      initial.passwordStorage === "vault" &&
+      isVaultUnlocked() &&
+      initial.ssh?.enabled
+    ) {
+      const sshPassword = getVaultSecret(sshVaultKey(initial.id));
+      const passphrase = getVaultSecret(sshPassphraseVaultKey(initial.id));
+      if (sshPassword || passphrase) {
+        setProfile((current) => {
+          const ssh = current.ssh;
+          if (!ssh) return current;
+          return {
+            ...current,
+            ssh: {
+              ...ssh,
+              password: ssh.password || sshPassword || "",
+              passphrase: ssh.passphrase || passphrase || "",
+            },
+          };
+        });
+      }
+    }
+  }, [initial.id, initial.password, initial.passwordStorage, initial.ssh?.enabled]);
+
+  // Prefill from the OS store so editing a profile does not blank the password.
+  useEffect(() => {
+    if (initial.passwordStorage !== "keychain" || initial.password) return;
+    let cancelled = false;
+    void getKeychainSecret(initial.id)
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        setProfile((current) =>
+          current.password ? current : { ...current, password: saved },
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [initial.id, initial.password, initial.passwordStorage]);
 
   const activeDriver = drivers.find((driver) => driver.id === profile.driver);
@@ -136,9 +185,9 @@ export function ConnectionModal({
     });
   }
 
-  function profileForConnect(): ConnectionProfile {
+  async function profileForConnect(): Promise<ConnectionProfile> {
     try {
-      return withResolvedPassword(profile);
+      return await withResolvedPassword(profile);
     } catch {
       return profile;
     }
@@ -148,7 +197,7 @@ export function ConnectionModal({
     setTesting(true);
     setTestStatus("");
     try {
-      const ready = profileForConnect();
+      const ready = await profileForConnect();
       const info = await databaseApi.testConnection(ready);
       setTestStatus(`Connected to ${info.database}`);
       if (!supportsSchemas) return;
@@ -175,7 +224,7 @@ export function ConnectionModal({
     setLoadingSchemas(true);
     setTestStatus("");
     try {
-      const ready = profileForConnect();
+      const ready = await profileForConnect();
       await databaseApi.connect(ready);
       try {
         const listed = await databaseApi.listSchemas(profile.id);
@@ -199,11 +248,55 @@ export function ConnectionModal({
         throw new Error("Enter a password to store in the vault.");
       }
       await setVaultSecret(next.id, password);
+      await removeKeychainSecret(next.id).catch(() => undefined);
+
+      if (next.ssh?.enabled) {
+        if (next.ssh.auth === "password") {
+          const sshPassword =
+            next.ssh.password || getVaultSecret(sshVaultKey(next.id)) || "";
+          if (!sshPassword) {
+            throw new Error("Enter an SSH password to store in the vault.");
+          }
+          await setVaultSecret(sshVaultKey(next.id), sshPassword);
+        } else {
+          await removeVaultSecret(sshVaultKey(next.id));
+        }
+        if (next.ssh.auth === "key" && next.ssh.passphrase) {
+          await setVaultSecret(
+            sshPassphraseVaultKey(next.id),
+            next.ssh.passphrase,
+          );
+        } else {
+          await removeVaultSecret(sshPassphraseVaultKey(next.id));
+        }
+      } else {
+        await removeVaultSecret(sshVaultKey(next.id));
+        await removeVaultSecret(sshPassphraseVaultKey(next.id));
+      }
       return;
     }
 
+    if (next.passwordStorage === "keychain") {
+      const password =
+        next.password || (await getKeychainSecret(next.id)) || "";
+      if (!password) {
+        throw new Error(
+          "Enter a password to store in the OS credential store.",
+        );
+      }
+      await setKeychainSecret(next.id, password);
+      if (vaultExists() && isVaultUnlocked()) {
+        await removeVaultSecret(next.id);
+      }
+      return;
+    }
+
+    // Switching to raw or session-only leaves no managed copy behind.
+    await removeKeychainSecret(next.id).catch(() => undefined);
     if (vaultExists() && isVaultUnlocked()) {
       await removeVaultSecret(next.id);
+      await removeVaultSecret(sshVaultKey(next.id));
+      await removeVaultSecret(sshPassphraseVaultKey(next.id));
     }
   }
 
@@ -286,6 +379,19 @@ export function ConnectionModal({
           >
             General
           </button>
+          <button
+            type="button"
+            className={cn(
+              "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
+              tab === "ssh" && "text-[#d8dde6] border-b-blue",
+            )}
+            onClick={() => setTab("ssh")}
+          >
+            SSH
+            {profile.ssh?.enabled ? (
+              <span className="ml-1.5 text-[9px] text-green">on</span>
+            ) : null}
+          </button>
           {supportsSchemas && (
             <button
               type="button"
@@ -300,7 +406,17 @@ export function ConnectionModal({
           )}
         </div>
 
-        {tab === "general" || !supportsSchemas ? (
+        {tab === "ssh" ? (
+          <SshTab profile={profile} onChange={update} />
+        ) : tab === "schemas" && supportsSchemas ? (
+          <SchemasTab
+            profile={profile}
+            availableSchemas={availableSchemas}
+            loading={loadingSchemas}
+            onChange={update}
+            onRefresh={() => void refreshSchemas()}
+          />
+        ) : (
           <GeneralTab
             profile={profile}
             drivers={drivers}
@@ -309,14 +425,6 @@ export function ConnectionModal({
             onChange={update}
             onDriverChange={switchDriver}
             onFolderChange={onFolderChange}
-          />
-        ) : (
-          <SchemasTab
-            profile={profile}
-            availableSchemas={availableSchemas}
-            loading={loadingSchemas}
-            onChange={update}
-            onRefresh={() => void refreshSchemas()}
           />
         )}
 

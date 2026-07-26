@@ -1,10 +1,20 @@
-import { Database, Puzzle, Search, Settings } from "lucide-react";
+import {
+  Database,
+  KeyRound,
+  Lock,
+  Puzzle,
+  Search,
+  Settings,
+} from "lucide-react";
 import { cn } from "../lib/cn";
 
 interface ActivityBarProps {
   active: "databases" | "settings";
   onSelect: (view: "databases" | "settings") => void;
   onOpenPlugins: () => void;
+  /** Absent when no vault has been created yet. */
+  vaultUnlocked?: boolean | null;
+  onOpenVault?: () => void;
 }
 
 const activityClass = cn(
@@ -16,6 +26,8 @@ export function ActivityBar({
   active,
   onSelect,
   onOpenPlugins,
+  vaultUnlocked = null,
+  onOpenVault,
 }: ActivityBarProps) {
   return (
     <aside className="flex flex-col items-center gap-[5px] border-r border-border bg-activity px-[5px] py-2">
@@ -39,6 +51,20 @@ export function ActivityBar({
         <Search size={19} />
       </button>
       <div className="flex-1" />
+      {vaultUnlocked !== null && onOpenVault && (
+        <button
+          className={cn(activityClass, vaultUnlocked && "text-accent-bright")}
+          aria-label="Vault settings"
+          title={
+            vaultUnlocked
+              ? "Vault unlocked · settings"
+              : "Vault locked · settings"
+          }
+          onClick={onOpenVault}
+        >
+          {vaultUnlocked ? <KeyRound size={19} /> : <Lock size={19} />}
+        </button>
+      )}
       <button
         className={activityClass}
         aria-label="Plugins"

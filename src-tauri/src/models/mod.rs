@@ -20,6 +20,39 @@ pub struct ConnectionConfig {
     #[serde(default)]
     #[allow(dead_code)]
     pub all_schemas: bool,
+    /// Optional SSH hop that fronts the database host.
+    #[serde(default)]
+    pub ssh: Option<SshTunnelConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SshTunnelConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub host: String,
+    #[serde(default = "default_ssh_port")]
+    pub port: u16,
+    #[serde(default)]
+    pub username: String,
+    /// `password`, `key`, or `agent`.
+    #[serde(default = "default_ssh_auth")]
+    pub auth: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub private_key_path: String,
+    #[serde(default)]
+    pub passphrase: String,
+}
+
+fn default_ssh_port() -> u16 {
+    22
+}
+
+fn default_ssh_auth() -> String {
+    "password".into()
 }
 
 #[derive(Serialize)]
@@ -362,6 +395,12 @@ pub struct DriverCapabilities {
     /// Drivers append/clamp LIMIT to this value to avoid loading huge result sets.
     #[serde(default = "default_max_rows")]
     pub max_rows: u32,
+    /// Driver supports explicit transactions and cancelling a running query.
+    #[serde(default)]
+    pub sessions: bool,
+    /// Whether `execute_batch` runs its statements in one atomic transaction.
+    #[serde(default)]
+    pub transactions: bool,
 }
 
 fn default_max_rows() -> u32 {
@@ -383,6 +422,8 @@ impl Default for DriverCapabilities {
             readonly: false,
             identifier_quote: "\"".into(),
             max_rows: Self::DEFAULT_MAX_ROWS,
+            sessions: false,
+            transactions: false,
         }
     }
 }

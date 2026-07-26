@@ -1,17 +1,48 @@
 import {
   blankProfile,
+  blankSsh,
   ConnectionProfile,
+  ConnectionSafety,
   PasswordStorage,
+  SshTunnelSettings,
   TreeNode,
 } from "../types/connection";
+import { removeKeychainSecret } from "./keychain";
 import { queueVaultSecretRemoval } from "./vault";
 
 const STORAGE_KEY = "hyperstudio.connections.v2";
 const LEGACY_STORAGE_KEY = "hyperstudio.connections.v1";
 
 function normalizeStorage(value: unknown): PasswordStorage {
-  if (value === "raw" || value === "vault" || value === "none") return value;
+  if (
+    value === "raw" ||
+    value === "vault" ||
+    value === "keychain" ||
+    value === "none"
+  ) {
+    return value;
+  }
   return "none";
+}
+
+function normalizeSafety(value: unknown): ConnectionSafety {
+  if (value === "confirm" || value === "readOnly" || value === "none") {
+    return value;
+  }
+  return "none";
+}
+
+function prepareSshForDisk(
+  ssh: SshTunnelSettings | undefined,
+  passwordStorage: PasswordStorage,
+): SshTunnelSettings | undefined {
+  if (!ssh) return undefined;
+  const keepSecrets = passwordStorage === "raw";
+  return {
+    ...ssh,
+    password: keepSecrets ? ssh.password : "",
+    passphrase: keepSecrets ? ssh.passphrase : "",
+  };
 }
 
 function prepareProfileForDisk(profile: ConnectionProfile): ConnectionProfile {
@@ -22,6 +53,9 @@ function prepareProfileForDisk(profile: ConnectionProfile): ConnectionProfile {
     password: passwordStorage === "raw" ? profile.password : "",
     allSchemas: profile.allSchemas ?? true,
     schemas: profile.schemas ?? [],
+    ssh: prepareSshForDisk(profile.ssh, passwordStorage),
+    color: profile.color ?? "none",
+    safety: normalizeSafety(profile.safety),
   };
 }
 
@@ -41,18 +75,31 @@ function normalizeLoadedProfile(
   profile: Partial<ConnectionProfile>,
 ): ConnectionProfile {
   const passwordStorage = normalizeStorage(profile.passwordStorage);
+  const base = blankProfile(
+    typeof profile.driver === "string" && profile.driver
+      ? profile.driver
+      : "postgres",
+  );
+  const keepSecrets = passwordStorage === "raw";
+  const sshIn = profile.ssh;
   return {
-    ...blankProfile(
-      typeof profile.driver === "string" && profile.driver
-        ? profile.driver
-        : "postgres",
-    ),
+    ...base,
     ...profile,
     passwordStorage,
-    password: passwordStorage === "raw" ? (profile.password ?? "") : "",
+    password: keepSecrets ? (profile.password ?? "") : "",
     allSchemas: profile.allSchemas ?? !(profile.schemas?.length),
     schemas: Array.isArray(profile.schemas) ? profile.schemas : [],
+    color: profile.color ?? "none",
+    safety: normalizeSafety(profile.safety),
     id: profile.id || crypto.randomUUID(),
+    ssh: sshIn
+      ? {
+          ...blankSsh(),
+          ...sshIn,
+          password: keepSecrets ? (sshIn.password ?? "") : "",
+          passphrase: keepSecrets ? (sshIn.passphrase ?? "") : "",
+        }
+      : blankSsh(),
   };
 }
 
@@ -106,6 +153,9 @@ export function saveTree(nodes: TreeNode[]) {
 
 export function onConnectionDeleted(connectionId: string) {
   queueVaultSecretRemoval(connectionId);
+  // Best effort: a locked or unavailable credential store must not block
+  // deleting the profile itself.
+  void removeKeychainSecret(connectionId).catch(() => undefined);
 }
 
 export function mapTreeProfiles(
