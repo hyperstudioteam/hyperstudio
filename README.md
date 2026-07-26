@@ -84,7 +84,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [ ] SQL formatting
 - [ ] Query history and saved queries
 - [ ] Explicit transaction control and query cancellation
-- [ ] Multi-statement scripts and per-statement results
+- [x] Multi-statement scripts and per-statement results
 
 ### Data editor
 
@@ -171,7 +171,13 @@ first query, refresh, or edit.
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
 
-**5. Move data around.** Drag across cells to select a range, then copy with your chosen
+**5. Run a script.** When the buffer holds more than one statement, a **Run script** button
+appears next to **Run**. Statements execute in order, each result is listed on the left of
+the results pane, and clicking one shows its grid or error. Scripts stop at the first
+failure unless you clear **Stop on error**, and **Stop** halts after the running statement.
+Semicolons inside strings, comments, and `$$` blocks are left alone by the splitter.
+
+**6. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
