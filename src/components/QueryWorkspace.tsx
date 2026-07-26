@@ -8,8 +8,10 @@ import {
   Clock,
   Download,
   GitBranch,
+  ListOrdered,
   LoaderCircle,
   Play,
+  Square,
   Star,
   Table2,
   WandSparkles,
@@ -46,6 +48,9 @@ import {
   tableFromObject,
 } from "../types/schema";
 import { cn } from "../lib/cn";
+import { errorMessage } from "../lib/format";
+import { StatementRun, toStatementRuns } from "../lib/scriptRun";
+import { splitStatements } from "../lib/splitStatements";
 import {
   HistoryEntry,
   SavedQuery,
@@ -66,6 +71,7 @@ import { ExplainPlanView } from "./explain/ExplainPlanView";
 import { ExportModal, ExportOptions } from "./ExportModal";
 import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { ResultGrid } from "./ResultGrid";
+import { ScriptResults } from "./ScriptResults";
 import { SqlEditor, SqlEditorHandle } from "./SqlEditor";
 import { TableDataEditor } from "./TableDataEditor";
 
@@ -148,6 +154,10 @@ export function QueryWorkspace({
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
+  const [scriptRuns, setScriptRuns] = useState<StatementRun[] | null>(null);
+  const [scriptIndex, setScriptIndex] = useState(0);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [stopOnError, setStopOnError] = useState(true);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
   const [saved, setSaved] = useState<SavedQuery[]>(() => loadSavedQueries());
@@ -166,6 +176,7 @@ export function QueryWorkspace({
   } | null>(null);
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
+  const cancelScript = useRef(false);
   /** SQL awaiting its result so the run can be recorded once it settles. */
   const pendingRunRef = useRef<string | null>(null);
 
@@ -184,6 +195,10 @@ export function QueryWorkspace({
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
   const query = active?.kind === "query" ? active.sql : STARTER_QUERY;
+  const statementCount = useMemo(
+    () => splitStatements(query).length,
+    [query],
+  );
   const explainCapable = canVisualizeExplain(selected?.driver);
   const explainDisabled =
     busy === "query" || !selected || connectedId !== selected.id || !explainCapable;
@@ -324,6 +339,7 @@ export function QueryWorkspace({
   }
 
   function runSql(sql: string) {
+    setScriptRuns(null);
     if (isExplainSql(sql) && selected && canVisualizeExplain(selected.driver)) {
       const analyze = explainHasAnalyze(sql) || analyzeEnabled;
       runExplainSql(sql, analyze);
@@ -343,6 +359,57 @@ export function QueryWorkspace({
   function run() {
     if (!active || active.kind !== "query") return;
     runSql(editorRef.current?.getSqlToRun() ?? query);
+  }
+
+  async function runScript() {
+    if (!active || active.kind !== "query" || scriptBusy) return;
+    const statements = splitStatements(
+      editorRef.current?.getSqlToRun() ?? query,
+    );
+    if (statements.length === 0) return;
+
+    const runs = toStatementRuns(statements);
+    cancelScript.current = false;
+    setScriptRuns(runs);
+    setScriptIndex(0);
+    setScriptBusy(true);
+
+    // Mutate a local copy so each statement's outcome renders as it lands.
+    const publish = () => setScriptRuns([...runs]);
+
+    for (let index = 0; index < runs.length; index += 1) {
+      if (cancelScript.current) {
+        for (let rest = index; rest < runs.length; rest += 1) {
+          runs[rest].status = "skipped";
+        }
+        publish();
+        break;
+      }
+      runs[index].status = "running";
+      setScriptIndex(index);
+      publish();
+      try {
+        runs[index].result = await onExecute(runs[index].sql);
+        runs[index].status = "ok";
+      } catch (error) {
+        runs[index].status = "error";
+        runs[index].error = errorMessage(error);
+        publish();
+        if (stopOnError) {
+          for (let rest = index + 1; rest < runs.length; rest += 1) {
+            runs[rest].status = "skipped";
+          }
+          publish();
+          break;
+        }
+      }
+      publish();
+    }
+
+    setScriptBusy(false);
+    // Land on the first failure so it is not buried in a long script.
+    const failure = runs.findIndex((item) => item.status === "error");
+    if (failure >= 0) setScriptIndex(failure);
   }
 
   function formatQuery() {
@@ -570,6 +637,30 @@ export function QueryWorkspace({
                   ⌘↵
                 </kbd>
               </button>
+              {statementCount > 1 && (
+                <button
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
+                  disabled={busy === "query" || scriptBusy}
+                  onClick={() => void runScript()}
+                  title="Run every statement in order"
+                >
+                  <ListOrdered size={13} />
+                  Run script
+                  <span className="text-subtle">({statementCount})</span>
+                </button>
+              )}
+              {scriptBusy && (
+                <button
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
+                  onClick={() => {
+                    cancelScript.current = true;
+                  }}
+                  title="Stop after the running statement"
+                >
+                  <Square size={11} fill="currentColor" />
+                  Stop
+                </button>
+              )}
               <button
                 type="button"
                 className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
@@ -645,6 +736,16 @@ export function QueryWorkspace({
                   <span className="text-danger">
                     Cannot format: {formatError}
                   </span>
+                ) : statementCount > 1 ? (
+                  <label className="flex cursor-pointer items-center gap-1 text-[9px] text-subtle">
+                    <input
+                      type="checkbox"
+                      className="size-3 cursor-pointer accent-accent"
+                      checked={stopOnError}
+                      onChange={(event) => setStopOnError(event.target.checked)}
+                    />
+                    Stop on error
+                  </label>
                 ) : (
                   "Run selection or current query"
                 )}
@@ -706,7 +807,29 @@ export function QueryWorkspace({
                   Messages
                 </button>
               </div>
-              {result && resultPanel === "results" && (
+              {scriptRuns ? (
+                <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle">
+                  <span>
+                    {scriptRuns.filter((item) => item.status === "ok").length} of{" "}
+                    {scriptRuns.length} succeeded
+                  </span>
+                  {scriptRuns.some((item) => item.status === "error") && (
+                    <span className="text-red">
+                      {scriptRuns.filter((item) => item.status === "error").length}{" "}
+                      failed
+                    </span>
+                  )}
+                  <span>
+                    {scriptRuns.reduce(
+                      (total, item) => total + (item.result?.elapsedMs ?? 0),
+                      0,
+                    )}{" "}
+                    ms
+                  </span>
+                </div>
+              ) : (
+                result &&
+                resultPanel === "results" && (
                 <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle [&>span]:flex [&>span]:items-center [&>span]:gap-1">
                   {pageable && result.columns.length > 0 ? (
                     <div className="flex items-center gap-0.5">
@@ -770,9 +893,17 @@ export function QueryWorkspace({
                     </button>
                   )}
                 </div>
+                )
               )}
             </div>
-            {resultPanel === "plan" && explainPlan ? (
+            {scriptRuns ? (
+              <ScriptResults
+                runs={scriptRuns}
+                activeIndex={scriptIndex}
+                driver={selected?.driver}
+                onSelect={setScriptIndex}
+              />
+            ) : resultPanel === "plan" && explainPlan ? (
               <ExplainPlanView plan={explainPlan} />
             ) : resultPanel === "messages" ? (
               <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] text-[#c9d0db]">
