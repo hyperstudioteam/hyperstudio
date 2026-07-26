@@ -46,9 +46,24 @@ pub fn decode(row: &MySqlRow, index: usize) -> Value {
     } else if kind.starts_with("TIME") {
         row.try_get::<chrono::NaiveTime, _>(index)
             .map(|value| Value::String(value.to_string()))
-    } else if kind.contains("BLOB") || kind.contains("BINARY") {
-        row.try_get::<Vec<u8>, _>(index)
-            .map(|value| Value::String(format!("<{} bytes>", value.len())))
+    } else if (kind.contains("BLOB") || kind.contains("BINARY")) {
+        match row.try_get::<Vec<u8>, _>(index) {
+            Ok(bytes) => {
+                // DESCRIBE / SHOW and some metadata columns arrive as BINARY
+                // even when they are plain UTF-8 text (e.g. Type, Key).
+                if let Ok(text) = std::str::from_utf8(&bytes) {
+                    if text.chars().all(|ch| !ch.is_control() || ch == '\t' || ch == '\n' || ch == '\r')
+                    {
+                        Ok(Value::String(text.to_string()))
+                    } else {
+                        Ok(Value::String(format!("<{} bytes>", bytes.len())))
+                    }
+                } else {
+                    Ok(Value::String(format!("<{} bytes>", bytes.len())))
+                }
+            }
+            Err(error) => Err(error),
+        }
     } else {
         row.try_get::<String, _>(index).map(Value::String)
     };
