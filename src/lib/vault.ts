@@ -17,6 +17,59 @@ type SecretsMap = Record<string, string>;
 let sessionKey: CryptoKey | null = null;
 let sessionSecrets: SecretsMap = {};
 
+const AUTO_LOCK_KEY = "hyperstudio.vault-autolock.v1";
+/** Minutes of inactivity before locking; 0 disables auto-lock. */
+const DEFAULT_AUTO_LOCK_MINUTES = 15;
+
+export const AUTO_LOCK_CHOICES = [0, 5, 15, 30, 60] as const;
+
+let autoLockTimer: number | null = null;
+const lockListeners = new Set<() => void>();
+
+export function getAutoLockMinutes(): number {
+  const raw = localStorage.getItem(AUTO_LOCK_KEY);
+  if (raw === null) return DEFAULT_AUTO_LOCK_MINUTES;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : DEFAULT_AUTO_LOCK_MINUTES;
+}
+
+export function setAutoLockMinutes(minutes: number) {
+  localStorage.setItem(AUTO_LOCK_KEY, String(minutes));
+  if (isVaultUnlocked()) touchVaultActivity();
+}
+
+/** Notified whenever the vault locks, so the UI can drop cached secrets. */
+export function onVaultLocked(listener: () => void): () => void {
+  lockListeners.add(listener);
+  return () => lockListeners.delete(listener);
+}
+
+function clearAutoLockTimer() {
+  if (autoLockTimer !== null) {
+    window.clearTimeout(autoLockTimer);
+    autoLockTimer = null;
+  }
+}
+
+/**
+ * Restart the inactivity countdown.
+ *
+ * Called on unlock and on user activity, so the vault only locks after a real
+ * idle period rather than a fixed time since unlocking.
+ */
+export function touchVaultActivity() {
+  clearAutoLockTimer();
+  if (!sessionKey) return;
+  const minutes = getAutoLockMinutes();
+  if (minutes <= 0) return;
+  autoLockTimer = window.setTimeout(
+    () => lockVault(),
+    minutes * 60 * 1000,
+  );
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -123,8 +176,13 @@ export function isVaultUnlocked(): boolean {
 }
 
 export function lockVault() {
+  const wasUnlocked = sessionKey !== null;
+  clearAutoLockTimer();
   sessionKey = null;
   sessionSecrets = {};
+  if (wasUnlocked) {
+    for (const listener of lockListeners) listener();
+  }
 }
 
 export async function createVault(masterPassword: string): Promise<void> {
@@ -152,6 +210,7 @@ export async function createVault(masterPassword: string): Promise<void> {
 
   sessionKey = key;
   sessionSecrets = {};
+  touchVaultActivity();
 }
 
 export async function unlockVault(masterPassword: string): Promise<void> {
@@ -181,9 +240,74 @@ export async function unlockVault(masterPassword: string): Promise<void> {
     const secrets = JSON.parse(secretsJson) as SecretsMap;
     sessionKey = key;
     sessionSecrets = secrets && typeof secrets === "object" ? secrets : {};
+    touchVaultActivity();
   } catch {
     throw new Error("Invalid master password.");
   }
+}
+
+/**
+ * Re-key the vault under a new master password.
+ *
+ * A fresh salt is generated and every secret is re-encrypted, so the old
+ * password cannot open the new ciphertext. The write is a single
+ * `localStorage` set, so an interrupted rotation leaves the old vault intact.
+ */
+export async function changeMasterPassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const stored = readStored();
+  if (!stored) throw new Error("No vault found.");
+  if (!newPassword.trim()) {
+    throw new Error("New master password is required.");
+  }
+
+  const currentKey = await deriveKey(
+    currentPassword,
+    base64ToBytes(stored.salt),
+    stored.iterations || PBKDF2_ITERATIONS,
+  );
+
+  let secrets: SecretsMap;
+  try {
+    const verified = await decrypt(
+      currentKey,
+      stored.verifierIv,
+      stored.verifierCipher,
+    );
+    if (verified !== VERIFIER_PLAINTEXT) {
+      throw new Error("Invalid master password.");
+    }
+    const json = await decrypt(
+      currentKey,
+      stored.secretsIv,
+      stored.secretsCipher,
+    );
+    const parsed = JSON.parse(json) as SecretsMap;
+    secrets = parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    throw new Error("Current master password is incorrect.");
+  }
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const nextKey = await deriveKey(newPassword, salt, PBKDF2_ITERATIONS);
+  const verifier = await encrypt(nextKey, VERIFIER_PLAINTEXT);
+  const sealed = await encrypt(nextKey, JSON.stringify(secrets));
+
+  writeStored({
+    version: 1,
+    salt: bytesToBase64(salt),
+    iterations: PBKDF2_ITERATIONS,
+    verifierIv: verifier.iv,
+    verifierCipher: verifier.cipher,
+    secretsIv: sealed.iv,
+    secretsCipher: sealed.cipher,
+  });
+
+  sessionKey = nextKey;
+  sessionSecrets = secrets;
+  touchVaultActivity();
 }
 
 export function getVaultSecret(connectionId: string): string | null {

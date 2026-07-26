@@ -1,4 +1,5 @@
 import { ConnectionProfile } from "../types/connection";
+import { getKeychainSecret } from "./keychain";
 import {
   getVaultSecret,
   isVaultUnlocked,
@@ -77,12 +78,30 @@ function resolveSshSecrets(profile: ConnectionProfile): ConnectionProfile {
   };
 }
 
-export function withResolvedPassword(
+/**
+ * Same as `resolvePassword`, but able to reach the OS credential store, which
+ * is only readable across the async command bridge.
+ */
+export async function resolvePasswordAsync(
   profile: ConnectionProfile,
-): ConnectionProfile {
+): Promise<string> {
+  if (profile.passwordStorage !== "keychain") {
+    return resolvePassword(profile);
+  }
+  const stored = await getKeychainSecret(profile.id);
+  if (stored) return stored;
+  if (profile.password) return profile.password;
+  throw new Error(
+    "No password found in the OS credential store for this connection. Open settings and save it again.",
+  );
+}
+
+export async function withResolvedPassword(
+  profile: ConnectionProfile,
+): Promise<ConnectionProfile> {
   // Empty DB password is allowed when SSH alone authenticates a jump and the
   // database trusts the bastion, but drivers still require a password field —
-  // fall through to resolvePassword which throws when missing.
-  const withDb = { ...profile, password: resolvePassword(profile) };
+  // fall through to resolvePasswordAsync which throws when missing.
+  const withDb = { ...profile, password: await resolvePasswordAsync(profile) };
   return resolveSshSecrets(withDb);
 }

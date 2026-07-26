@@ -32,3 +32,5 @@ bigdecimal = "0.4"
 async-trait = "0.1.91"
 zip = { version = "8.6.0", features = ["deflate"] }
 async-ssh2-tokio = "0.13.0"
+keyring = { version = "4.1.5", features = ["v1"] }
+tauri-plugin-dialog = "2.7.2"

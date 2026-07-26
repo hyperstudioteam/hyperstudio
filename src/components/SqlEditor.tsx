@@ -35,10 +35,13 @@ import {
 } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { dialectFor } from "../lib/completionSchema";
+import { formatSql } from "../lib/sqlFormat";
 
 export interface SqlEditorHandle {
   /** Selected text when there is a selection, otherwise the whole document. */
   getSqlToRun: () => string;
+  /** Pretty-print the selection, or the whole buffer when nothing is selected. */
+  format: () => void;
   focus: () => void;
 }
 
@@ -51,6 +54,8 @@ interface SqlEditorProps {
   defaultSchema?: string;
   onChange: (value: string) => void;
   onRun: (sql: string) => void;
+  /** Reports a formatter parse failure so the workspace can surface it. */
+  onFormatError?: (message: string) => void;
 }
 
 const highlight = HighlightStyle.define([
@@ -156,7 +161,15 @@ const theme = EditorView.theme(
 
 export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
   function SqlEditor(
-    { value, driver, completionSchema, defaultSchema, onChange, onRun },
+    {
+      value,
+      driver,
+      completionSchema,
+      defaultSchema,
+      onChange,
+      onRun,
+      onFormatError,
+    },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement>(null);
@@ -165,8 +178,12 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
     // Keep callbacks current without tearing down the editor on every render.
     const onChangeRef = useRef(onChange);
     const onRunRef = useRef(onRun);
+    const driverRef = useRef(driver);
+    const onFormatErrorRef = useRef(onFormatError);
     onChangeRef.current = onChange;
     onRunRef.current = onRun;
+    driverRef.current = driver;
+    onFormatErrorRef.current = onFormatError;
 
     function sqlToRun(view: EditorView) {
       const { from, to } = view.state.selection.main;
@@ -175,9 +192,40 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
         : view.state.sliceDoc(from, to);
     }
 
+    function formatDoc(view: EditorView) {
+      const { from, to } = view.state.selection.main;
+      const wholeDoc = from === to;
+      const source = wholeDoc
+        ? view.state.doc.toString()
+        : view.state.sliceDoc(from, to);
+      if (!source.trim()) return;
+
+      let formatted: string;
+      try {
+        formatted = formatSql(source, driverRef.current);
+      } catch (error) {
+        onFormatErrorRef.current?.(
+          error instanceof Error ? error.message : String(error),
+        );
+        return;
+      }
+      if (formatted === source) return;
+
+      const range = wholeDoc
+        ? { from: 0, to: view.state.doc.length }
+        : { from, to };
+      view.dispatch({
+        changes: { ...range, insert: formatted },
+        selection: { anchor: range.from + formatted.length },
+      });
+    }
+
     useImperativeHandle(ref, () => ({
       getSqlToRun: () =>
         viewRef.current ? sqlToRun(viewRef.current) : "",
+      format: () => {
+        if (viewRef.current) formatDoc(viewRef.current);
+      },
       focus: () => viewRef.current?.focus(),
     }));
 
@@ -209,6 +257,14 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
                 preventDefault: true,
                 run: (target) => {
                   onRunRef.current(sqlToRun(target));
+                  return true;
+                },
+              },
+              {
+                key: "Shift-Alt-f",
+                preventDefault: true,
+                run: (target) => {
+                  formatDoc(target);
                   return true;
                 },
               },
