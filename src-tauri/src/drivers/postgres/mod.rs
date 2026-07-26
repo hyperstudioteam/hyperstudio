@@ -1,4 +1,5 @@
 mod alter;
+mod ddl;
 mod objects;
 mod pool;
 mod query;
@@ -178,6 +179,16 @@ impl DatabaseDriver for NativePostgres {
     ) -> Result<(), String> {
         let pool = get_pool(&self.pools, connection_id).await?;
         alter::alter_key(&pool, request).await
+    }
+
+    async fn table_ddl(
+        &self,
+        connection_id: &str,
+        schema: &str,
+        table: &str,
+    ) -> Result<String, String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        ddl::table_ddl(&pool, schema, table).await
     }
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String> {
