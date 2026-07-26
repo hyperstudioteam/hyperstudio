@@ -239,6 +239,10 @@ function App() {
               nonce: Date.now(),
             });
           }}
+          schemaReadonly={
+            drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.readonly ?? false
+          }
           findConnection={tree.findConnection}
           findFolder={tree.findFolder}
           parentOf={tree.parentOf}

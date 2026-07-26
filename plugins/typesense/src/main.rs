@@ -14,8 +14,8 @@ mod client;
 mod query;
 
 use client::{
-    TypesenseClient, TypesenseConfig, alias_to_object, collection_subgroup, collection_to_object,
-    collection_to_table, key_to_object, schema_name, synonym_to_object,
+    TypesenseClient, TypesenseConfig, alias_to_object, alter_column, collection_subgroup,
+    collection_to_object, collection_to_table, key_to_object, schema_name, synonym_to_object,
 };
 use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
@@ -214,6 +214,17 @@ fn dispatch(
             let guard = state.lock().map_err(|e| e.to_string())?;
             let client = guard.client()?;
             query::execute(client, &sql)
+        }
+        "alter_table" => Err(
+            "Typesense does not support renaming collections via alter_table.".into(),
+        ),
+        "alter_key" => Err(
+            "Typesense collections have no SQL keys; alter_key is not supported.".into(),
+        ),
+        "alter_column" => {
+            let guard = state.lock().map_err(|e| e.to_string())?;
+            let client = guard.client()?;
+            alter_column(client, params)
         }
         _ => Err(format!("Method not found: {method}")),
     }

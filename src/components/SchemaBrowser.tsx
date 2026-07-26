@@ -13,22 +13,27 @@ import {
   ListTree,
   LoaderCircle,
   MoreHorizontal,
+  Pencil,
   Plug,
   RefreshCw,
   Server,
   Table2,
   Zap,
 } from "lucide-react";
+import { databaseApi } from "../api/database";
 import { objectGroupsFor } from "../lib/driverGroups";
 import { treeKeys, type SessionBusy } from "../hooks/useDatabaseSession";
 import { ConnectionProfile } from "../types/connection";
 import {
+  ColumnNode,
   ObjectGroupDef,
   ObjectNode,
   SchemaNode,
   TABLES_GROUP,
 } from "../types/schema";
 import { ContextMenu } from "./ContextMenu";
+import { EditColumnModal } from "./schema-edit/EditColumnModal";
+import { EditTableModal } from "./schema-edit/EditTableModal";
 
 type BusyDetail = SessionBusy;
 
@@ -43,12 +48,73 @@ type BrowserMenu =
       object: ObjectNode;
       x: number;
       y: number;
+    }
+  | {
+      kind: "column";
+      schema: string;
+      group: ObjectGroupDef;
+      object: ObjectNode;
+      column: ColumnNode;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "key";
+      schema: string;
+      group: ObjectGroupDef;
+      object: ObjectNode;
+      key: ObjectNode;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "keysFolder";
+      schema: string;
+      group: ObjectGroupDef;
+      object: ObjectNode;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "index";
+      schema: string;
+      group: ObjectGroupDef;
+      object: ObjectNode;
+      index: ObjectNode;
+      x: number;
+      y: number;
+    }
+  | {
+      kind: "indexesFolder";
+      schema: string;
+      group: ObjectGroupDef;
+      object: ObjectNode;
+      x: number;
+      y: number;
+    };
+
+type SchemaEditDialog =
+  | {
+      kind: "table";
+      schema: string;
+      table: string;
+      columns: ColumnNode[];
+      initialSection?: "columns" | "keys" | "indexes";
+      initialName?: string;
+    }
+  | {
+      kind: "column";
+      schema: string;
+      table: string;
+      column: ColumnNode;
+      supportsDefault: boolean;
     };
 
 interface SchemaBrowserProps {
   profile: ConnectionProfile;
   live: boolean;
   hasCache: boolean;
+  readonly?: boolean;
   busy: "connect" | "query" | "schema" | null;
   busyDetail: BusyDetail;
   schemas: SchemaNode[];
@@ -91,6 +157,7 @@ export function SchemaBrowser({
   profile,
   live,
   hasCache,
+  readonly = false,
   busy,
   busyDetail,
   schemas,
@@ -106,12 +173,16 @@ export function SchemaBrowser({
   onEditTable,
 }: SchemaBrowserProps) {
   const [menu, setMenu] = useState<BrowserMenu | null>(null);
+  const [editDialog, setEditDialog] = useState<SchemaEditDialog | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const groups = objectGroupsFor(profile.driver);
   const refreshingSchemas = busyDetail?.kind === "schemas";
   const refreshingObjects =
     busyDetail?.kind === "objects" ? busyDetail : null;
   const showConnect = !hasCache && !live;
   const canInteract = hasCache || live;
+  const canMutate = live && !readonly;
   const databaseLabel = profile.database || profile.host || profile.name;
 
   useEffect(() => {
@@ -125,6 +196,31 @@ export function SchemaBrowser({
     event.preventDefault();
     event.stopPropagation();
     setMenu(next);
+  }
+
+  function openEdit(dialog: SchemaEditDialog) {
+    setEditError(null);
+    setEditBusy(false);
+    setEditDialog(dialog);
+    setMenu(null);
+  }
+
+  async function runAlter(
+    action: () => Promise<void>,
+    schema: string,
+    group: string,
+  ) {
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      await action();
+      setEditDialog(null);
+      onRefreshGroup(schema, group);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setEditBusy(false);
+    }
   }
 
   return (
@@ -259,6 +355,7 @@ export function SchemaBrowser({
                         refreshingObjects?.schema === schema.name &&
                         refreshingObjects.group === group.id
                       }
+                      canMutate={canMutate}
                       onToggle={onToggle}
                       onRefreshGroup={onRefreshGroup}
                       onOpenMenu={openMenu}
@@ -309,6 +406,22 @@ export function SchemaBrowser({
           )}
           {menu.kind === "object" && (
             <>
+              {canMutate &&
+                objectActions(menu.group, menu.object).includes("editTable") && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openEdit({
+                        kind: "table",
+                        schema: menu.schema,
+                        table: menu.object.name,
+                        columns: menu.object.children ?? [],
+                      })
+                    }
+                  >
+                    <Pencil size={14} /> Edit Table…
+                  </button>
+                )}
               {objectActions(menu.group, menu.object).includes("editData") && (
                 <button
                   type="button"
@@ -342,8 +455,161 @@ export function SchemaBrowser({
               </button>
             </>
           )}
+          {menu.kind === "column" &&
+            canMutate &&
+            objectActions(menu.group, menu.object).includes("editColumn") && (
+              <button
+                type="button"
+                onClick={() =>
+                  openEdit({
+                    kind: "column",
+                    schema: menu.schema,
+                    table: menu.object.name,
+                    column: menu.column,
+                    supportsDefault: profile.driver !== "typesense",
+                  })
+                }
+              >
+                <Pencil size={14} /> Edit Column…
+              </button>
+            )}
+          {menu.kind === "keysFolder" &&
+            canMutate &&
+            objectActions(menu.group, menu.object).includes("editKey") && (
+              <button
+                type="button"
+                onClick={() =>
+                  openEdit({
+                    kind: "table",
+                    schema: menu.schema,
+                    table: menu.object.name,
+                    columns: menu.object.children,
+                    initialSection: "keys",
+                  })
+                }
+              >
+                <Pencil size={14} /> Modify Keys…
+              </button>
+            )}
+          {menu.kind === "key" &&
+            canMutate &&
+            objectActions(menu.group, menu.object).includes("editKey") && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openEdit({
+                      kind: "table",
+                      schema: menu.schema,
+                      table: menu.object.name,
+                      columns: menu.object.children,
+                      initialSection: "keys",
+                      initialName: menu.key.name,
+                    })
+                  }
+                >
+                  <Pencil size={14} /> Edit Key…
+                </button>
+              </>
+            )}
+          {menu.kind === "indexesFolder" && canMutate && (
+            <button
+              type="button"
+              onClick={() =>
+                openEdit({
+                  kind: "table",
+                  schema: menu.schema,
+                  table: menu.object.name,
+                  columns: menu.object.children,
+                  initialSection: "indexes",
+                })
+              }
+            >
+              <Pencil size={14} /> Modify Indexes…
+            </button>
+          )}
+          {menu.kind === "index" && canMutate && (
+            <button
+              type="button"
+              onClick={() =>
+                openEdit({
+                  kind: "table",
+                  schema: menu.schema,
+                  table: menu.object.name,
+                  columns: menu.object.children,
+                  initialSection: "indexes",
+                  initialName: menu.index.name,
+                })
+              }
+            >
+              <Pencil size={14} /> Edit Index…
+            </button>
+          )}
         </ContextMenu>
       )}
+
+      {editDialog?.kind === "table" && (
+        <EditTableModal
+          connectionId={profile.id}
+          schema={editDialog.schema}
+          table={editDialog.table}
+          columns={editDialog.columns}
+          driver={profile.driver}
+          initialSection={editDialog.initialSection}
+          initialName={editDialog.initialName}
+          busy={editBusy}
+          error={editError}
+          onClose={() => !editBusy && setEditDialog(null)}
+          onSave={(request) =>
+            void runAlter(
+              () => databaseApi.alterTable(profile.id, request),
+              editDialog.schema,
+              TABLES_GROUP,
+            )
+          }
+        />
+      )}
+
+      {editDialog?.kind === "column" && (
+        <EditColumnModal
+          schema={editDialog.schema}
+          table={editDialog.table}
+          column={editDialog.column}
+          supportsDefault={editDialog.supportsDefault}
+          busy={editBusy}
+          error={editError}
+          onClose={() => !editBusy && setEditDialog(null)}
+          onSave={(input) =>
+            void runAlter(
+              () =>
+                databaseApi.alterColumn(profile.id, {
+                  schema: editDialog.schema,
+                  table: editDialog.table,
+                  column: editDialog.column.name,
+                  newName:
+                    input.newName !== editDialog.column.name
+                      ? input.newName
+                      : null,
+                  dataType:
+                    input.dataType !== editDialog.column.dataType
+                      ? input.dataType
+                      : null,
+                  nullable:
+                    input.nullable !== editDialog.column.nullable
+                      ? input.nullable
+                      : null,
+                  defaultValue: input.clearDefault
+                    ? null
+                    : input.defaultValue || null,
+                  clearDefault: input.clearDefault,
+                }),
+              editDialog.schema,
+              TABLES_GROUP,
+            )
+          }
+        />
+      )}
+
     </>
   );
 }
@@ -355,6 +621,7 @@ interface ObjectGroupBranchProps {
   objectSubgroups: Record<string, ObjectNode[]>;
   busyDetail: BusyDetail;
   busy: "connect" | "query" | "schema" | null;
+  canMutate: boolean;
   refreshing: boolean;
   onToggle: (key: string) => void;
   onRefreshGroup: (schema: string, group: string) => void;
@@ -370,6 +637,7 @@ function ObjectGroupBranch({
   objectSubgroups,
   busyDetail,
   busy,
+  canMutate,
   refreshing,
   onToggle,
   onRefreshGroup,
@@ -382,6 +650,7 @@ function ObjectGroupBranch({
   const loaded = Object.prototype.hasOwnProperty.call(schema.objects, group.id);
   const objects = schema.objects[group.id];
   const editable = group.id === TABLES_GROUP || group.actions.includes("editData");
+  const actions = group.actions ?? [];
 
   return (
     <div>
@@ -434,6 +703,7 @@ function ObjectGroupBranch({
           const subgroupDefs = group.objectSubgroups ?? [];
           const hasChildren =
             subgroupDefs.length > 0 || object.children.length > 0;
+          const objectActs = objectActions(group, object);
           return (
             <div key={objectKey}>
               <button
@@ -444,7 +714,7 @@ function ObjectGroupBranch({
                 }}
                 onDoubleClick={() => {
                   if (editable) onEditTable(schema.name, object.name);
-                  else if (group.actions.includes("viewData")) {
+                  else if (actions.includes("viewData")) {
                     onViewTable(schema.name, object.name);
                   }
                 }}
@@ -483,7 +753,9 @@ function ObjectGroupBranch({
                       );
                       const subgroupOpen = expanded.has(subgroupKey);
                       const isColumns = subgroup.id === "columns";
-                      const loaded =
+                      const isKeys = subgroup.id === "keys";
+                      const isIndexes = subgroup.id === "indexes";
+                      const loadedSub =
                         isColumns ||
                         Object.prototype.hasOwnProperty.call(
                           objectSubgroups,
@@ -492,7 +764,7 @@ function ObjectGroupBranch({
                       const items = objectSubgroups[subgroupKey] ?? [];
                       const count = isColumns
                         ? object.children.length
-                        : loaded
+                        : loadedSub
                           ? items.length
                           : null;
                       const loading =
@@ -506,6 +778,32 @@ function ObjectGroupBranch({
                             type="button"
                             className="tree-row object-subgroup-row"
                             onClick={() => onToggle(subgroupKey)}
+                            onContextMenu={(event) => {
+                              if (canMutate) {
+                                if (
+                                  isKeys &&
+                                  objectActs.includes("editKey")
+                                ) {
+                                  onOpenMenu(event, {
+                                    kind: "keysFolder",
+                                    schema: schema.name,
+                                    group,
+                                    object,
+                                    x: event.clientX,
+                                    y: event.clientY,
+                                  });
+                                } else if (isIndexes) {
+                                  onOpenMenu(event, {
+                                    kind: "indexesFolder",
+                                    schema: schema.name,
+                                    group,
+                                    object,
+                                    x: event.clientX,
+                                    y: event.clientY,
+                                  });
+                                }
+                              }
+                            }}
                           >
                             {subgroupOpen ? (
                               <ChevronDown size={13} />
@@ -517,7 +815,7 @@ function ObjectGroupBranch({
                             <em>{loading ? "…" : count ?? ""}</em>
                           </button>
                           {subgroupOpen &&
-                            (loading && !loaded ? (
+                            (loading && !loadedSub ? (
                               <div className="tree-row metadata-row loading-row">
                                 <LoaderCircle className="spin" size={12} />
                                 <span>Loading…</span>
@@ -527,6 +825,22 @@ function ObjectGroupBranch({
                                 <div
                                   className="tree-row metadata-row"
                                   key={`${subgroupKey}.${child.name}`}
+                                  onContextMenu={(event) => {
+                                    if (
+                                      canMutate &&
+                                      objectActs.includes("editColumn")
+                                    ) {
+                                      onOpenMenu(event, {
+                                        kind: "column",
+                                        schema: schema.name,
+                                        group,
+                                        object,
+                                        column: child,
+                                        x: event.clientX,
+                                        y: event.clientY,
+                                      });
+                                    }
+                                  }}
                                 >
                                   <Columns3 size={12} />
                                   <span>{child.name}</span>
@@ -539,6 +853,34 @@ function ObjectGroupBranch({
                                   className="tree-row metadata-row"
                                   key={`${subgroupKey}.${item.name}`}
                                   title={item.detail ?? undefined}
+                                  onContextMenu={(event) => {
+                                    if (canMutate) {
+                                      if (
+                                        isKeys &&
+                                        objectActs.includes("editKey")
+                                      ) {
+                                        onOpenMenu(event, {
+                                          kind: "key",
+                                          schema: schema.name,
+                                          group,
+                                          object,
+                                          key: item,
+                                          x: event.clientX,
+                                          y: event.clientY,
+                                        });
+                                      } else if (isIndexes) {
+                                        onOpenMenu(event, {
+                                          kind: "index",
+                                          schema: schema.name,
+                                          group,
+                                          object,
+                                          index: item,
+                                          x: event.clientX,
+                                          y: event.clientY,
+                                        });
+                                      }
+                                    }
+                                  }}
                                 >
                                   <GroupIcon name={subgroup.icon} size={12} />
                                   <span>{item.name}</span>
@@ -553,6 +895,22 @@ function ObjectGroupBranch({
                       <div
                         className="tree-row column-row"
                         key={`${objectKey}.${child.name}`}
+                        onContextMenu={(event) => {
+                          if (
+                            canMutate &&
+                            objectActs.includes("editColumn")
+                          ) {
+                            onOpenMenu(event, {
+                              kind: "column",
+                              schema: schema.name,
+                              group,
+                              object,
+                              column: child,
+                              x: event.clientX,
+                              y: event.clientY,
+                            });
+                          }
+                        }}
                       >
                         <Columns3 size={12} />
                         <span>{child.name}</span>

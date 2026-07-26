@@ -12,9 +12,9 @@ use async_trait::async_trait;
 use tokio::sync::RwLock;
 
 use crate::models::{
-    ColumnTypeDeclaration, ConnectionConfig, ConnectionFieldDef, ConnectionInfo,
-    DriverCapabilities, DriverInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo,
-    SchemaNode, TableNode,
+    AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ColumnTypeDeclaration,
+    ConnectionConfig, ConnectionFieldDef, ConnectionInfo, DriverCapabilities, DriverInfo,
+    ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
 };
 
 pub use mysql::NativeMySql;
@@ -108,6 +108,36 @@ pub trait DatabaseDriver: Send + Sync {
             "Driver '{}' has no object subgroup '{subgroup}'.",
             self.id()
         ))
+    }
+
+    async fn alter_table(
+        &self,
+        _connection_id: &str,
+        _request: AlterTableRequest,
+    ) -> Result<(), String> {
+        Err(format!(
+            "Driver '{}' does not support alter_table.",
+            self.id()
+        ))
+    }
+
+    async fn alter_column(
+        &self,
+        _connection_id: &str,
+        _request: AlterColumnRequest,
+    ) -> Result<(), String> {
+        Err(format!(
+            "Driver '{}' does not support alter_column.",
+            self.id()
+        ))
+    }
+
+    async fn alter_key(
+        &self,
+        _connection_id: &str,
+        _request: AlterKeyRequest,
+    ) -> Result<(), String> {
+        Err(format!("Driver '{}' does not support alter_key.", self.id()))
     }
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String>;

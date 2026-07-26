@@ -10,7 +10,7 @@ export const DEFAULT_OBJECT_GROUPS: ObjectGroupDef[] = [
     label: "Tables",
     icon: "table",
     childLabel: "Columns",
-    actions: ["viewData", "editData"],
+    actions: ["viewData", "editData", "editTable", "editColumn", "editKey"],
     defaultOpen: true,
   },
 ];

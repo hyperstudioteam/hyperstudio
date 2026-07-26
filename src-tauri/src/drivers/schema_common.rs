@@ -42,6 +42,24 @@ where
                 nullable: nullable.eq_ignore_ascii_case("YES"),
                 primary_key: primary.eq_ignore_ascii_case("YES")
                     || primary.eq_ignore_ascii_case("PRI"),
+                default_value: row
+                    .try_get::<Option<String>, _>(6)
+                    .ok()
+                    .flatten()
+                    .filter(|value| !value.is_empty()),
+                comment: row
+                    .try_get::<Option<String>, _>(7)
+                    .ok()
+                    .flatten()
+                    .filter(|value| !value.is_empty()),
+                auto_increment: row
+                    .try_get::<String, _>(8)
+                    .ok()
+                    .map(|value| {
+                        value.eq_ignore_ascii_case("YES")
+                            || value.to_ascii_lowercase().contains("auto_increment")
+                    })
+                    .unwrap_or(false),
             });
         }
     }

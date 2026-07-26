@@ -1,3 +1,4 @@
+mod alter;
 mod objects;
 mod pool;
 mod query;
@@ -14,8 +15,8 @@ use tokio::sync::RwLock;
 use crate::drivers::DatabaseDriver;
 use crate::drivers::shared::{get_pool, insert_pool, remove_pool};
 use crate::models::{
-    ConnectionConfig, ConnectionInfo, DriverCapabilities, ObjectGroupDef, ObjectNode, QueryResult,
-    SchemaInfo, SchemaNode, TableNode,
+    AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ConnectionConfig, ConnectionInfo,
+    DriverCapabilities, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
 };
 
 pub struct NativeMySql {
@@ -150,6 +151,33 @@ impl DatabaseDriver for NativeMySql {
     ) -> Result<Vec<ObjectNode>, String> {
         let pool = get_pool(&self.pools, connection_id).await?;
         table_metadata::list(&pool, schema, object, subgroup).await
+    }
+
+    async fn alter_table(
+        &self,
+        connection_id: &str,
+        request: AlterTableRequest,
+    ) -> Result<(), String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        alter::alter_table(&pool, request).await
+    }
+
+    async fn alter_column(
+        &self,
+        connection_id: &str,
+        request: AlterColumnRequest,
+    ) -> Result<(), String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        alter::alter_column(&pool, request).await
+    }
+
+    async fn alter_key(
+        &self,
+        connection_id: &str,
+        request: AlterKeyRequest,
+    ) -> Result<(), String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        alter::alter_key(&pool, request).await
     }
 
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String> {

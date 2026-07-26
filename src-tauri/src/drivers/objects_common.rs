@@ -54,6 +54,9 @@ where
             },
             nullable: true,
             primary_key: false,
+            default_value: None,
+            comment: None,
+            auto_increment: false,
         });
     }
 

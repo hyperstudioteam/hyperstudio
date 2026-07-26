@@ -4,8 +4,9 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::db::AppState;
 use crate::models::{
-    ConnectionConfig, ConnectionInfo, DriverInfo, InstalledPluginInfo, ObjectGroupDef, ObjectNode,
-    QueryResult, SchemaInfo, SchemaNode, TableNode,
+    AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ConnectionConfig, ConnectionInfo,
+    DriverInfo, InstalledPluginInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo,
+    SchemaNode, TableNode,
 };
 use crate::plugins::{
     discover_and_register, install_from_path, list_installed, register_plugin_dir, uninstall,
@@ -130,6 +131,36 @@ pub async fn execute_query(
 ) -> Result<QueryResult, String> {
     let driver = state.registry.driver_for_connection(&connection_id).await?;
     driver.execute_query(&connection_id, &sql).await
+}
+
+#[tauri::command]
+pub async fn alter_table(
+    connection_id: String,
+    request: AlterTableRequest,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.alter_table(&connection_id, request).await
+}
+
+#[tauri::command]
+pub async fn alter_column(
+    connection_id: String,
+    request: AlterColumnRequest,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.alter_column(&connection_id, request).await
+}
+
+#[tauri::command]
+pub async fn alter_key(
+    connection_id: String,
+    request: AlterKeyRequest,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.alter_key(&connection_id, request).await
 }
 
 #[tauri::command]

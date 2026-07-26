@@ -200,6 +200,21 @@ impl TypesenseClient {
             .map_err(|error| format!("Invalid collection response: {error}"))
     }
 
+    /// Update collection schema fields (add / drop / modify via drop+add).
+    pub fn update_collection_fields(
+        &self,
+        name: &str,
+        fields: Vec<Value>,
+    ) -> Result<Value, String> {
+        let path = format!("/collections/{}", urlencoding::encode(name));
+        let response = self
+            .request("PATCH", &path)
+            .set("Content-Type", "application/json")
+            .send_json(json!({ "fields": fields }))
+            .map_err(Self::map_http_error)?;
+        self.read_json(response)
+    }
+
     pub fn list_aliases(&self) -> Result<Vec<Value>, String> {
         let response = self
             .request("GET", "/aliases")
@@ -346,6 +361,67 @@ pub fn field_to_column(field: &FieldDef) -> Value {
     })
 }
 
+/// Apply an `alter_column` request against a Typesense collection field.
+pub fn alter_column(client: &TypesenseClient, params: &Value) -> Result<Value, String> {
+    let collection_name = params
+        .get("table")
+        .or_else(|| params.get("object"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    let column = params
+        .get("column")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if collection_name.is_empty() || column.is_empty() {
+        return Err("table and column are required for alter_column.".into());
+    }
+    if column == "id" {
+        return Err("The Typesense id field cannot be modified.".into());
+    }
+
+    let new_name = params
+        .get("newName")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
+    let data_type = params
+        .get("dataType")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let nullable = params.get("nullable").and_then(|v| v.as_bool());
+
+    if new_name.is_none() && data_type.is_none() && nullable.is_none() {
+        return Err("No column changes provided.".into());
+    }
+
+    let collection = client.get_collection(collection_name)?;
+    let existing = collection
+        .fields
+        .iter()
+        .find(|field| field.name == column)
+        .ok_or_else(|| format!("Field '{column}' not found on collection '{collection_name}'."))?;
+
+    let target_name = new_name.unwrap_or(column);
+    let target_type = data_type.unwrap_or(existing.field_type.as_str());
+    let optional = nullable.unwrap_or(existing.optional);
+
+    // Typesense modifies fields via drop + add in one PATCH.
+    let mut fields = vec![json!({ "name": column, "drop": true })];
+    fields.push(json!({
+        "name": target_name,
+        "type": target_type,
+        "optional": optional,
+        "facet": existing.facet,
+        "index": existing.index,
+        "sort": existing.sort,
+        "infix": existing.infix,
+    }));
+    client.update_collection_fields(collection_name, fields)
+}
+
 pub fn collection_to_table(collection: &CollectionSummary) -> Value {
     let mut columns: Vec<Value> = collection.fields.iter().map(field_to_column).collect();
     if !columns.iter().any(|column| column.get("name").and_then(|v| v.as_str()) == Some("id")) {
@@ -373,7 +449,7 @@ pub fn collection_to_object(collection: &CollectionSummary) -> Value {
         "kind": "COLLECTION",
         "detail": format!("{} docs", collection.num_documents),
         "children": table.get("columns").cloned().unwrap_or(json!([])),
-        "actions": ["viewData", "editData"],
+        "actions": ["viewData", "editData", "editColumn"],
     })
 }
 

@@ -58,7 +58,21 @@ pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<Schema
                                  c.column_name,
                                  c.data_type,
                                  c.is_nullable,
-                                 CASE WHEN pk.column_name IS NULL THEN 'NO' ELSE 'YES' END
+                                 CASE WHEN pk.column_name IS NULL THEN 'NO' ELSE 'YES' END,
+                                 c.column_default,
+                                 (
+                                   SELECT pg_catalog.col_description(cls.oid, c.ordinal_position::int)
+                                   FROM pg_catalog.pg_class cls
+                                   JOIN pg_catalog.pg_namespace nsp ON nsp.oid = cls.relnamespace
+                                   WHERE nsp.nspname = c.table_schema AND cls.relname = c.table_name
+                                     AND cls.relkind IN ('r', 'p', 'v', 'm', 'f')
+                                   LIMIT 1
+                                 ),
+                                 CASE
+                                   WHEN c.is_identity = 'YES' THEN 'YES'
+                                   WHEN c.column_default LIKE 'nextval(%' THEN 'YES'
+                                   ELSE 'NO'
+                                 END
                           FROM information_schema.columns c
                           LEFT JOIN (
                             SELECT kcu.table_schema, kcu.table_name, kcu.column_name
@@ -80,7 +94,21 @@ pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<Schema
                                       c.column_name,
                                       c.data_type,
                                       c.is_nullable,
-                                      CASE WHEN pk.column_name IS NULL THEN 'NO' ELSE 'YES' END
+                                      CASE WHEN pk.column_name IS NULL THEN 'NO' ELSE 'YES' END,
+                                      c.column_default,
+                                      (
+                                        SELECT pg_catalog.col_description(cls.oid, c.ordinal_position::int)
+                                        FROM pg_catalog.pg_class cls
+                                        JOIN pg_catalog.pg_namespace nsp ON nsp.oid = cls.relnamespace
+                                        WHERE nsp.nspname = c.table_schema AND cls.relname = c.table_name
+                                          AND cls.relkind IN ('r', 'p', 'v', 'm', 'f')
+                                        LIMIT 1
+                                      ),
+                                      CASE
+                                        WHEN c.is_identity = 'YES' THEN 'YES'
+                                        WHEN c.column_default LIKE 'nextval(%' THEN 'YES'
+                                        ELSE 'NO'
+                                      END
                                FROM information_schema.columns c
                                LEFT JOIN (
                                  SELECT kcu.table_schema, kcu.table_name, kcu.column_name

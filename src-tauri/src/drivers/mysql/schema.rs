@@ -86,7 +86,10 @@ pub async fn introspect(
                     CAST(COLUMN_NAME AS CHAR),
                     CAST(COLUMN_TYPE AS CHAR),
                     CAST(IS_NULLABLE AS CHAR),
-                    CAST(COLUMN_KEY AS CHAR)
+                    CAST(COLUMN_KEY AS CHAR),
+                    CAST(COLUMN_DEFAULT AS CHAR),
+                    CAST(COLUMN_COMMENT AS CHAR),
+                    CAST(EXTRA AS CHAR)
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA IN ({placeholders})
              ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION"
@@ -106,7 +109,10 @@ pub async fn introspect(
                     CAST(COLUMN_NAME AS CHAR),
                     CAST(COLUMN_TYPE AS CHAR),
                     CAST(IS_NULLABLE AS CHAR),
-                    CAST(COLUMN_KEY AS CHAR)
+                    CAST(COLUMN_KEY AS CHAR),
+                    CAST(COLUMN_DEFAULT AS CHAR),
+                    CAST(COLUMN_COMMENT AS CHAR),
+                    CAST(EXTRA AS CHAR)
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
              ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION",
@@ -121,7 +127,10 @@ pub async fn introspect(
                     CAST(COLUMN_NAME AS CHAR),
                     CAST(COLUMN_TYPE AS CHAR),
                     CAST(IS_NULLABLE AS CHAR),
-                    CAST(COLUMN_KEY AS CHAR)
+                    CAST(COLUMN_KEY AS CHAR),
+                    CAST(COLUMN_DEFAULT AS CHAR),
+                    CAST(COLUMN_COMMENT AS CHAR),
+                    CAST(EXTRA AS CHAR)
              FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE()
              ORDER BY TABLE_NAME, ORDINAL_POSITION",

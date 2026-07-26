@@ -8,6 +8,74 @@ export interface ColumnNode {
   dataType: string;
   nullable: boolean;
   primaryKey?: boolean;
+  defaultValue?: string | null;
+  comment?: string | null;
+  autoIncrement?: boolean;
+}
+
+export interface TableColumnChange {
+  action: "add" | "modify" | "drop" | string;
+  name: string;
+  newName?: string | null;
+  dataType?: string | null;
+  nullable?: boolean | null;
+  defaultValue?: string | null;
+  clearDefault?: boolean;
+  comment?: string | null;
+  autoIncrement?: boolean | null;
+  onUpdate?: string | null;
+  collation?: string | null;
+}
+
+export interface TableKeyChange {
+  action: "add" | "modify" | "drop" | string;
+  name?: string | null;
+  newName?: string | null;
+  kind: "PRIMARY KEY" | "UNIQUE" | string;
+  columns: string[];
+}
+
+export interface TableIndexChange {
+  action: "add" | "modify" | "drop" | string;
+  name?: string | null;
+  newName?: string | null;
+  unique?: boolean;
+  method?: string | null;
+  columns: string[];
+}
+
+export interface AlterTableRequest {
+  schema: string;
+  table: string;
+  newName?: string | null;
+  columns?: TableColumnChange[];
+  keys?: TableKeyChange[];
+  indexes?: TableIndexChange[];
+}
+
+export interface AlterColumnRequest {
+  schema: string;
+  table: string;
+  column: string;
+  newName?: string | null;
+  dataType?: string | null;
+  nullable?: boolean | null;
+  defaultValue?: string | null;
+  clearDefault?: boolean;
+  comment?: string | null;
+  autoIncrement?: boolean | null;
+  onUpdate?: string | null;
+  collation?: string | null;
+}
+
+export interface AlterKeyRequest {
+  schema: string;
+  table: string;
+  name?: string | null;
+  newName?: string | null;
+  kind?: string | null;
+  columns?: string[] | null;
+  drop?: boolean;
 }
 
 export interface TableNode {

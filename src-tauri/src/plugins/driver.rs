@@ -8,8 +8,9 @@ use tokio::sync::RwLock;
 
 use crate::drivers::DatabaseDriver;
 use crate::models::{
-    ColumnNode, ColumnTypeDeclaration, ConnectionConfig, ConnectionFieldDef, ConnectionInfo,
-    DriverCapabilities, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
+    AlterColumnRequest, AlterKeyRequest, AlterTableRequest, ColumnNode, ColumnTypeDeclaration,
+    ConnectionConfig, ConnectionFieldDef, ConnectionInfo, DriverCapabilities, ObjectGroupDef,
+    ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
 };
 use crate::plugins::manifest::PluginManifest;
 use crate::plugins::process::PluginProcess;
@@ -290,6 +291,48 @@ impl DatabaseDriver for PluginDriver {
         parse_objects(value)
     }
 
+    async fn alter_table(
+        &self,
+        connection_id: &str,
+        request: AlterTableRequest,
+    ) -> Result<(), String> {
+        let process = self.session(connection_id).await?;
+        let mut params = serde_json::to_value(request).map_err(|e| e.to_string())?;
+        if let Some(obj) = params.as_object_mut() {
+            obj.insert("connectionId".into(), json!(connection_id));
+        }
+        process.call("alter_table", params).await?;
+        Ok(())
+    }
+
+    async fn alter_column(
+        &self,
+        connection_id: &str,
+        request: AlterColumnRequest,
+    ) -> Result<(), String> {
+        let process = self.session(connection_id).await?;
+        let mut params = serde_json::to_value(request).map_err(|e| e.to_string())?;
+        if let Some(obj) = params.as_object_mut() {
+            obj.insert("connectionId".into(), json!(connection_id));
+        }
+        process.call("alter_column", params).await?;
+        Ok(())
+    }
+
+    async fn alter_key(
+        &self,
+        connection_id: &str,
+        request: AlterKeyRequest,
+    ) -> Result<(), String> {
+        let process = self.session(connection_id).await?;
+        let mut params = serde_json::to_value(request).map_err(|e| e.to_string())?;
+        if let Some(obj) = params.as_object_mut() {
+            obj.insert("connectionId".into(), json!(connection_id));
+        }
+        process.call("alter_key", params).await?;
+        Ok(())
+    }
+
     async fn execute_query(
         &self,
         connection_id: &str,
@@ -480,6 +523,22 @@ fn parse_columns(value: Value) -> Result<Vec<ColumnNode>, String> {
             primary_key: obj
                 .get("primaryKey")
                 .or_else(|| obj.get("primary_key"))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            default_value: obj
+                .get("defaultValue")
+                .or_else(|| obj.get("default_value"))
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .filter(|value| !value.is_empty()),
+            comment: obj
+                .get("comment")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .filter(|value| !value.is_empty()),
+            auto_increment: obj
+                .get("autoIncrement")
+                .or_else(|| obj.get("auto_increment"))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
         });

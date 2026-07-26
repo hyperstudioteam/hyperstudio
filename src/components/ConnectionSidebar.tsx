@@ -48,6 +48,7 @@ interface ConnectionSidebarProps {
   onDelete: (id: string) => void;
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
+  schemaReadonly?: boolean;
   findConnection: (id: string) => ConnectionProfile | null;
   findFolder: (
     id: string,
@@ -162,6 +163,7 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
           onToggle={props.onToggleSchema}
           onViewTable={props.onViewTable}
           onEditTable={props.onEditTable}
+          readonly={props.schemaReadonly}
         />
       )}
 

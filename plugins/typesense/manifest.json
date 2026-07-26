@@ -56,7 +56,7 @@
         "label": "Collections",
         "icon": "layers",
         "childLabel": "Fields",
-        "actions": ["viewData", "editData"],
+        "actions": ["viewData", "editData", "editColumn"],
         "defaultOpen": true,
         "objectSubgroups": [
           { "id": "columns", "label": "Fields", "icon": "columns" },

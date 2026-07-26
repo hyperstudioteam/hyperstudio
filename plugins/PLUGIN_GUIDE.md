@@ -109,6 +109,17 @@ One JSON object per line.
 | `get_columns` | no | `[{ "name", "dataType", "nullable", "primaryKey" }]` |
 | `get_schema_tree` | no | `[{ "name", "tables": […] }]` bulk alternative |
 | `execute_query` | yes | `{ "columns", "rows", "affectedRows"?, "truncated"? }` |
+| `alter_table` | no | `null` — rename plus batched `columns`, `keys`, and `indexes` changes (`{ schema, table, newName?, columns?, keys?, indexes? }`) |
+| `alter_column` | no | `null` — rename / type / nullable / default (`{ schema, table, column, newName?, dataType?, nullable?, defaultValue?, clearDefault? }`) |
+| `alter_key` | no | `null` — add / drop / rename PK or UNIQUE (`{ schema, table, name?, newName?, kind?, columns?, drop? }`) |
+
+Schema mutations are optional. Built-in SQL drivers implement them with `ALTER TABLE`.
+Plugins that do not support a method should return a clear JSON-RPC error (Hypergrid shows it
+to the user). Typesense implements `alter_column` via `PATCH /collections/:name` and rejects
+`alter_table` / `alter_key`.
+
+Object group `actions` may include `editTable`, `editColumn`, and `editKey` so the schema browser
+offers the matching context menus. Omit them when the plugin does not implement the method.
 
 \*Required when `capabilities.schemas` is true / when browsing tables. If `get_objects`
 is missing, Hypergrid falls back to `get_tables` for the `tables` group only.

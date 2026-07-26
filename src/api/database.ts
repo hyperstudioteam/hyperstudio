@@ -6,6 +6,9 @@ import {
 } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
 import {
+  AlterColumnRequest,
+  AlterKeyRequest,
+  AlterTableRequest,
   ObjectGroupDef,
   ObjectNode,
   SchemaInfo,
@@ -84,6 +87,15 @@ export const databaseApi = {
   },
   executeQuery(connectionId: string, sql: string) {
     return invoke<QueryResult>("execute_query", { connectionId, sql });
+  },
+  alterTable(connectionId: string, request: AlterTableRequest) {
+    return invoke<void>("alter_table", { connectionId, request });
+  },
+  alterColumn(connectionId: string, request: AlterColumnRequest) {
+    return invoke<void>("alter_column", { connectionId, request });
+  },
+  alterKey(connectionId: string, request: AlterKeyRequest) {
+    return invoke<void>("alter_key", { connectionId, request });
   },
 };
 

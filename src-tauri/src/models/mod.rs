@@ -43,6 +43,135 @@ pub struct ColumnNode {
     pub data_type: String,
     pub nullable: bool,
     pub primary_key: bool,
+    /// Column DEFAULT expression when known (e.g. `'active'::text`, `CURRENT_TIMESTAMP`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub auto_increment: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TableColumnChange {
+    /// `add` | `modify` | `drop`
+    pub action: String,
+    /// Current column name (for modify/drop) or new name (for add).
+    pub name: String,
+    #[serde(default)]
+    pub new_name: Option<String>,
+    #[serde(default)]
+    pub data_type: Option<String>,
+    #[serde(default)]
+    pub nullable: Option<bool>,
+    #[serde(default)]
+    pub default_value: Option<String>,
+    #[serde(default)]
+    pub clear_default: bool,
+    #[serde(default)]
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub auto_increment: Option<bool>,
+    #[serde(default)]
+    pub on_update: Option<String>,
+    #[serde(default)]
+    pub collation: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TableKeyChange {
+    /// `add` | `modify` | `drop`
+    pub action: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub new_name: Option<String>,
+    /// `PRIMARY KEY` or `UNIQUE`.
+    pub kind: String,
+    #[serde(default)]
+    pub columns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TableIndexChange {
+    /// `add` | `modify` | `drop`
+    pub action: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub new_name: Option<String>,
+    #[serde(default)]
+    pub unique: bool,
+    #[serde(default)]
+    pub method: Option<String>,
+    #[serde(default)]
+    pub columns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlterTableRequest {
+    pub schema: String,
+    pub table: String,
+    #[serde(default)]
+    pub new_name: Option<String>,
+    #[serde(default)]
+    pub columns: Vec<TableColumnChange>,
+    #[serde(default)]
+    pub keys: Vec<TableKeyChange>,
+    #[serde(default)]
+    pub indexes: Vec<TableIndexChange>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlterColumnRequest {
+    pub schema: String,
+    pub table: String,
+    pub column: String,
+    #[serde(default)]
+    pub new_name: Option<String>,
+    #[serde(default)]
+    pub data_type: Option<String>,
+    #[serde(default)]
+    pub nullable: Option<bool>,
+    /// Set a new DEFAULT expression. Ignored when `clear_default` is true.
+    #[serde(default)]
+    pub default_value: Option<String>,
+    /// Drop the column DEFAULT.
+    #[serde(default)]
+    pub clear_default: bool,
+    /// Set column comment (empty string clears on engines that support it).
+    #[serde(default)]
+    pub comment: Option<String>,
+    #[serde(default)]
+    pub auto_increment: Option<bool>,
+    #[serde(default)]
+    pub on_update: Option<String>,
+    #[serde(default)]
+    pub collation: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlterKeyRequest {
+    pub schema: String,
+    pub table: String,
+    /// Existing constraint / index name (required to drop or rename).
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub new_name: Option<String>,
+    /// `PRIMARY KEY` or `UNIQUE`.
+    #[serde(default)]
+    pub kind: Option<String>,
+    #[serde(default)]
+    pub columns: Option<Vec<String>>,
+    #[serde(default)]
+    pub drop: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,7 +212,7 @@ pub struct ObjectGroupDef {
     /// Heading for an object's children, e.g. "Columns" or "Parameters".
     #[serde(default, alias = "child_label")]
     pub child_label: Option<String>,
-    /// Action ids offered on objects in this group: viewData, editData, ddl.
+    /// Action ids: viewData, editData, editTable, editColumn, editKey, ddl.
     #[serde(default)]
     pub actions: Vec<String>,
     /// Load this group as soon as the schema is expanded.
@@ -101,7 +230,7 @@ impl ObjectGroupDef {
             label: "Tables".into(),
             icon: Some("table".into()),
             child_label: Some("Columns".into()),
-            actions: vec!["viewData".into(), "editData".into()],
+            actions: vec!["viewData".into(), "editData".into(), "editTable".into()],
             default_open: true,
             object_subgroups: Vec::new(),
         }
@@ -109,6 +238,13 @@ impl ObjectGroupDef {
 
     pub fn database_tables() -> Self {
         let mut group = Self::tables();
+        group.actions = vec![
+            "viewData".into(),
+            "editData".into(),
+            "editTable".into(),
+            "editColumn".into(),
+            "editKey".into(),
+        ];
         group.object_subgroups = vec![
             ObjectSubgroupDef {
                 id: "columns".into(),
