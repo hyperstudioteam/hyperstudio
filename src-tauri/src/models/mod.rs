@@ -146,6 +146,18 @@ pub struct DriverCapabilities {
     pub no_connection_required: bool,
     pub readonly: bool,
     pub identifier_quote: String,
+    /// Max rows returned for a single SELECT from the query editor.
+    /// Drivers append/clamp LIMIT to this value to avoid loading huge result sets.
+    #[serde(default = "default_max_rows")]
+    pub max_rows: u32,
+}
+
+fn default_max_rows() -> u32 {
+    DriverCapabilities::DEFAULT_MAX_ROWS
+}
+
+impl DriverCapabilities {
+    pub const DEFAULT_MAX_ROWS: u32 = 500;
 }
 
 impl Default for DriverCapabilities {
@@ -158,6 +170,7 @@ impl Default for DriverCapabilities {
             no_connection_required: false,
             readonly: false,
             identifier_quote: "\"".into(),
+            max_rows: Self::DEFAULT_MAX_ROWS,
         }
     }
 }

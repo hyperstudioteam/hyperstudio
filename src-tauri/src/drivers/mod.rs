@@ -1,4 +1,9 @@
-pub mod native;
+pub mod mysql;
+pub mod objects_common;
+pub mod postgres;
+pub mod query_common;
+pub mod schema_common;
+mod shared;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -11,7 +16,10 @@ use crate::models::{
     DriverInfo, ObjectGroupDef, ObjectNode, QueryResult, SchemaInfo, SchemaNode, TableNode,
 };
 
-pub use native::{NativeMySql, NativePostgres, BUILTIN_DRIVER_IDS};
+pub use mysql::NativeMySql;
+pub use postgres::NativePostgres;
+
+pub const BUILTIN_DRIVER_IDS: [&str; 2] = ["postgres", "mysql"];
 
 #[async_trait]
 pub trait DatabaseDriver: Send + Sync {

@@ -12,7 +12,8 @@
     "folder_based": false,
     "no_connection_required": false,
     "readonly": false,
-    "identifier_quote": "\""
+    "identifier_quote": "\"",
+    "maxRows": 250
   },
   "connectionFields": [
     {

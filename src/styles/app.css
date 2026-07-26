@@ -179,6 +179,7 @@ kbd { padding: 1px 4px; border: 1px solid #403a67; border-radius: 3px; color: #8
 .result-meta { padding: 0 11px; display: flex; align-items: center; gap: 13px; color: var(--subtle); font-size: 9px; }
 .result-meta span { display: flex; align-items: center; gap: 4px; }
 .result-meta span:first-child { color: #74cda0; }
+.result-paging { display: flex; align-items: center; gap: 2px; }
 .grid-scroll { flex: 1; overflow: auto; scrollbar-width: thin; scrollbar-color: #383e49 transparent; }
 table { min-width: 100%; border-collapse: separate; border-spacing: 0; table-layout: auto; font: 10px/1.35 "SFMono-Regular", Consolas, monospace; }
 th, td { height: 29px; max-width: 300px; padding: 0 10px; border-right: 1px solid #252a33; border-bottom: 1px solid #242831; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

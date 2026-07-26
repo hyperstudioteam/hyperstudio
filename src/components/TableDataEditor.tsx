@@ -46,8 +46,6 @@ import { ConnectionProfile } from "../types/connection";
 import { QueryResult } from "../types/query";
 import { ColumnNode, TableNode } from "../types/schema";
 
-const PAGE_SIZE = 500;
-
 type RowStatus = "clean" | "modified" | "inserted" | "deleted";
 
 interface EditorRow {
@@ -62,6 +60,8 @@ interface TableDataEditorProps {
   schema: string;
   table: string;
   tableMeta: TableNode | null;
+  /** Rows per page; defaults to driver max (500). */
+  pageSize?: number;
   execute: (sql: string) => Promise<QueryResult>;
 }
 
@@ -93,6 +93,7 @@ export function TableDataEditor({
   schema,
   table,
   tableMeta,
+  pageSize = 500,
   execute,
 }: TableDataEditorProps) {
   const [where, setWhere] = useState("");
@@ -142,10 +143,10 @@ export function TableDataEditor({
   );
 
   const dirtyCount = rows.filter((row) => row.status !== "clean").length;
-  const rangeStart = rows.length === 0 ? 0 : page * PAGE_SIZE + 1;
+  const rangeStart = rows.length === 0 ? 0 : page * pageSize + 1;
   const loadedCount = rows.filter((row) => row.status !== "inserted").length;
-  const hasMore = truncated || loadedCount >= PAGE_SIZE;
-  const displayEnd = page * PAGE_SIZE + loadedCount;
+  const hasMore = truncated || loadedCount >= pageSize;
+  const displayEnd = page * pageSize + loadedCount;
 
   async function load(nextPage = page) {
     setBusy(true);
@@ -159,8 +160,8 @@ export function TableDataEditor({
         table,
         where,
         orderBy,
-        limit: PAGE_SIZE,
-        offset: nextPage * PAGE_SIZE,
+        limit: pageSize,
+        offset: nextPage * pageSize,
       });
       const result = await execute(sql);
       const meta =
@@ -741,7 +742,7 @@ export function TableDataEditor({
                       });
                     }}
                   >
-                    {page * PAGE_SIZE + rowIndex + 1}
+                    {page * pageSize + rowIndex + 1}
                   </td>
                   {row.values.map((value, colIndex) => {
                     const isEditing =

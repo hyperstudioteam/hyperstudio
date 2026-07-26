@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
   CirclePlus,
   LoaderCircle,
   Play,
@@ -13,7 +16,13 @@ import {
   hasCompletionData,
 } from "../lib/completionSchema";
 import { getSchemaCache } from "../lib/schemaCache";
-import { buildTableQuery } from "../lib/sql";
+import {
+  buildTableQuery,
+  defaultMaxRows,
+  planPagedQuery,
+  PagedQueryPlan,
+  sqlForPage,
+} from "../lib/sql";
 import { ConnectionProfile } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
 import {
@@ -62,6 +71,8 @@ interface QueryWorkspaceProps {
   error: string;
   /** Cached metadata for the active connection, used for autocompletion. */
   schemas: SchemaNode[];
+  /** Driver max rows per SELECT page (from capabilities.maxRows). */
+  maxRows?: number;
   openRequest: WorkspaceOpen;
   onRun: (sql: string) => void;
   onExecute: (sql: string) => Promise<QueryResult>;
@@ -86,14 +97,18 @@ export function QueryWorkspace({
   result,
   error,
   schemas,
+  maxRows: maxRowsProp,
   openRequest,
   onRun,
   onExecute,
 }: QueryWorkspaceProps) {
+  const pageSize = defaultMaxRows(maxRowsProp);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
     { id: "query-1", kind: "query", title: "Query 1", sql: STARTER_QUERY },
   ]);
   const [activeId, setActiveId] = useState("query-1");
+  const [resultPage, setResultPage] = useState(0);
+  const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
   const editorRef = useRef<SqlEditorHandle>(null);
   const queryCounter = useRef(1);
 
@@ -111,10 +126,18 @@ export function QueryWorkspace({
   );
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
-  const query =
-    active?.kind === "query"
-      ? active.sql
-      : STARTER_QUERY;
+  const query = active?.kind === "query" ? active.sql : STARTER_QUERY;
+
+  const pageable = pagePlan?.pageable === true;
+  const hasMore =
+    pageable &&
+    Boolean(result?.columns.length) &&
+    (Boolean(result?.truncated) || (result?.rows.length ?? 0) >= pageSize);
+  const rangeStart =
+    !result?.columns.length || result.rows.length === 0
+      ? 0
+      : resultPage * pageSize + 1;
+  const rangeEnd = resultPage * pageSize + (result?.rows.length ?? 0);
 
   useEffect(() => {
     if (!openRequest || !selected) return;
@@ -149,7 +172,7 @@ export function QueryWorkspace({
         ]);
         setActiveId(id);
       }
-      onRun(sql);
+      runSql(sql);
       return;
     }
 
@@ -181,9 +204,22 @@ export function QueryWorkspace({
     );
   }
 
+  function runSql(sql: string) {
+    const plan = planPagedQuery(sql, pageSize);
+    setPagePlan(plan);
+    setResultPage(0);
+    onRun(sqlForPage(plan, 0));
+  }
+
   function run() {
     if (!active || active.kind !== "query") return;
-    onRun(editorRef.current?.getSqlToRun() ?? query);
+    runSql(editorRef.current?.getSqlToRun() ?? query);
+  }
+
+  function loadPage(page: number) {
+    if (!pagePlan?.pageable) return;
+    setResultPage(page);
+    onRun(sqlForPage(pagePlan, page));
   }
 
   function addQueryTab() {
@@ -269,6 +305,7 @@ export function QueryWorkspace({
           schema={active.schema}
           table={active.table}
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
+          pageSize={pageSize}
           execute={onExecute}
         />
       ) : (
@@ -305,7 +342,7 @@ export function QueryWorkspace({
                 completionSchema={completionSchema}
                 defaultSchema={defaultSchema}
                 onChange={setQuerySql}
-                onRun={onRun}
+                onRun={runSql}
               />
             </div>
           </section>
@@ -318,12 +355,52 @@ export function QueryWorkspace({
               </div>
               {result && (
                 <div className="result-meta">
-                  <span>
-                    <Check size={13} /> {result.rows.length || result.affectedRows}{" "}
-                    {result.columns.length ? "rows" : "affected"}
-                  </span>
+                  {pageable && result.columns.length > 0 ? (
+                    <div className="result-paging">
+                      <span className="page-range">
+                        {rangeStart === 0
+                          ? "0 of 0"
+                          : `${rangeStart}-${rangeEnd}${hasMore ? "+" : ""}`}
+                      </span>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="First page"
+                        disabled={busy === "query" || resultPage === 0}
+                        onClick={() => loadPage(0)}
+                      >
+                        <ChevronsLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="Previous page"
+                        disabled={busy === "query" || resultPage === 0}
+                        onClick={() => loadPage(resultPage - 1)}
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button"
+                        title="Next page"
+                        disabled={busy === "query" || !hasMore}
+                        onClick={() => loadPage(resultPage + 1)}
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <span>
+                      <Check size={13} />{" "}
+                      {result.rows.length || result.affectedRows}{" "}
+                      {result.columns.length ? "rows" : "affected"}
+                    </span>
+                  )}
                   <span>{result.elapsedMs} ms</span>
-                  {result.truncated && <span>Limited to 1,000 rows</span>}
+                  {result.truncated && (
+                    <span>Limited to {pageSize.toLocaleString()} rows</span>
+                  )}
                 </div>
               )}
             </div>

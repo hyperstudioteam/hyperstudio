@@ -21,7 +21,7 @@ import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
 import { getVaultSecret, isVaultUnlocked } from "./lib/vault";
-import { ConnectionProfile } from "./types/connection";
+import { ConnectionProfile, DriverInfo } from "./types/connection";
 import { SchemaInfo } from "./types/schema";
 import { collectFolderOptions } from "./lib/tree";
 import { databaseApi } from "./api/database";
@@ -32,6 +32,7 @@ import "./styles/app.css";
 function App() {
   const tree = useConnectionTree();
   const session = useDatabaseSession();
+  const [drivers, setDrivers] = useState<DriverInfo[]>([]);
   const [modalProfile, setModalProfile] = useState<ConnectionProfile | null>(
     null,
   );
@@ -54,6 +55,7 @@ function App() {
     void databaseApi
       .listDrivers()
       .then((list) => {
+        setDrivers(list);
         syncPluginColumnTypes(list);
         cacheDriverGroups(list);
       })
@@ -248,6 +250,10 @@ function App() {
           result={session.result}
           error={session.error}
           schemas={session.schemas}
+          maxRows={
+            drivers.find((driver) => driver.id === tree.selected?.driver)
+              ?.capabilities.maxRows
+          }
           openRequest={openRequest}
           onRun={(sql) => {
             if (!tree.selected) {

@@ -51,6 +51,7 @@ export function buildTableQuery(
   driver: ConnectionProfile["driver"],
   schema: string,
   table: string,
+  limit = 100,
 ): string {
   return `${buildTableSelect({
     driver,
@@ -58,9 +59,87 @@ export function buildTableQuery(
     table,
     where: "",
     orderBy: "",
-    limit: 100,
+    limit,
     offset: 0,
   })};`;
+}
+
+const DEFAULT_MAX_ROWS = 500;
+
+export function defaultMaxRows(maxRows?: number): number {
+  return maxRows && maxRows > 0 ? maxRows : DEFAULT_MAX_ROWS;
+}
+
+function isRowQuery(sql: string): boolean {
+  const statement = sql.trim().replace(/^;+/, "").trimStart().toLowerCase();
+  return [
+    "select",
+    "with",
+    "show",
+    "describe",
+    "desc",
+    "explain",
+    "values",
+  ].some((keyword) => statement.startsWith(keyword));
+}
+
+/** Strip a trailing LIMIT / OFFSET so the UI can re-apply paging. */
+export function stripTrailingLimitOffset(sql: string): string {
+  const trimmed = sql.trim();
+  const hadSemi = trimmed.endsWith(";");
+  let body = hadSemi ? trimmed.slice(0, -1).trimEnd() : trimmed;
+  const lower = body.toLowerCase();
+
+  const patterns = [
+    /\s+limit\s+\d+\s+offset\s+\d+\s*$/i,
+    /\s+offset\s+\d+\s+limit\s+\d+\s*$/i,
+    /\s+limit\s+\d+\s*,\s*\d+\s*$/i,
+    /\s+limit\s+\d+\s*$/i,
+  ];
+  for (const pattern of patterns) {
+    if (pattern.test(lower)) {
+      body = body.replace(pattern, "").trimEnd();
+      break;
+    }
+  }
+  return hadSemi ? `${body};` : body;
+}
+
+function trailingLimit(sql: string): number | null {
+  const body = sql.trim().replace(/;$/, "").trimEnd();
+  const match =
+    body.match(/\blimit\s+(\d+)\s+offset\s+\d+\s*$/i) ||
+    body.match(/\boffset\s+\d+\s+limit\s+(\d+)\s*$/i) ||
+    body.match(/\blimit\s+\d+\s*,\s*(\d+)\s*$/i) ||
+    body.match(/\blimit\s+(\d+)\s*$/i);
+  return match ? Number(match[1]) : null;
+}
+
+export type PagedQueryPlan =
+  | { pageable: false; sql: string }
+  | { pageable: true; baseSql: string; limit: number };
+
+/**
+ * Decide whether the query editor should page this statement with the driver
+ * max row limit, or run the user's SQL as-is (mutations / intentional small LIMIT).
+ */
+export function planPagedQuery(sql: string, maxRows: number): PagedQueryPlan {
+  const limit = defaultMaxRows(maxRows);
+  if (!isRowQuery(sql)) {
+    return { pageable: false, sql };
+  }
+  const existing = trailingLimit(sql);
+  if (existing != null && existing <= limit) {
+    return { pageable: false, sql };
+  }
+  const base = stripTrailingLimitOffset(sql).replace(/;$/, "").trimEnd();
+  return { pageable: true, baseSql: base, limit };
+}
+
+export function sqlForPage(plan: PagedQueryPlan, page: number): string {
+  if (!plan.pageable) return plan.sql;
+  const offset = Math.max(0, page) * plan.limit;
+  return `${plan.baseSql}\nLIMIT ${plan.limit} OFFSET ${offset}`;
 }
 
 export function primaryKeyColumns(columns: ColumnNode[]): ColumnNode[] {

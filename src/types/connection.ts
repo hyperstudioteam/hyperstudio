@@ -15,6 +15,8 @@ export interface DriverCapabilities {
   noConnectionRequired: boolean;
   readonly: boolean;
   identifierQuote: string;
+  /** Max rows per SELECT page from the query editor. */
+  maxRows?: number;
 }
 
 export interface ColumnTypeDeclaration {

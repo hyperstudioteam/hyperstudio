@@ -53,6 +53,12 @@ pub struct ManifestCapabilities {
     pub readonly: bool,
     #[serde(default = "default_quote")]
     pub identifier_quote: String,
+    #[serde(default = "default_max_rows", alias = "maxRows")]
+    pub max_rows: u32,
+}
+
+fn default_max_rows() -> u32 {
+    DriverCapabilities::DEFAULT_MAX_ROWS
 }
 
 impl Default for ManifestCapabilities {
@@ -65,6 +71,7 @@ impl Default for ManifestCapabilities {
             no_connection_required: false,
             readonly: false,
             identifier_quote: "\"".into(),
+            max_rows: DriverCapabilities::DEFAULT_MAX_ROWS,
         }
     }
 }
@@ -79,6 +86,11 @@ impl From<&ManifestCapabilities> for DriverCapabilities {
             no_connection_required: value.no_connection_required,
             readonly: value.readonly,
             identifier_quote: value.identifier_quote.clone(),
+            max_rows: if value.max_rows == 0 {
+                DriverCapabilities::DEFAULT_MAX_ROWS
+            } else {
+                value.max_rows
+            },
         }
     }
 }
