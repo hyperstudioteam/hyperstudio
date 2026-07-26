@@ -326,6 +326,9 @@ pub struct DriverCapabilities {
     /// Drivers append/clamp LIMIT to this value to avoid loading huge result sets.
     #[serde(default = "default_max_rows")]
     pub max_rows: u32,
+    /// Driver supports explicit transactions and cancelling a running query.
+    #[serde(default)]
+    pub sessions: bool,
     /// Whether `execute_batch` runs its statements in one atomic transaction.
     #[serde(default)]
     pub transactions: bool,
@@ -350,6 +353,7 @@ impl Default for DriverCapabilities {
             readonly: false,
             identifier_quote: "\"".into(),
             max_rows: Self::DEFAULT_MAX_ROWS,
+            sessions: false,
             transactions: false,
         }
     }

@@ -14,6 +14,7 @@ import {
   Square,
   Star,
   Table2,
+  Undo2,
   WandSparkles,
   X,
 } from "lucide-react";
@@ -116,8 +117,15 @@ interface QueryWorkspaceProps {
   /** Driver max rows per SELECT page (from capabilities.maxRows). */
   maxRows?: number;
   openRequest: WorkspaceOpen;
+  /** Driver supports explicit transactions and cancellation. */
+  sessions?: boolean;
+  /** True while an explicit transaction is open on this connection. */
+  txnOpen?: boolean;
   onRun: (sql: string) => void;
   onExecute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
+  onCancel?: () => void;
+  onBeginTransaction?: () => void;
+  onEndTransaction?: (commit: boolean) => void;
   /** Set only when the driver can commit a batch atomically. */
   onExecuteBatch?: (statements: string[]) => Promise<number[]>;
   /** Prompts for a guarded connection; resolves true when the user agrees. */
@@ -145,8 +153,13 @@ export function QueryWorkspace({
   schemas,
   maxRows: maxRowsProp,
   openRequest,
+  sessions = false,
+  txnOpen = false,
   onRun,
   onExecute,
+  onCancel,
+  onBeginTransaction,
+  onEndTransaction,
   onExecuteBatch,
   onConfirmWrites,
 }: QueryWorkspaceProps) {
@@ -641,6 +654,56 @@ export function QueryWorkspace({
                   ⌘↵
                 </kbd>
               </button>
+              {busy === "query" && sessions && (
+                <button
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
+                  onClick={onCancel}
+                  title="Ask the server to stop this statement"
+                >
+                  <Square size={11} fill="currentColor" />
+                  Cancel
+                </button>
+              )}
+              {sessions && (
+                <>
+                  <span className="h-4 w-px bg-border" />
+                  {txnOpen ? (
+                    <div className="flex items-center gap-1">
+                      <span
+                        className="rounded-[3px] border border-warn bg-[rgba(201,162,39,.12)] px-[7px] py-0.5 text-[10px] text-warn"
+                        title="Statements run inside an open transaction"
+                      >
+                        Tx: Open
+                      </span>
+                      <button
+                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-green hover:text-white disabled:opacity-60"
+                        disabled={busy === "query"}
+                        onClick={() => onEndTransaction?.(true)}
+                      >
+                        <Check size={12} />
+                        Commit
+                      </button>
+                      <button
+                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-red hover:text-white disabled:opacity-60"
+                        disabled={busy === "query"}
+                        onClick={() => onEndTransaction?.(false)}
+                      >
+                        <Undo2 size={12} />
+                        Rollback
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
+                      disabled={busy === "query" || !selected}
+                      onClick={onBeginTransaction}
+                      title="Run the next statements inside a transaction"
+                    >
+                      Begin transaction
+                    </button>
+                  )}
+                </>
+              )}
               {statementCount > 1 && (
                 <button
                   className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
@@ -959,6 +1022,9 @@ export function QueryWorkspace({
             ? `Edit Data · ${active.schema}.${active.table}`
             : (connectionInfo?.serverVersion ?? "HyperStudio local session")}
         </span>
+        {txnOpen && (
+          <span className="ml-2 text-warn">Transaction open · uncommitted</span>
+        )}
         <span className="ml-auto flex gap-[13px]">
           UTF-8 <span>LF</span> SQL
         </span>

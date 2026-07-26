@@ -1,7 +1,7 @@
 //! MySQL query execution with dialect-aware LIMIT capping.
 
 use futures_util::TryStreamExt;
-use sqlx::{Column, MySqlPool, Row};
+use sqlx::{Column, MySqlConnection, MySqlPool, Row};
 
 use crate::drivers::mysql::values::decode;
 use crate::drivers::query_common::{
@@ -55,7 +55,28 @@ pub fn enforce_select_limit(sql: &str, max_rows: usize) -> String {
     with_semi(rewritten, trailing_semi)
 }
 
-pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<QueryResult, String> {
+/// Server-side id of this session, used to cancel its running statement.
+pub async fn connection_id(conn: &mut MySqlConnection) -> Result<u64, String> {
+    sqlx::query_scalar::<_, u64>("SELECT CONNECTION_ID()")
+        .fetch_one(conn)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+/// Kill only the running statement, leaving the session itself alive.
+pub async fn kill_query(pool: &MySqlPool, session_id: u64) -> Result<bool, String> {
+    sqlx::query(&format!("KILL QUERY {session_id}"))
+        .execute(pool)
+        .await
+        .map(|_| true)
+        .map_err(|error| error.to_string())
+}
+
+pub async fn execute_on(
+    conn: &mut MySqlConnection,
+    sql: &str,
+    max_rows: usize,
+) -> Result<QueryResult, String> {
     if sql.trim().is_empty() {
         return Err("Enter a SQL statement first.".into());
     }
@@ -66,7 +87,7 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
 
     if !is_row_query(&sql) {
         let affected_rows = sqlx::query(&sql)
-            .execute(pool)
+            .execute(&mut *conn)
             .await
             .map_err(|error| error.to_string())?
             .rows_affected();
@@ -79,7 +100,7 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
         });
     }
 
-    let mut stream = sqlx::query(&sql).fetch(pool);
+    let mut stream = sqlx::query(&sql).fetch(&mut *conn);
     let mut rows = Vec::new();
     let mut columns = Vec::new();
     while let Some(row) = stream.try_next().await.map_err(|error| error.to_string())? {

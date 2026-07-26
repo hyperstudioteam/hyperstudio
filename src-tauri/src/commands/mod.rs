@@ -183,6 +183,45 @@ pub async fn execute_batch(
 }
 
 #[tauri::command]
+pub async fn begin_transaction(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.begin_transaction(&connection_id).await
+}
+
+#[tauri::command]
+pub async fn end_transaction(
+    connection_id: String,
+    commit: bool,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.end_transaction(&connection_id, commit).await
+}
+
+#[tauri::command]
+pub async fn transaction_open(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let Ok(driver) = state.registry.driver_for_connection(&connection_id).await else {
+        return Ok(false);
+    };
+    Ok(driver.transaction_open(&connection_id).await)
+}
+
+#[tauri::command]
+pub async fn cancel_query(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.cancel_query(&connection_id).await
+}
+
+#[tauri::command]
 pub async fn alter_table(
     connection_id: String,
     request: AlterTableRequest,
