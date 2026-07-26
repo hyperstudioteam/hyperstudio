@@ -141,10 +141,37 @@ pub trait DatabaseDriver: Send + Sync {
         Err(format!("Driver '{}' does not support alter_key.", self.id()))
     }
 
+    /// The `CREATE` statement for one object, for display and copying.
+    async fn table_ddl(
+        &self,
+        _connection_id: &str,
+        _schema: &str,
+        _table: &str,
+    ) -> Result<String, String> {
+        Err(format!(
+            "Driver '{}' cannot show DDL for an object.",
+            self.id()
+        ))
+    }
+
     async fn execute_query(&self, connection_id: &str, sql: &str) -> Result<QueryResult, String>;
 
     /// Start a transaction that later statements on this connection join.
     async fn begin_transaction(&self, _connection_id: &str) -> Result<(), String> {
+        Err(format!(
+            "Driver '{}' does not support transactions.",
+            self.id()
+        ))
+    }
+
+    /// Run every statement in one transaction, returning affected rows per
+    /// statement. Only offered by drivers whose capabilities set
+    /// `transactions`; callers fall back to statement-at-a-time execution.
+    async fn execute_batch(
+        &self,
+        _connection_id: &str,
+        _statements: &[String],
+    ) -> Result<Vec<u64>, String> {
         Err(format!(
             "Driver '{}' does not support transactions.",
             self.id()

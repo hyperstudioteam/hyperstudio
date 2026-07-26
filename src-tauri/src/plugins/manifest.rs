@@ -94,6 +94,9 @@ impl From<&ManifestCapabilities> for DriverCapabilities {
             // The plugin protocol has no session affinity, so a transaction
             // could not span calls and there is no handle to cancel.
             sessions: false,
+            // Plugins run one statement per RPC call, so there is no batch to
+            // wrap in a transaction.
+            transactions: false,
         }
     }
 }

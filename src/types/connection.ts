@@ -7,6 +7,9 @@ export type SslMode = "prefer" | "require" | "disable";
 /** How the DB password is persisted. */
 export type PasswordStorage = "none" | "raw" | "vault";
 
+/** How aggressively writes are guarded on a connection. */
+export type ConnectionSafety = "none" | "confirm" | "readOnly";
+
 export interface DriverCapabilities {
   schemas: boolean;
   views: boolean;
@@ -19,6 +22,8 @@ export interface DriverCapabilities {
   maxRows?: number;
   /** Driver supports explicit transactions and query cancellation. */
   sessions?: boolean;
+  /** Driver can commit a batch of statements atomically. */
+  transactions?: boolean;
 }
 
 export interface ColumnTypeDeclaration {
@@ -84,6 +89,10 @@ export interface ConnectionProfile {
   allSchemas: boolean;
   /** Used when allSchemas is false. */
   schemas: string[];
+  /** Swatch id used to tint the connection in the tree. */
+  color?: string;
+  /** Guard applied to statements that are not reads. */
+  safety?: ConnectionSafety;
 }
 
 export type TreeNode =
@@ -116,6 +125,8 @@ export function blankProfile(driver: Driver = "postgres"): ConnectionProfile {
     sslMode: "prefer",
     allSchemas: true,
     schemas: [],
+    color: "none",
+    safety: "none",
   };
 }
 
