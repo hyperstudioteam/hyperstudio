@@ -73,6 +73,19 @@ export interface InstalledPluginInfo {
   path: string;
 }
 
+export type SshAuth = "password" | "key" | "agent";
+
+export interface SshTunnelSettings {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  auth: SshAuth;
+  password: string;
+  privateKeyPath: string;
+  passphrase: string;
+}
+
 export interface ConnectionProfile {
   id: string;
   name: string;
@@ -92,10 +105,25 @@ export interface ConnectionProfile {
   allSchemas: boolean;
   /** Used when allSchemas is false. */
   schemas: string[];
+  /** Optional SSH hop in front of the database host. */
+  ssh?: SshTunnelSettings;
   /** Swatch id used to tint the connection in the tree. */
   color?: string;
   /** Guard applied to statements that are not reads. */
   safety?: ConnectionSafety;
+}
+
+export function blankSsh(): SshTunnelSettings {
+  return {
+    enabled: false,
+    host: "",
+    port: 22,
+    username: "",
+    auth: "password",
+    password: "",
+    privateKeyPath: "",
+    passphrase: "",
+  };
 }
 
 export type TreeNode =
@@ -128,6 +156,7 @@ export function blankProfile(driver: Driver = "postgres"): ConnectionProfile {
     sslMode: "prefer",
     allSchemas: true,
     schemas: [],
+    ssh: blankSsh(),
     color: "none",
     safety: "none",
   };

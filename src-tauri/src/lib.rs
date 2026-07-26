@@ -3,6 +3,7 @@ mod db;
 mod drivers;
 mod models;
 mod plugins;
+mod ssh;
 
 use commands::{
     alter_column, alter_key, alter_table, begin_transaction, cancel_query, connect, disconnect,
