@@ -11,6 +11,7 @@ import {
   closeBrackets,
   closeBracketsKeymap,
   completionKeymap,
+  startCompletion,
 } from "@codemirror/autocomplete";
 import {
   defaultKeymap,
@@ -44,8 +45,9 @@ import {
   Scissors,
   WandSparkles,
 } from "lucide-react";
-import { dialectFor } from "../lib/completionSchema";
+import { dialectFor, fromClauseColumnCompletionSource } from "../lib/completionSchema";
 import { formatSql } from "../lib/sqlFormat";
+import { SchemaNode } from "../types/schema";
 import { ContextMenu } from "./ContextMenu";
 import { useExtensionMenu } from "../extensions/hooks";
 import { extensionRegistry } from "../extensions/registry";
@@ -67,6 +69,8 @@ interface SqlEditorProps {
   driver: string;
   /** schema -> table -> columns, used for autocompletion. */
   completionSchema: SQLNamespace;
+  /** Cached schema nodes used for FROM-clause column completion. */
+  schemas?: SchemaNode[];
   /** Schema that bare table names resolve against. */
   defaultSchema?: string;
   onChange: (value: string) => void;
@@ -188,6 +192,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
       value,
       driver,
       completionSchema,
+      schemas = [],
       defaultSchema,
       onChange,
       onRun,
@@ -398,6 +403,20 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
               if (update.docChanged) {
                 onChangeRef.current(update.state.doc.toString());
               }
+              if (
+                update.docChanged &&
+                update.transactions.some((transaction) =>
+                  transaction.isUserEvent("input.type"),
+                )
+              ) {
+                const cursor = update.state.selection.main.head;
+                const beforeCursor = update.state.doc.sliceString(0, cursor);
+                if (/\b(?:where|and|or|on|having)\s$/i.test(beforeCursor)) {
+                  // A blank completion position isn't activated by
+                  // activateOnTyping, so open it after clause keywords.
+                  queueMicrotask(() => startCompletion(update.view));
+                }
+              }
             }),
           ],
         }),
@@ -416,17 +435,26 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
     useEffect(() => {
       const view = viewRef.current;
       if (!view) return;
-      view.dispatch({
-        effects: languageRef.current.reconfigure(
-          sql({
-            dialect: dialectFor(driver),
-            schema: completionSchema,
-            defaultSchema,
-            upperCaseKeywords: true,
-          }),
-        ),
+      const support = sql({
+        dialect: dialectFor(driver),
+        schema: completionSchema,
+        defaultSchema,
+        upperCaseKeywords: true,
       });
-    }, [driver, completionSchema, defaultSchema]);
+      view.dispatch({
+        effects: languageRef.current.reconfigure([
+          support,
+          // Bare column names from tables in the current FROM clause
+          // (built-in schema completion only offers them after `table.`).
+          support.language.data.of({
+            autocomplete: fromClauseColumnCompletionSource(
+              schemas,
+              defaultSchema,
+            ),
+          }),
+        ]),
+      });
+    }, [driver, completionSchema, defaultSchema, schemas]);
 
     // Pull in external edits, such as View Data replacing the buffer.
     useEffect(() => {
