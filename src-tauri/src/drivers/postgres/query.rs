@@ -74,6 +74,25 @@ pub async fn execute(pool: &PgPool, sql: &str, max_rows: usize) -> Result<QueryR
     })
 }
 
+/// Run every statement inside one transaction, rolling back on the first error.
+pub async fn execute_batch(pool: &PgPool, statements: &[String]) -> Result<Vec<u64>, String> {
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let mut affected = Vec::with_capacity(statements.len());
+    for (index, statement) in statements.iter().enumerate() {
+        let outcome = sqlx::query(statement).execute(&mut *tx).await;
+        match outcome {
+            Ok(done) => affected.push(done.rows_affected()),
+            Err(error) => {
+                // Explicit rollback so the connection returns to the pool clean.
+                let _ = tx.rollback().await;
+                return Err(format!("Statement {} failed: {error}", index + 1));
+            }
+        }
+    }
+    tx.commit().await.map_err(|error| error.to_string())?;
+    Ok(affected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::enforce_select_limit;

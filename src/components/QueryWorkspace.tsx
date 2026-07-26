@@ -77,6 +77,8 @@ interface QueryWorkspaceProps {
   openRequest: WorkspaceOpen;
   onRun: (sql: string) => void;
   onExecute: (sql: string) => Promise<QueryResult>;
+  /** Set only when the driver can commit a batch atomically. */
+  onExecuteBatch?: (statements: string[]) => Promise<number[]>;
 }
 
 function findTableMeta(
@@ -102,6 +104,7 @@ export function QueryWorkspace({
   openRequest,
   onRun,
   onExecute,
+  onExecuteBatch,
 }: QueryWorkspaceProps) {
   const pageSize = defaultMaxRows(maxRowsProp);
   const [tabs, setTabs] = useState<WorkspaceTab[]>([
@@ -325,6 +328,7 @@ export function QueryWorkspace({
           tableMeta={findTableMeta(selected.id, active.schema, active.table)}
           pageSize={pageSize}
           execute={onExecute}
+          executeBatch={onExecuteBatch}
         />
       ) : (
         <>

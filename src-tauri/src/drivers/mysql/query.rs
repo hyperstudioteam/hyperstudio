@@ -106,6 +106,25 @@ pub async fn execute(pool: &MySqlPool, sql: &str, max_rows: usize) -> Result<Que
     })
 }
 
+/// Run every statement inside one transaction, rolling back on the first error.
+/// DDL still commits implicitly in MySQL, so callers should keep batches to DML.
+pub async fn execute_batch(pool: &MySqlPool, statements: &[String]) -> Result<Vec<u64>, String> {
+    let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
+    let mut affected = Vec::with_capacity(statements.len());
+    for (index, statement) in statements.iter().enumerate() {
+        let outcome = sqlx::query(statement).execute(&mut *tx).await;
+        match outcome {
+            Ok(done) => affected.push(done.rows_affected()),
+            Err(error) => {
+                let _ = tx.rollback().await;
+                return Err(format!("Statement {} failed: {error}", index + 1));
+            }
+        }
+    }
+    tx.commit().await.map_err(|error| error.to_string())?;
+    Ok(affected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::enforce_select_limit;

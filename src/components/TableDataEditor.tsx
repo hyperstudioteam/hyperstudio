@@ -64,6 +64,8 @@ interface TableDataEditorProps {
   /** Rows per page; defaults to driver max (500). */
   pageSize?: number;
   execute: (sql: string) => Promise<QueryResult>;
+  /** Present when the driver can commit a batch atomically. */
+  executeBatch?: (statements: string[]) => Promise<number[]>;
 }
 
 function parseCellInput(raw: string): unknown {
@@ -103,6 +105,7 @@ export function TableDataEditor({
   tableMeta,
   pageSize = 500,
   execute,
+  executeBatch,
 }: TableDataEditorProps) {
   const [where, setWhere] = useState("");
   const [orderBy, setOrderBy] = useState("");
@@ -128,6 +131,7 @@ export function TableDataEditor({
     y: number;
   } | null>(null);
   const [copyAsOpen, setCopyAsOpen] = useState(false);
+  const [transactional, setTransactional] = useState(Boolean(executeBatch));
   const [viewerCell, setViewerCell] = useState<{
     rowId: string;
     col: number;
@@ -461,6 +465,46 @@ export function TableDataEditor({
     setEditing(null);
   }
 
+  function pendingStatements(): string[] {
+    const statements: string[] = [];
+    for (const row of rows) {
+      if (row.status === "inserted") {
+        statements.push(
+          buildInsertSql({
+            driver: profile.driver,
+            schema,
+            table,
+            columns,
+            values: row.values,
+          }),
+        );
+      } else if (row.status === "deleted") {
+        statements.push(
+          buildDeleteSql({
+            driver: profile.driver,
+            schema,
+            table,
+            columns,
+            pkColumns: pkNames,
+            original: row.original,
+          }),
+        );
+      } else if (row.status === "modified") {
+        const sql = buildUpdateSql({
+          driver: profile.driver,
+          schema,
+          table,
+          columns,
+          pkColumns: pkNames,
+          original: row.original,
+          next: row.values,
+        });
+        if (sql) statements.push(sql);
+      }
+    }
+    return statements;
+  }
+
   async function commit() {
     if (dirtyCount === 0) return;
     const needsPk = rows.some(
@@ -473,47 +517,30 @@ export function TableDataEditor({
       return;
     }
 
+    const statements = pendingStatements();
+    if (statements.length === 0) return;
+
     setBusy(true);
     setError("");
     try {
-      for (const row of rows) {
-        if (row.status === "inserted") {
-          await execute(
-            buildInsertSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              values: row.values,
-            }),
-          );
-        } else if (row.status === "deleted") {
-          await execute(
-            buildDeleteSql({
-              driver: profile.driver,
-              schema,
-              table,
-              columns,
-              pkColumns: pkNames,
-              original: row.original,
-            }),
-          );
-        } else if (row.status === "modified") {
-          const sql = buildUpdateSql({
-            driver: profile.driver,
-            schema,
-            table,
-            columns,
-            pkColumns: pkNames,
-            original: row.original,
-            next: row.values,
-          });
-          if (sql) await execute(sql);
+      if (transactional && executeBatch) {
+        await executeBatch(statements);
+      } else {
+        for (const statement of statements) {
+          await execute(statement);
         }
       }
       await load(page);
     } catch (nextError) {
-      setError(errorMessage(nextError));
+      // A rolled-back batch leaves the staged edits intact so they can be
+      // fixed and resubmitted; an auto-commit run may have applied a prefix,
+      // which the reload below would hide, so keep the rows and let the user
+      // refresh deliberately.
+      setError(
+        transactional
+          ? `${errorMessage(nextError)}\nNothing was committed; the transaction rolled back.`
+          : `${errorMessage(nextError)}\nEarlier statements in this batch may already be committed.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -598,7 +625,11 @@ export function TableDataEditor({
           <button
             type="button"
             className={iconButtonClass}
-            title="Submit changes"
+            title={
+              transactional
+                ? "Submit changes in one transaction"
+                : "Submit changes, one statement at a time"
+            }
             disabled={busy || dirtyCount === 0}
             onClick={() => void commit()}
           >
@@ -616,9 +647,24 @@ export function TableDataEditor({
         </div>
 
         <span className="h-4 w-px bg-border" />
-        <span className="rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3]">
-          Tx: Auto
-        </span>
+        <button
+          type="button"
+          className={cn(
+            "cursor-pointer rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3] disabled:cursor-default disabled:opacity-60",
+            transactional && "border-accent text-[#c9c2ff]",
+          )}
+          disabled={!executeBatch || busy}
+          title={
+            executeBatch
+              ? transactional
+                ? "Changes commit as one transaction; click for auto-commit per statement"
+                : "Each statement commits on its own; click to commit as one transaction"
+              : `${profile.driver} does not support transactional commits`
+          }
+          onClick={() => setTransactional((current) => !current)}
+        >
+          Tx: {transactional ? "Atomic" : "Auto"}
+        </button>
         {pkNames.length === 0 && columns.length > 0 && (
           <span className="text-[9px] text-subtle">
             No primary key · update/delete limited

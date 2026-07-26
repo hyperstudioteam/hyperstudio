@@ -96,7 +96,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] Primary-key-aware `UPDATE` / `DELETE` statement generation
 - [x] Cell viewers: JSON tree, image, and text (double-click or right-click → View value…)
 - [x] Pluggable column types and data viewers via the contribution registry
-- [ ] Transactional commit mode (currently auto-commit per statement)
+- [x] Transactional commit mode (**Tx: Atomic**), or auto-commit per statement
 - [ ] Column sorting and per-column filters from the grid header
 
 ### Selection, copy, and paste
@@ -171,7 +171,12 @@ first query, refresh, or edit.
 | View Data | Right-click a table → **View Data** | Runs `SELECT * … LIMIT 100` in a query tab |
 | Edit Data | Double-click a table, or right-click → **Edit Data** | Opens the editable grid in its own tab |
 
-**5. Move data around.** Drag across cells to select a range, then copy with your chosen
+**5. Choose how edits commit.** The **Tx** badge in the data editor toolbar switches between
+**Atomic** (all staged changes go out in one transaction that rolls back on the first error)
+and **Auto** (one statement at a time). Atomic is the default on PostgreSQL and MySQL;
+drivers without transaction support stay on Auto.
+
+**6. Move data around.** Drag across cells to select a range, then copy with your chosen
 extractor or paste a block from a spreadsheet. Edits are staged locally and highlighted
 until you submit them.
 
@@ -258,7 +263,7 @@ Key modules worth knowing:
 
 ### v0.2 — Trust the editor
 
-- [ ] Transactional commit mode with an explicit **Commit** / **Rollback** toolbar
+- [x] Transactional commit mode for the data editor (explicit **Commit** / **Rollback** toolbar still to come)
 - [ ] Query cancellation and a visible transaction state
 - [ ] Column sorting and header filters in both grids
 - [ ] Export a result set or table to CSV, JSON, or SQL
