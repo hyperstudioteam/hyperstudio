@@ -60,7 +60,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] **Raw** — stored in plain text on this device
 - [x] **Vault** — AES-GCM encrypted, key derived from a master password with PBKDF2-SHA256
 - [x] Unlock prompt appears on demand when a locked vault is needed
-- [ ] OS keychain integration (macOS Keychain, Windows Credential Manager, libsecret)
+- [x] OS keychain integration (macOS Keychain, Windows Credential Manager, Secret Service)
 - [x] Vault auto-lock after inactivity and master password rotation
 
 ### Schema browser
@@ -159,8 +159,9 @@ cd src-tauri && cargo check
 introspection to the schemas you care about, which keeps large servers fast.
 
 **2. Decide how the password is stored.** Leave **Save password** off to keep it in memory
-for the session, or turn it on and choose **Into vault** or **Raw password**. The first vault
-save walks you through creating a master password.
+for the session, or turn it on and choose **Into vault**, **OS credential store**, or
+**Raw password**. The first vault save walks you through creating a master password; the OS
+credential store needs no master password and is greyed out where the system has none.
 
 **3. Browse.** Expand a schema to load its tables. Everything is cached locally, so
 reopening the app shows the tree immediately without connecting. The pool opens on your
@@ -221,6 +222,7 @@ HyperStudio stores everything locally; there is no server, telemetry, or sync.
 | Connection profiles | `hyperstudio.connections.v2` | Passwords are stripped unless the mode is **raw** |
 | Schema cache | `hyperstudio.schema-cache.v1` | Names, types, and PK flags only — never row data |
 | Encrypted vault | `hyperstudio.vault.v1` | Salt, verifier, and AES-GCM ciphertext |
+| Keychain secrets | OS credential store | Keyed by connection id under service `com.hyperstudio.app` |
 
 The vault derives a 256-bit AES-GCM key from your master password using PBKDF2-SHA256 with
 310,000 iterations and a random 16-byte salt. The master password itself is never written
@@ -232,8 +234,11 @@ re-encrypts every stored secret.
 **Caveats you should know about:**
 
 - **Raw** mode is plain text. Use it only on a machine you trust.
-- Local storage is not protected by the OS keychain yet, so an attacker with access to your
-  user account can read raw passwords and attempt an offline attack on the vault.
+- **OS credential store** mode hands the password to macOS Keychain, Windows Credential
+  Manager, or Secret Service, so it is protected by your login session and needs no master
+  password. Access is governed by the OS, which may prompt on first read.
+- Local storage itself is not encrypted, so an attacker with access to your user account can
+  read raw passwords and attempt an offline attack on the vault.
 - Edits in the data editor auto-commit per statement; there is no transactional rollback yet.
 
 ## Architecture
@@ -309,7 +314,7 @@ Key modules worth knowing:
 
 ### v1.0 — Ship it
 
-- [ ] OS keychain integration and vault auto-lock
+- [x] OS keychain integration and vault auto-lock
 - [ ] Signed, notarized builds for macOS, Windows, and Linux
 - [ ] Auto-updates
 - [ ] Automated test suite and CI on every pull request

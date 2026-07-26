@@ -6,7 +6,8 @@ mod plugins;
 
 use commands::{
     alter_column, alter_key, alter_table, begin_transaction, cancel_query, connect, disconnect,
-    end_transaction, execute_batch, execute_query, install_plugin, list_drivers, list_object_groups,
+    end_transaction, execute_batch, execute_query, install_plugin, keychain_available,
+    keychain_delete, keychain_get, keychain_set, list_drivers, list_object_groups,
     list_object_subgroup, list_objects, list_plugins, list_schema, list_schemas, list_tables,
     reload_plugins, set_plugin_enabled, table_ddl, test_connection, transaction_open,
     uninstall_plugin, write_export_chunk,
@@ -54,6 +55,10 @@ pub fn run() {
             list_objects,
             list_object_subgroup,
             execute_query,
+            keychain_available,
+            keychain_get,
+            keychain_set,
+            keychain_delete,
             begin_transaction,
             end_transaction,
             transaction_open,
