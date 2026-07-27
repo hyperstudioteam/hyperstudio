@@ -44,6 +44,7 @@
     font-family: var(--font-sans);
     color: var(--color-text);
     background: var(--color-bg);
+    color-scheme: dark;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -80,11 +81,73 @@
     outline: 1px solid var(--color-accent);
     outline-offset: -1px;
   }
+
+  /* Dark scrollbars for Windows / WebView2 (and Firefox via scrollbar-*). */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3a4150 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #3a4150;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #525a6b;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Native selects still appear in forms; color-scheme helps option chrome. */
+  select,
+  option {
+    color-scheme: dark;
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
 }
 
 @utility scrollbar-thin-app {
   scrollbar-width: thin;
-  scrollbar-color: #383e49 transparent;
+  scrollbar-color: #3a4150 transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: #3a4150;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: #525a6b;
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 @keyframes spin {
