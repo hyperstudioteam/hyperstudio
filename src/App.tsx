@@ -28,18 +28,13 @@ import { errorMessage } from "./lib/format";
 import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache, hydrateSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
-import {
-  getVaultSecret,
-  isVaultUnlocked,
-  onVaultLocked,
-  touchVaultActivity,
-  vaultExists,
-} from "./lib/vault";
 import { VaultSettingsModal } from "./components/connection-modal/VaultSettingsModal";
 import { ConnectionProfile, DriverInfo, TreeNode } from "./types/connection";
 import { ColumnNode, SchemaInfo } from "./types/schema";
 import { ImportCsvModal } from "./components/ImportCsvModal";
 import { ImportConnectionsModal } from "./components/connection-modal/ImportConnectionsModal";
+import { GithubSyncSettingsModal } from "./components/connection-modal/GithubSyncSettingsModal";
+import { GithubPullConfirmModal } from "./components/connection-modal/GithubPullConfirmModal";
 import { collectConnections, collectFolderOptions } from "./lib/tree";
 import {
   applyImportedSecrets,
@@ -50,6 +45,31 @@ import {
   remapTreeIds,
   summarizeExport,
 } from "./lib/connectionTransfer";
+import {
+  demoteVaultConnections,
+  VaultApplyChoice,
+} from "./lib/connectionSyncDocument";
+import {
+  GithubAuthRequiredError,
+  GithubSyncConflictError,
+  pullConnectionsFromGithub,
+  pushConnectionsToGithub,
+  rememberPulledSha,
+} from "./lib/githubSync";
+import {
+  GithubSyncSettings,
+  loadGithubSyncSettings,
+  settingsReady,
+} from "./lib/githubSyncSettings";
+import {
+  getVaultSecret,
+  isVaultUnlocked,
+  onVaultLocked,
+  readStoredVault,
+  touchVaultActivity,
+  vaultExists,
+  writeStoredVault,
+} from "./lib/vault";
 import { databaseApi, pluginsApi } from "./api/database";
 import { cacheDriverGroups } from "./lib/driverGroups";
 import { syncPluginColumnTypes } from "./plugins/init";
@@ -95,6 +115,18 @@ function App() {
     keychainWithoutPassword: number;
   } | null>(null);
   const [transferNotice, setTransferNotice] = useState("");
+  const [githubSettingsOpen, setGithubSettingsOpen] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [pullPreview, setPullPreview] = useState<{
+    tree: TreeNode[];
+    sha: string;
+    connectionCount: number;
+    vaultConnectionCount: number;
+    hasRemoteVault: boolean;
+    vaultConflict: boolean;
+    settings: GithubSyncSettings;
+    vault: ReturnType<typeof readStoredVault>;
+  } | null>(null);
 
   // Any interaction defers auto-lock; locking flips the indicator.
   useEffect(() => {
@@ -252,6 +284,120 @@ function App() {
       setTransferNotice(errorMessage(error));
       setImportPreview(null);
     }
+  }
+
+  function openGithubSettingsIfNeeded(): GithubSyncSettings | null {
+    const settings = loadGithubSyncSettings();
+    if (!settingsReady(settings)) {
+      setGithubSettingsOpen(true);
+      setTransferNotice("Configure GitHub sync settings first.");
+      return null;
+    }
+    return settings;
+  }
+
+  async function handleGithubPush() {
+    setTransferNotice("");
+    const settings = openGithubSettingsIfNeeded();
+    if (!settings) return;
+    setSyncBusy(true);
+    try {
+      const result = await pushConnectionsToGithub(settings, tree.tree);
+      const parts = [
+        `Pushed ${result.connectionCount} connection${result.connectionCount === 1 ? "" : "s"} to GitHub.`,
+      ];
+      if (result.vaultAttached) {
+        parts.push("Vault ciphertext included.");
+      }
+      setTransferNotice(parts.join(" "));
+    } catch (error) {
+      if (error instanceof GithubAuthRequiredError) {
+        setGithubSettingsOpen(true);
+        setTransferNotice(errorMessage(error));
+        return;
+      }
+      if (error instanceof GithubSyncConflictError) {
+        setTransferNotice(errorMessage(error));
+        return;
+      }
+      setTransferNotice(errorMessage(error));
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  async function handleGithubPull() {
+    setTransferNotice("");
+    const settings = openGithubSettingsIfNeeded();
+    if (!settings) return;
+    setSyncBusy(true);
+    try {
+      const result = await pullConnectionsFromGithub(settings);
+      const localVault = readStoredVault();
+      const remoteVault = result.document.vault;
+      const vaultConflict = Boolean(
+        localVault && remoteVault && localVault.salt !== remoteVault.salt,
+      );
+      setPullPreview({
+        tree: result.document.tree,
+        sha: result.sha,
+        connectionCount: result.document.connectionCount,
+        vaultConnectionCount: result.document.vaultConnectionCount,
+        hasRemoteVault: Boolean(remoteVault),
+        vaultConflict,
+        settings,
+        vault: remoteVault,
+      });
+    } catch (error) {
+      if (error instanceof GithubAuthRequiredError) {
+        setGithubSettingsOpen(true);
+      }
+      setTransferNotice(errorMessage(error));
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  function confirmGithubPull(vaultChoice: VaultApplyChoice) {
+    if (!pullPreview) return;
+    const preview = pullPreview;
+    let nextTree = preview.tree;
+    const remoteVault = preview.vault;
+
+    if (remoteVault) {
+      if (preview.vaultConflict && vaultChoice === "skip") {
+        nextTree = demoteVaultConnections(nextTree);
+      } else {
+        writeStoredVault(remoteVault);
+        setVaultUnlocked(false);
+        setHasVault(true);
+      }
+    }
+
+    const nextIds = new Set(
+      collectConnections(nextTree).map((profile) => profile.id),
+    );
+    for (const profile of collectConnections(tree.tree)) {
+      session.onDeleted(profile.id);
+      if (!nextIds.has(profile.id)) {
+        onConnectionDeleted(profile.id);
+      }
+    }
+    tree.replaceTree(nextTree);
+    rememberPulledSha(preview.settings, preview.sha);
+    setPullPreview(null);
+
+    const parts = [
+      `Pulled ${preview.connectionCount} connection${preview.connectionCount === 1 ? "" : "s"} from GitHub.`,
+    ];
+    if (remoteVault && !(preview.vaultConflict && vaultChoice === "skip")) {
+      parts.push("Vault ciphertext imported — unlock to use vault passwords.");
+    } else if (preview.vaultConflict && vaultChoice === "skip") {
+      parts.push(
+        "Kept local vault; vault-backed passwords need to be set again.",
+      );
+    }
+    setTransferNotice(parts.join(" "));
   }
 
   function openEditConnection(profile: ConnectionProfile) {
@@ -482,6 +628,10 @@ function App() {
           }}
           onExportConnections={() => void handleExportConnections()}
           onImportConnections={() => void handleImportConnections()}
+          syncBusy={syncBusy}
+          onGithubPull={() => void handleGithubPull()}
+          onGithubPush={() => void handleGithubPush()}
+          onGithubSyncSettings={() => setGithubSettingsOpen(true)}
           onViewTable={(schema, table) => {
             setOpenRequest({
               kind: "view",
@@ -650,6 +800,23 @@ function App() {
           keychainWithoutPassword={importPreview.keychainWithoutPassword}
           onConfirm={(mode) => void confirmImport(mode)}
           onClose={() => setImportPreview(null)}
+        />
+      )}
+
+      {pullPreview && (
+        <GithubPullConfirmModal
+          connectionCount={pullPreview.connectionCount}
+          vaultConnectionCount={pullPreview.vaultConnectionCount}
+          hasRemoteVault={pullPreview.hasRemoteVault}
+          vaultConflict={pullPreview.vaultConflict}
+          onConfirm={(vaultChoice) => confirmGithubPull(vaultChoice)}
+          onClose={() => setPullPreview(null)}
+        />
+      )}
+
+      {githubSettingsOpen && (
+        <GithubSyncSettingsModal
+          onClose={() => setGithubSettingsOpen(false)}
         />
       )}
 

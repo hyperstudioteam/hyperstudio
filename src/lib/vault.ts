@@ -2,7 +2,7 @@ const VAULT_KEY = "hyperstudio.vault.v1";
 const VERIFIER_PLAINTEXT = "hyperstudio-vault-ok";
 const PBKDF2_ITERATIONS = 310_000;
 
-interface StoredVault {
+export interface StoredVault {
   version: 1;
   salt: string;
   iterations: number;
@@ -89,9 +89,8 @@ function readStored(): StoredVault | null {
   try {
     const raw = localStorage.getItem(VAULT_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredVault;
-    if (parsed?.version !== 1 || !parsed.salt) return null;
-    return parsed;
+    const parsed = JSON.parse(raw) as unknown;
+    return isStoredVault(parsed) ? parsed : null;
   } catch {
     return null;
   }
@@ -99,6 +98,24 @@ function readStored(): StoredVault | null {
 
 function writeStored(vault: StoredVault) {
   localStorage.setItem(VAULT_KEY, JSON.stringify(vault));
+}
+
+function isStoredVault(value: unknown): value is StoredVault {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Partial<StoredVault>;
+  return (
+    v.version === 1 &&
+    typeof v.salt === "string" &&
+    typeof v.iterations === "number" &&
+    typeof v.verifierIv === "string" &&
+    typeof v.verifierCipher === "string" &&
+    typeof v.secretsIv === "string" &&
+    typeof v.secretsCipher === "string"
+  );
+}
+
+export function isValidStoredVault(value: unknown): value is StoredVault {
+  return isStoredVault(value);
 }
 
 async function deriveKey(
@@ -183,6 +200,23 @@ export function lockVault() {
   if (wasUnlocked) {
     for (const listener of lockListeners) listener();
   }
+}
+
+/** Encrypted vault blob for sync / backup. Does not unlock the session. */
+export function readStoredVault(): StoredVault | null {
+  return readStored();
+}
+
+/**
+ * Replace the on-disk vault ciphertext and lock the session.
+ * Callers must unlock again with the matching master password.
+ */
+export function writeStoredVault(vault: StoredVault) {
+  if (!isStoredVault(vault)) {
+    throw new Error("Invalid vault payload.");
+  }
+  writeStored(vault);
+  lockVault();
 }
 
 export async function createVault(masterPassword: string): Promise<void> {

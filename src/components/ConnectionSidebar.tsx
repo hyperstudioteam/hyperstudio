@@ -1,12 +1,16 @@
-import { MouseEvent, useEffect, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
   CirclePlus,
   Download,
+  Ellipsis,
   FolderPlus,
   Pencil,
   Plug,
   Puzzle,
   RefreshCw,
+  Settings2,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -21,6 +25,7 @@ import {
 } from "../types/connection";
 import { useExtensionMenu } from "../extensions/hooks";
 import { extensionRegistry } from "../extensions/registry";
+import { cn } from "../lib/cn";
 
 interface ConnectionSidebarProps {
   tree: TreeNode[];
@@ -36,6 +41,7 @@ interface ConnectionSidebarProps {
   objectSubgroups: Parameters<typeof SchemaBrowser>[0]["objectSubgroups"];
   schemaExpanded: Set<string>;
   hasSchemaCache: boolean;
+  syncBusy?: boolean;
   onSelect: (selection: Selection) => void;
   onToggleFolder: (key: string) => void;
   onToggleSchema: (key: string) => void;
@@ -55,6 +61,9 @@ interface ConnectionSidebarProps {
   onDelete: (id: string) => void;
   onExportConnections: () => void;
   onImportConnections: () => void;
+  onGithubPull: () => void;
+  onGithubPush: () => void;
+  onGithubSyncSettings: () => void;
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
   onShowEr: (schema: string) => void;
@@ -81,6 +90,8 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
     y: number;
     target: Selection;
   } | null>(null);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -88,6 +99,22 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [contextMenu]);
+
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    const close = (event: Event) => {
+      if (
+        actionsMenuRef.current &&
+        event.target instanceof Node &&
+        actionsMenuRef.current.contains(event.target)
+      ) {
+        return;
+      }
+      setActionsMenuOpen(false);
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [actionsMenuOpen]);
 
   function openContextMenu(event: MouseEvent, target: Selection) {
     event.preventDefault();
@@ -97,53 +124,117 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
     props.onSelect(target);
   }
 
+  const menuItemClass =
+    "flex h-[30px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-[9px] text-left text-[11px] text-[#c5cad3] hover:bg-panel-soft hover:text-white disabled:cursor-default disabled:opacity-40";
+
+  const selectedFolderId =
+    props.selection?.kind === "folder" ? props.selection.id : null;
+
   return (
     <aside className="min-w-0 flex flex-col bg-panel border-r border-border overflow-hidden">
       <div className="h-11 px-[11px] pl-3.5 flex items-center justify-between text-[#aab1be] text-[10px] font-bold tracking-[0.08em] uppercase">
         <span>Connections</span>
         <div className="flex gap-0.5">
-          <button
-            className={iconButtonClass}
-            aria-label="Import connections"
-            title="Import connections"
-            onClick={props.onImportConnections}
-          >
-            <Upload size={15} />
-          </button>
-          <button
-            className={iconButtonClass}
-            aria-label="Export connections"
-            title="Export connections"
-            onClick={props.onExportConnections}
-            disabled={props.tree.length === 0}
-          >
-            <Download size={15} />
-          </button>
-          <button
-            className={iconButtonClass}
-            aria-label="New folder"
-            title="New folder"
-            onClick={() =>
-              props.onNewFolder(
-                props.selection?.kind === "folder"
-                  ? props.selection.id
-                  : null,
-              )
-            }
-          >
-            <FolderPlus size={16} />
-          </button>
+          <div className="relative" ref={actionsMenuRef}>
+            <button
+              className={cn(
+                iconButtonClass,
+                actionsMenuOpen && "text-text bg-panel-soft",
+              )}
+              aria-label="Connection actions"
+              title="Connection actions"
+              aria-expanded={actionsMenuOpen}
+              onClick={() => setActionsMenuOpen((open) => !open)}
+            >
+              <Ellipsis size={15} />
+            </button>
+            {actionsMenuOpen && (
+              <div
+                className={cn(
+                  "absolute right-0 top-[calc(100%+4px)] z-30 min-w-[180px]",
+                  "rounded-lg border border-border-bright bg-surface p-1",
+                  "shadow-[0_12px_40px_rgba(0,0,0,0.45)]",
+                )}
+              >
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    props.onNewFolder(selectedFolderId);
+                  }}
+                >
+                  <FolderPlus size={14} />
+                  New folder
+                </button>
+                <div className="my-1 h-px bg-border" />
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    props.onImportConnections();
+                  }}
+                >
+                  <Upload size={14} />
+                  Import…
+                </button>
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  disabled={props.tree.length === 0}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    props.onExportConnections();
+                  }}
+                >
+                  <Download size={14} />
+                  Export…
+                </button>
+                <div className="my-1 h-px bg-border" />
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  disabled={props.syncBusy}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    props.onGithubPull();
+                  }}
+                >
+                  <ArrowDownToLine size={14} />
+                  Pull from GitHub
+                </button>
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  disabled={props.syncBusy || props.tree.length === 0}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    props.onGithubPush();
+                  }}
+                >
+                  <ArrowUpFromLine size={14} />
+                  Push to GitHub
+                </button>
+                <button
+                  type="button"
+                  className={menuItemClass}
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    props.onGithubSyncSettings();
+                  }}
+                >
+                  <Settings2 size={14} />
+                  Sync settings…
+                </button>
+              </div>
+            )}
+          </div>
           <button
             className={iconButtonClass}
             aria-label="New connection"
             title="New connection"
-            onClick={() =>
-              props.onNewConnection(
-                props.selection?.kind === "folder"
-                  ? props.selection.id
-                  : null,
-              )
-            }
+            onClick={() => props.onNewConnection(selectedFolderId)}
           >
             <CirclePlus size={16} />
           </button>
