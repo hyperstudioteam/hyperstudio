@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -32,6 +32,7 @@ import { extensionRegistry } from "../extensions/registry";
 import {
   CellRange,
   ExtractorId,
+  extractSelection,
   isCellInRange,
   normalizeRange,
   parseClipboardMatrix,
@@ -143,6 +144,11 @@ export function TableDataEditor({
   const [editing, setEditing] = useState<{
     rowId: string;
     col: number;
+    /** When true, committing applies the value to every cell in fillRange. */
+    fillSelection: boolean;
+    fillRange: CellRange | null;
+    /** Initial character when the user typed to start editing. */
+    seed?: string;
   } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     x: number;
@@ -155,6 +161,8 @@ export function TableDataEditor({
     col: number;
   } | null>(null);
   const dragging = useRef(false);
+  const rowSelectAnchor = useRef<number | null>(null);
+  const suppressEditCommit = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const pkNames = useMemo(
@@ -177,6 +185,52 @@ export function TableDataEditor({
   const loadedCount = rows.filter((row) => row.status !== "inserted").length;
   const hasMore = truncated || loadedCount >= pageSize;
   const displayEnd = page * pageSize + loadedCount;
+  const hasSelection = Boolean(cellRange) || selected.size > 0;
+
+  /** Full-width cell range covering selected row ids (non-contiguous → bounding box). */
+  function rangeFromSelectedRows(): CellRange | null {
+    if (selected.size === 0 || columns.length === 0) return null;
+    let r0 = Infinity;
+    let r1 = -Infinity;
+    visibleRows.forEach((row, index) => {
+      if (!selected.has(row.id)) return;
+      r0 = Math.min(r0, index);
+      r1 = Math.max(r1, index);
+    });
+    if (!Number.isFinite(r0) || r1 < 0) return null;
+    return {
+      anchor: { row: r0, col: 0 },
+      focus: { row: r1, col: columns.length - 1 },
+    };
+  }
+
+  /** Active paste/edit target: cell range, or full rows when row-selected. */
+  function activeSelection(): CellRange | null {
+    return cellRange ?? rangeFromSelectedRows();
+  }
+
+  /**
+   * Matrix + range for copy. Row checkbox selection copies only those rows
+   * (gaps omitted) as a contiguous block.
+   */
+  function copySource(): { matrix: unknown[][]; range: CellRange } | null {
+    if (cellRange) return { matrix, range: cellRange };
+    if (selected.size === 0 || columns.length === 0) return null;
+    const selectedMatrix = visibleRows
+      .filter((row) => selected.has(row.id))
+      .map((row) => row.values);
+    if (selectedMatrix.length === 0) return null;
+    return {
+      matrix: selectedMatrix,
+      range: {
+        anchor: { row: 0, col: 0 },
+        focus: {
+          row: selectedMatrix.length - 1,
+          col: columns.length - 1,
+        },
+      },
+    };
+  }
 
   /**
    * Header sort/filter changes call this with explicit overrides, since the
@@ -308,36 +362,111 @@ export function TableDataEditor({
       );
     }
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey)) return;
-      const key = event.key.toLowerCase();
-      if (key === "c") {
-        if (!cellRange || editing || isEditingField(event.target)) return;
+    function onCopy(event: ClipboardEvent) {
+      if (editing || isEditingField(event.target)) return;
+      const source = copySource();
+      if (!source) return;
+      try {
+        const text = extractSelection({
+          extractor,
+          driver: profile.driver,
+          schema,
+          table,
+          columns,
+          matrix: source.matrix,
+          range: source.range,
+          pkColumns: pkNames,
+          includeHeader,
+        });
         event.preventDefault();
-        void handleCopy(extractor);
+        event.clipboardData?.setData("text/plain", text);
+        setCopyFlash("Copied");
+        window.setTimeout(() => setCopyFlash(""), 1200);
+      } catch (nextError) {
+        setError(errorMessage(nextError));
+      }
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (editing || isEditingField(event.target)) return;
+
+      const key = event.key.toLowerCase();
+      const mod = event.metaKey || event.ctrlKey;
+
+      if (mod && key === "d") {
+        if (!hasSelection) return;
+        event.preventDefault();
+        duplicateRows();
+        return;
+      }
+
+      // Type-to-edit: printable key fills every cell in the selection.
+      if (
+        !mod &&
+        !event.altKey &&
+        event.key.length === 1 &&
+        !event.repeat
+      ) {
+        const selection = activeSelection();
+        if (!selection) return;
+        const focusRow = visibleRows[selection.focus.row];
+        if (!focusRow) return;
+        event.preventDefault();
+        const normalized = normalizeRange(selection);
+        const multi =
+          normalized.r0 !== normalized.r1 || normalized.c0 !== normalized.c1;
+        setSelected(new Set());
+        setCellRange(selection);
+        beginCellEdit({
+          rowId: focusRow.id,
+          col: selection.focus.col,
+          fillSelection: multi,
+          fillRange: multi ? selection : null,
+          seed: event.key,
+        });
       }
     }
 
     async function onPaste(event: ClipboardEvent) {
-      if (!cellRange || editing || isEditingField(event.target)) return;
+      if (editing || isEditingField(event.target)) return;
+      if (!activeSelection()) return;
       const text = event.clipboardData?.getData("text/plain");
       if (text == null) return;
       event.preventDefault();
       applyPaste(text);
     }
 
+    window.addEventListener("copy", onCopy);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("paste", onPaste);
     return () => {
+      window.removeEventListener("copy", onCopy);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("paste", onPaste);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cellRange, editing, extractor, includeHeader, matrix, columns, pkNames, visibleRows]);
+  }, [
+    cellRange,
+    selected,
+    editing,
+    extractor,
+    includeHeader,
+    matrix,
+    columns,
+    pkNames,
+    visibleRows,
+    hasSelection,
+  ]);
+
+  function focusGrid() {
+    gridRef.current?.focus({ preventScroll: true });
+  }
 
   function beginSelect(row: number, col: number, extend: boolean) {
     setSelected(new Set());
     setEditing(null);
+    rowSelectAnchor.current = row;
+    focusGrid();
     setCellRange((current) => {
       if (extend && current) {
         return { anchor: current.anchor, focus: { row, col } };
@@ -356,8 +485,39 @@ export function TableDataEditor({
     );
   }
 
+  function selectRows(rowIndex: number, event: MouseEvent) {
+    setEditing(null);
+    setCellRange(null);
+    focusGrid();
+
+    if (event.shiftKey && rowSelectAnchor.current != null) {
+      const a = Math.min(rowSelectAnchor.current, rowIndex);
+      const b = Math.max(rowSelectAnchor.current, rowIndex);
+      const next = new Set<string>();
+      for (let i = a; i <= b; i += 1) {
+        const row = visibleRows[i];
+        if (row) next.add(row.id);
+      }
+      setSelected(next);
+      return;
+    }
+
+    rowSelectAnchor.current = rowIndex;
+    setSelected((current) => {
+      const next = new Set(
+        event.metaKey || event.ctrlKey ? current : [],
+      );
+      const id = visibleRows[rowIndex]?.id;
+      if (!id) return next;
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   async function handleCopy(format: ExtractorId = extractor) {
-    if (!cellRange) return;
+    const source = copySource();
+    if (!source) return;
     try {
       await copySelection({
         extractor: format,
@@ -365,8 +525,8 @@ export function TableDataEditor({
         schema,
         table,
         columns,
-        matrix,
-        range: cellRange,
+        matrix: source.matrix,
+        range: source.range,
         pkColumns: pkNames,
         includeHeader,
       });
@@ -379,11 +539,12 @@ export function TableDataEditor({
   }
 
   function applyPaste(text: string) {
-    if (!cellRange) return;
+    const selection = activeSelection();
+    if (!selection) return;
     const clipboard = parseClipboardMatrix(text);
     const plan = planPaste({
       clipboard,
-      selection: cellRange,
+      selection,
       rowCount: visibleRows.length,
       colCount: columns.length,
     });
@@ -423,19 +584,35 @@ export function TableDataEditor({
       });
     });
 
+    setSelected(new Set());
     setCellRange(plan.range);
     setCopyFlash("Pasted");
     window.setTimeout(() => setCopyFlash(""), 1200);
   }
 
   async function handlePasteFromClipboard() {
-    if (!cellRange) return;
+    if (!activeSelection()) return;
     try {
       const text = await navigator.clipboard.readText();
       applyPaste(text);
     } catch (nextError) {
       setError(errorMessage(nextError));
     }
+  }
+
+  function markRowValues(
+    row: EditorRow,
+    values: unknown[],
+  ): EditorRow {
+    if (row.status === "inserted") return { ...row, values };
+    const changed = values.some(
+      (cell, index) => !Object.is(cell, row.original[index]),
+    );
+    return {
+      ...row,
+      values,
+      status: changed ? "modified" : "clean",
+    };
   }
 
   function updateCell(rowId: string, col: number, raw: string) {
@@ -445,17 +622,50 @@ export function TableDataEditor({
         if (row.id !== rowId) return row;
         const values = [...row.values];
         values[col] = value;
-        if (row.status === "inserted") return { ...row, values };
-        const changed = values.some(
-          (cell, index) => !Object.is(cell, row.original[index]),
-        );
-        return {
-          ...row,
-          values,
-          status: changed ? "modified" : "clean",
-        };
+        return markRowValues(row, values);
       }),
     );
+  }
+
+  /** Apply one value to every cell in a rectangular selection. */
+  function updateCellsInRange(range: CellRange, raw: string) {
+    const value = parseCellInput(raw);
+    const { r0, r1, c0, c1 } = normalizeRange(range);
+    setRows((current) => {
+      const visibleIds = current
+        .filter((row) => row.status !== "deleted")
+        .map((row) => row.id);
+      return current.map((row) => {
+        const visibleIndex = visibleIds.indexOf(row.id);
+        if (visibleIndex < r0 || visibleIndex > r1) return row;
+        const values = [...row.values];
+        for (let c = c0; c <= c1; c += 1) {
+          values[c] = value;
+        }
+        return markRowValues(row, values);
+      });
+    });
+  }
+
+  function commitEdit(raw: string) {
+    if (!editing) return;
+    if (editing.fillSelection && editing.fillRange) {
+      updateCellsInRange(editing.fillRange, raw);
+    } else {
+      updateCell(editing.rowId, editing.col, raw);
+    }
+    setEditing(null);
+  }
+
+  function beginCellEdit(options: {
+    rowId: string;
+    col: number;
+    fillSelection: boolean;
+    fillRange: CellRange | null;
+    seed?: string;
+  }) {
+    suppressEditCommit.current = false;
+    setEditing(options);
   }
 
   function addRow() {
@@ -472,9 +682,10 @@ export function TableDataEditor({
     ]);
     setSelected(new Set([id]));
     setCellRange(null);
+    rowSelectAnchor.current = 0;
   }
 
-  function rowsToDelete(): Set<string> {
+  function rowsFromSelection(): Set<string> {
     if (selected.size > 0) return selected;
     if (!cellRange) return new Set();
     const { r0, r1 } = normalizeRange(cellRange);
@@ -486,8 +697,51 @@ export function TableDataEditor({
     return ids;
   }
 
+  function duplicateRows() {
+    const targets = rowsFromSelection();
+    if (targets.size === 0) return;
+
+    const toDup = visibleRows.filter((row) => targets.has(row.id));
+    if (toDup.length === 0) return;
+
+    const duplicates: EditorRow[] = toDup.map((row) => {
+      const values = row.values.map((value, index) =>
+        columnMeta[index]?.primaryKey ? null : value,
+      );
+      return {
+        id: `new-${crypto.randomUUID()}`,
+        status: "inserted" as const,
+        original: columns.map(() => null),
+        values,
+      };
+    });
+
+    // Insert duplicates immediately after the last source row.
+    const lastId = toDup[toDup.length - 1].id;
+    setRows((current) => {
+      const index = current.findIndex((row) => row.id === lastId);
+      if (index < 0) return [...duplicates, ...current];
+      return [
+        ...current.slice(0, index + 1),
+        ...duplicates,
+        ...current.slice(index + 1),
+      ];
+    });
+
+    const newIds = new Set(duplicates.map((row) => row.id));
+    setSelected(newIds);
+    setCellRange(null);
+    setEditing(null);
+    setCopyFlash(
+      duplicates.length === 1
+        ? "Duplicated row"
+        : `Duplicated ${duplicates.length} rows`,
+    );
+    window.setTimeout(() => setCopyFlash(""), 1200);
+  }
+
   function deleteSelected() {
-    const targets = rowsToDelete();
+    const targets = rowsFromSelection();
     if (targets.size === 0) return;
     setRows((current) =>
       current
@@ -689,7 +943,7 @@ export function TableDataEditor({
             type="button"
             className={iconButtonClass}
             title="Delete selected"
-            disabled={busy || (selected.size === 0 && !cellRange)}
+            disabled={busy || !hasSelection}
             onClick={deleteSelected}
           >
             <Minus size={14} />
@@ -755,7 +1009,7 @@ export function TableDataEditor({
           <ExtractorToolbar
             activeExtractor={extractor}
             includeHeader={includeHeader}
-            disabled={!cellRange}
+            disabled={!hasSelection}
             onChange={(id) => {
               setExtractor(id);
               void handleCopy(id);
@@ -844,8 +1098,9 @@ export function TableDataEditor({
       )}
 
       <div
-        className="scrollbar-thin-app flex-1 overflow-auto bg-grid-row"
+        className="scrollbar-thin-app flex-1 overflow-auto bg-grid-row outline-none"
         ref={gridRef}
+        tabIndex={0}
         onMouseLeave={() => {
           dragging.current = false;
         }}
@@ -907,19 +1162,7 @@ export function TableDataEditor({
                       "w-[42px] min-w-[42px] bg-row-num! text-right text-[#596272]",
                       row.status === "modified" && "text-pk",
                     )}
-                    onClick={(event) => {
-                      setCellRange(null);
-                      setSelected((current) => {
-                        const next = new Set(
-                          event.metaKey || event.ctrlKey || event.shiftKey
-                            ? current
-                            : [],
-                        );
-                        if (next.has(row.id)) next.delete(row.id);
-                        else next.add(row.id);
-                        return next;
-                      });
-                    }}
+                    onClick={(event) => selectRows(rowIndex, event)}
                   >
                     {page * pageSize + rowIndex + 1}
                   </td>
@@ -964,7 +1207,12 @@ export function TableDataEditor({
                         }}
                         onMouseEnter={() => extendSelect(rowIndex, colIndex)}
                         onDoubleClick={() =>
-                          setEditing({ rowId: row.id, col: colIndex })
+                          beginCellEdit({
+                            rowId: row.id,
+                            col: colIndex,
+                            fillSelection: false,
+                            fillRange: null,
+                          })
                         }
                         onContextMenu={(event) => {
                           event.preventDefault();
@@ -980,25 +1228,39 @@ export function TableDataEditor({
                       >
                         {isEditing ? (
                           <input
+                            key={`${editing.rowId}-${editing.col}-${editing.seed ?? "edit"}`}
                             className="-mx-2.5 h-full min-h-[27px] w-full border border-accent bg-[#0f1218] px-2.5 text-[#e8ecf3] outline-0"
                             autoFocus
                             defaultValue={
-                              value === null ? "" : cellDisplay(value)
+                              editing.seed != null
+                                ? editing.seed
+                                : value === null
+                                  ? ""
+                                  : cellDisplay(value)
                             }
+                            ref={(el) => {
+                              if (!el || editing.seed == null) return;
+                              const len = el.value.length;
+                              el.setSelectionRange(len, len);
+                            }}
                             onBlur={(event) => {
-                              updateCell(row.id, colIndex, event.target.value);
-                              setEditing(null);
+                              if (suppressEditCommit.current) {
+                                suppressEditCommit.current = false;
+                                return;
+                              }
+                              commitEdit(event.target.value);
                             }}
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
-                                updateCell(
-                                  row.id,
-                                  colIndex,
+                                suppressEditCommit.current = true;
+                                commitEdit(
                                   (event.target as HTMLInputElement).value,
                                 );
+                              }
+                              if (event.key === "Escape") {
+                                suppressEditCommit.current = true;
                                 setEditing(null);
                               }
-                              if (event.key === "Escape") setEditing(null);
                             }}
                           />
                         ) : (
@@ -1027,7 +1289,7 @@ export function TableDataEditor({
             <span>{stats.coord}</span>
           </>
         ) : (
-          <span>Select cells · ⌘C copy · ⌘V paste</span>
+          <span>Select cells · ⌘C copy · ⌘V paste · ⌘D duplicate</span>
         )}
       </div>
 
@@ -1053,7 +1315,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            disabled={!cellRange}
+            disabled={!hasSelection}
             onClick={() => {
               void handleCopy();
               setContextMenu(null);
@@ -1063,7 +1325,7 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            disabled={!cellRange}
+            disabled={!hasSelection}
             onClick={(event) => {
               event.stopPropagation();
               setCopyAsOpen(true);
@@ -1073,13 +1335,23 @@ export function TableDataEditor({
           </button>
           <button
             type="button"
-            disabled={!cellRange}
+            disabled={!hasSelection}
             onClick={() => {
               void handlePasteFromClipboard();
               setContextMenu(null);
             }}
           >
             Paste
+          </button>
+          <button
+            type="button"
+            disabled={!hasSelection}
+            onClick={() => {
+              duplicateRows();
+              setContextMenu(null);
+            }}
+          >
+            Duplicate row
           </button>
           {extensionMenu.length > 0 && <ContextMenuSeparator />}
           {extensionMenu.map((item) => (

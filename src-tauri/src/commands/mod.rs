@@ -26,6 +26,37 @@ fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|error| error.to_string())
 }
 
+fn schema_cache_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app_data_dir(app)?.join("schema-cache.json"))
+}
+
+/// Schema trees (tables + columns per connection) outgrow localStorage's
+/// ~5 MiB quota; keep them under the app data directory instead.
+#[tauri::command]
+pub async fn read_schema_cache(app: AppHandle) -> Result<Option<String>, String> {
+    let path = schema_cache_path(&app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    std::fs::read_to_string(&path)
+        .map(Some)
+        .map_err(|error| format!("Cannot read schema cache: {error}"))
+}
+
+#[tauri::command]
+pub async fn write_schema_cache(app: AppHandle, contents: String) -> Result<(), String> {
+    let data = app_data_dir(&app)?;
+    std::fs::create_dir_all(&data).map_err(|error| error.to_string())?;
+    let path = data.join("schema-cache.json");
+    let tmp = data.join("schema-cache.json.tmp");
+    std::fs::write(&tmp, &contents)
+        .map_err(|error| format!("Cannot write schema cache: {error}"))?;
+    std::fs::rename(&tmp, &path).map_err(|error| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("Cannot finalize schema cache: {error}")
+    })
+}
+
 #[tauri::command]
 pub async fn list_drivers(state: State<'_, AppState>) -> Result<Vec<DriverInfo>, String> {
     Ok(state.registry.list().await)
@@ -203,6 +234,11 @@ pub async fn write_export_chunk(
         .map_err(|error| format!("Cannot open {path}: {error}"))?;
     file.write_all(contents.as_bytes())
         .map_err(|error| format!("Cannot write {path}: {error}"))
+}
+
+#[tauri::command]
+pub async fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|error| format!("Cannot read {path}: {error}"))
 }
 
 #[tauri::command]

@@ -10,8 +10,9 @@ use commands::{
     end_transaction, er_diagram, execute_batch, execute_query, extension_rpc, install_plugin,
     keychain_available, keychain_delete, keychain_get, keychain_set, list_drivers,
     list_object_groups, list_object_subgroup, list_objects, list_plugins, list_schema,
-    list_schemas, list_tables, reload_plugins, resolve_plugin_asset, set_plugin_enabled, table_ddl,
-    test_connection, transaction_open, uninstall_plugin, write_export_chunk,
+    list_schemas, list_tables, read_schema_cache, read_text_file, reload_plugins,
+    resolve_plugin_asset, set_plugin_enabled, table_ddl, test_connection, transaction_open,
+    uninstall_plugin, write_export_chunk, write_schema_cache,
 };
 use db::AppState;
 use plugins::discover_and_register;
@@ -68,6 +69,9 @@ pub fn run() {
             execute_batch,
             table_ddl,
             write_export_chunk,
+            read_text_file,
+            read_schema_cache,
+            write_schema_cache,
             alter_table,
             alter_column,
             alter_key,
