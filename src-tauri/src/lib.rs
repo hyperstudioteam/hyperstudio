@@ -7,8 +7,8 @@ mod ssh;
 
 use commands::{
     alter_column, alter_key, alter_table, begin_transaction, cancel_query, connect, disconnect,
-    end_transaction, er_diagram, execute_batch, execute_query, extension_rpc, install_plugin,
-    keychain_available, keychain_delete, keychain_get, keychain_set, list_drivers,
+    end_transaction, er_diagram, execute_batch, execute_query, extension_rpc, github_http,
+    install_plugin, keychain_available, keychain_delete, keychain_get, keychain_set, list_drivers,
     list_object_groups, list_object_subgroup, list_objects, list_plugins, list_schema,
     list_schemas, list_tables, read_schema_cache, read_text_file, reload_plugins,
     resolve_plugin_asset, set_plugin_enabled, table_ddl, test_connection, transaction_open,
@@ -62,6 +62,7 @@ pub fn run() {
             keychain_get,
             keychain_set,
             keychain_delete,
+            github_http,
             begin_transaction,
             end_transaction,
             transaction_open,

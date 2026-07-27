@@ -1,4 +1,5 @@
 mod keychain;
+mod github;
 
 use std::path::PathBuf;
 
@@ -18,6 +19,7 @@ use crate::plugins::{
 use crate::plugins::manager::{load_manifest, load_settings};
 use crate::plugins::process::PluginProcess;
 
+pub use github::github_http;
 pub use keychain::{keychain_available, keychain_delete, keychain_get, keychain_set};
 
 fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
