@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { TitleBar } from "./components/TitleBar";
 import { ActivityBar } from "./components/ActivityBar";
 import { ConnectionSidebar } from "./components/ConnectionSidebar";
@@ -25,7 +26,7 @@ import {
 } from "./lib/connectionGuard";
 import { errorMessage } from "./lib/format";
 import { completionGroupsFor } from "./lib/completionSchema";
-import { hasSchemaCache } from "./lib/schemaCache";
+import { hasSchemaCache, hydrateSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
 import {
   getVaultSecret,
@@ -35,10 +36,20 @@ import {
   vaultExists,
 } from "./lib/vault";
 import { VaultSettingsModal } from "./components/connection-modal/VaultSettingsModal";
-import { ConnectionProfile, DriverInfo } from "./types/connection";
+import { ConnectionProfile, DriverInfo, TreeNode } from "./types/connection";
 import { ColumnNode, SchemaInfo } from "./types/schema";
 import { ImportCsvModal } from "./components/ImportCsvModal";
+import { ImportConnectionsModal } from "./components/connection-modal/ImportConnectionsModal";
 import { collectConnections, collectFolderOptions } from "./lib/tree";
+import {
+  applyImportedSecrets,
+  exportConnections,
+  ImportMode,
+  parseConnectionExport,
+  pickAndReadImportFile,
+  remapTreeIds,
+  summarizeExport,
+} from "./lib/connectionTransfer";
 import { databaseApi, pluginsApi } from "./api/database";
 import { cacheDriverGroups } from "./lib/driverGroups";
 import { syncPluginColumnTypes } from "./plugins/init";
@@ -78,6 +89,12 @@ function App() {
     onConfirm: () => void;
     onCancel: () => void;
   } | null>(null);
+  const [importPreview, setImportPreview] = useState<{
+    tree: TreeNode[];
+    connectionCount: number;
+    keychainWithoutPassword: number;
+  } | null>(null);
+  const [transferNotice, setTransferNotice] = useState("");
 
   // Any interaction defers auto-lock; locking flips the indicator.
   useEffect(() => {
@@ -123,9 +140,16 @@ function App() {
   }, [tree.tree.length, modalProfile, folderModal]);
 
   useEffect(() => {
-    if (tree.selected) {
-      session.activate(tree.selected);
-    }
+    let cancelled = false;
+    void hydrateSchemaCache().then(() => {
+      if (cancelled) return;
+      if (tree.selected) {
+        session.activate(tree.selected);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree.selected?.id]);
 
@@ -144,6 +168,90 @@ function App() {
     setModalProfile(tree.createBlank());
     setModalFolderId(folderId);
     setModalSchemas([]);
+  }
+
+  async function handleExportConnections() {
+    setTransferNotice("");
+    const needsVault = collectConnections(tree.tree).some(
+      (profile) => profile.passwordStorage === "vault",
+    );
+    if (needsVault && vaultExists() && !isVaultUnlocked()) {
+      vaultRetry.current = () => void handleExportConnections();
+      setVaultPrompt("unlock");
+      return;
+    }
+    try {
+      const result = await exportConnections(tree.tree);
+      if (!result) return;
+      setTransferNotice(summarizeExport(result));
+    } catch (error) {
+      setTransferNotice(errorMessage(error));
+    }
+  }
+
+  async function handleImportConnections() {
+    setTransferNotice("");
+    try {
+      const raw = await pickAndReadImportFile();
+      if (!raw) return;
+      const imported = parseConnectionExport(raw);
+      const connections = collectConnections(imported);
+      setImportPreview({
+        tree: imported,
+        connectionCount: connections.length,
+        keychainWithoutPassword: connections.filter(
+          (profile) => profile.passwordStorage === "keychain",
+        ).length,
+      });
+    } catch (error) {
+      setTransferNotice(errorMessage(error));
+    }
+  }
+
+  async function confirmImport(mode: ImportMode) {
+    if (!importPreview) return;
+    const preview = importPreview;
+    const run = async () => {
+      const source =
+        mode === "merge" ? remapTreeIds(preview.tree) : preview.tree;
+      const applied = await applyImportedSecrets(source);
+      if (mode === "replace") {
+        for (const profile of collectConnections(tree.tree)) {
+          onConnectionDeleted(profile.id);
+          session.onDeleted(profile.id);
+        }
+        tree.replaceTree(applied.tree);
+      } else {
+        tree.mergeTree(applied.tree);
+      }
+      setImportPreview(null);
+      const parts = [
+        `Imported ${applied.connectionCount} connection${applied.connectionCount === 1 ? "" : "s"}.`,
+      ];
+      if (applied.keychainWithoutPassword > 0) {
+        parts.push(
+          `${applied.keychainWithoutPassword} keychain connection${applied.keychainWithoutPassword === 1 ? "" : "s"} need passwords saved again.`,
+        );
+      }
+      setTransferNotice(parts.join(" "));
+    };
+
+    try {
+      await run();
+    } catch (error) {
+      if (error instanceof VaultLockedError) {
+        vaultRetry.current = () => void confirmImport(mode);
+        setVaultPrompt("unlock");
+        return;
+      }
+      if (error instanceof VaultMissingError) {
+        vaultRetry.current = () => void confirmImport(mode);
+        setVaultPrompt("create");
+        return;
+      }
+      setTransferNotice(errorMessage(error));
+      setImportPreview(null);
+    }
   }
 
   function openEditConnection(profile: ConnectionProfile) {
@@ -372,6 +480,8 @@ function App() {
             tree.deleteNode(id);
             session.onDeleted(id);
           }}
+          onExportConnections={() => void handleExportConnections()}
+          onImportConnections={() => void handleImportConnections()}
           onViewTable={(schema, table) => {
             setOpenRequest({
               kind: "view",
@@ -532,6 +642,34 @@ function App() {
           }}
           onClose={() => setFolderModal(null)}
         />
+      )}
+
+      {importPreview && (
+        <ImportConnectionsModal
+          connectionCount={importPreview.connectionCount}
+          keychainWithoutPassword={importPreview.keychainWithoutPassword}
+          onConfirm={(mode) => void confirmImport(mode)}
+          onClose={() => setImportPreview(null)}
+        />
+      )}
+
+      {transferNotice && (
+        <div
+          className="fixed bottom-4 left-1/2 z-30 max-w-[min(520px,calc(100%-2rem))] -translate-x-1/2 px-3.5 py-2.5 border border-border-bright rounded-[8px] bg-surface text-[12px] leading-[1.4] text-[#d2d7df] shadow-[0_16px_40px_rgba(0,0,0,.45)]"
+          role="status"
+        >
+          <div className="flex items-start gap-3">
+            <span className="flex-1">{transferNotice}</span>
+            <button
+              type="button"
+              className="shrink-0 grid place-items-center border-0 bg-transparent text-muted cursor-pointer hover:text-text p-0"
+              aria-label="Dismiss"
+              onClick={() => setTransferNotice("")}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
       )}
 
       {vaultPrompt === "create" && (

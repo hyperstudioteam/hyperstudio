@@ -73,6 +73,7 @@ import {
 } from "../lib/exportResults";
 import { ExplainPlanView } from "./explain/ExplainPlanView";
 import { ExportModal, ExportOptions } from "./ExportModal";
+import { SaveQueryModal } from "./SaveQueryModal";
 import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { ResultGrid } from "./ResultGrid";
 import { ScriptResults } from "./ScriptResults";
@@ -114,6 +115,8 @@ type EditTab = {
   title: string;
   schema: string;
   table: string;
+  /** Connection this editor was opened on; does not follow sidebar selection. */
+  connectionId: string;
 };
 
 type ErTab = {
@@ -222,6 +225,8 @@ export function QueryWorkspace({
   const [exportBusy, setExportBusy] = useState(false);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportError, setExportError] = useState("");
+  const [saveQueryOpen, setSaveQueryOpen] = useState(false);
+  const [pendingSaveSql, setPendingSaveSql] = useState("");
   const [formatError, setFormatError] = useState("");
   const [resultPanel, setResultPanel] = useState<ResultPanel>("results");
   const [analyzeEnabled, setAnalyzeEnabled] = useState(false);
@@ -241,19 +246,26 @@ export function QueryWorkspace({
   const pendingConnectionRef = useRef<string>("");
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
-  const queryConnectionId =
-    active?.kind === "query" ? active.connectionId : selected?.id ?? "";
-  const queryConnection =
-    connections.find((item) => item.id === queryConnectionId) ??
-    (selected?.id === queryConnectionId ? selected : null);
+  const activeConnectionId =
+    active?.kind === "query" || active?.kind === "edit"
+      ? active.connectionId
+      : selected?.id ?? "";
+  const activeConnection =
+    connections.find((item) => item.id === activeConnectionId) ??
+    (selected?.id === activeConnectionId ? selected : null);
+  const queryConnectionId = activeConnectionId;
+  const queryConnection = activeConnection;
   const querySchemas = useMemo(() => {
-    if (active?.kind === "query" && active.connectionId) {
+    if (
+      (active?.kind === "query" || active?.kind === "edit") &&
+      active.connectionId
+    ) {
       return toSchemaNodes(getSchemaCache(active.connectionId));
     }
     return schemas;
   }, [active, schemas]);
   const queryCaps = drivers.find(
-    (driver) => driver.id === queryConnection?.driver,
+    (driver) => driver.id === activeConnection?.driver,
   )?.capabilities;
   const pageSize = defaultMaxRows(queryCaps?.maxRows);
   const sessions = Boolean(queryCaps?.sessions);
@@ -464,7 +476,7 @@ export function QueryWorkspace({
       return;
     }
 
-    const id = `edit-${openRequest.schema}.${openRequest.table}`;
+    const id = `edit-${selected.id}:${openRequest.schema}.${openRequest.table}`;
     const title = `${openRequest.schema}.${openRequest.table}`;
     setTabs((current) => {
       if (current.some((tab) => tab.id === id)) return current;
@@ -476,6 +488,7 @@ export function QueryWorkspace({
           title,
           schema: openRequest.schema,
           table: openRequest.table,
+          connectionId: selected.id,
         },
       ];
     });
@@ -660,15 +673,20 @@ export function QueryWorkspace({
     if (!active || active.kind !== "query") return;
     const sql = editorRef.current?.getSqlToRun() ?? query;
     if (!sql.trim()) return;
-    const name = window.prompt("Save query as", active.title);
-    if (!name) return;
+    setPendingSaveSql(sql);
+    setSaveQueryOpen(true);
+  }
+
+  function confirmSaveQuery(name: string) {
     setSaved(
       saveQuery({
         name,
-        sql,
+        sql: pendingSaveSql,
         connectionId: queryConnectionId || selected?.id || null,
       }),
     );
+    setSaveQueryOpen(false);
+    setPendingSaveSql("");
     setHistoryOpen(true);
   }
 
@@ -834,39 +852,48 @@ export function QueryWorkspace({
               <span
                 className={cn(
                   "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
-                  connectedId === selected?.id &&
+                  activeConnectionId &&
+                    liveConnectionIds.has(activeConnectionId) &&
                     "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
                 )}
               />
-              {selected
-                ? `${selected.name || selected.database}${connectedId === selected.id ? "" : " · cached"}`
-                : "Not connected"}
+              {activeConnection
+                ? `${activeConnection.name || activeConnection.database}${
+                    liveConnectionIds.has(activeConnection.id) ? "" : " · cached"
+                  }`
+                : selected
+                  ? `${selected.name || selected.database}${connectedId === selected.id ? "" : " · cached"}`
+                  : "Not connected"}
             </>
           )}
         </div>
       </div>
 
-      {active?.kind === "edit" && selected ? (
+      {active?.kind === "edit" && activeConnection ? (
         <TableDataEditor
           key={active.id}
-          profile={selected}
+          profile={activeConnection}
           schema={active.schema}
           table={active.table}
-          tableMeta={findTableMeta(selected.id, active.schema, active.table)}
+          tableMeta={findTableMeta(
+            active.connectionId,
+            active.schema,
+            active.table,
+          )}
           pageSize={pageSize}
           execute={(sql, confirmedWrite) =>
-            onExecute(sql, selected.id, confirmedWrite)
+            onExecute(sql, active.connectionId, confirmedWrite)
           }
           executeBatch={
             onExecuteBatch &&
-            drivers.find((driver) => driver.id === selected.driver)?.capabilities
-              .transactions
-              ? (statements) => onExecuteBatch(selected.id, statements)
+            drivers.find((driver) => driver.id === activeConnection.driver)
+              ?.capabilities.transactions
+              ? (statements) => onExecuteBatch(active.connectionId, statements)
               : undefined
           }
           confirmWrites={
             onConfirmWrites
-              ? (preview) => onConfirmWrites(selected.id, preview)
+              ? (preview) => onConfirmWrites(active.connectionId, preview)
               : undefined
           }
         />
@@ -1267,6 +1294,17 @@ export function QueryWorkspace({
           error={exportError}
           onClose={() => setExportOpen(false)}
           onExport={(options) => void runExport(options)}
+        />
+      )}
+
+      {saveQueryOpen && active?.kind === "query" && (
+        <SaveQueryModal
+          defaultName={active.title}
+          onSave={confirmSaveQuery}
+          onClose={() => {
+            setSaveQueryOpen(false);
+            setPendingSaveSql("");
+          }}
         />
       )}
 
