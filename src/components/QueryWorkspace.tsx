@@ -73,6 +73,7 @@ import {
 } from "../lib/exportResults";
 import { ExplainPlanView } from "./explain/ExplainPlanView";
 import { ExportModal, ExportOptions } from "./ExportModal";
+import { QueryParamsPanel } from "./QueryParamsPanel";
 import { SaveQueryModal } from "./SaveQueryModal";
 import { QueryHistoryPanel } from "./QueryHistoryPanel";
 import { ResultGrid } from "./ResultGrid";
@@ -85,8 +86,51 @@ import {
   useExtensionStatusItems,
 } from "../extensions/hooks";
 import { extensionRegistry } from "../extensions/registry";
+import {
+  bindQueryParams,
+  findQueryParams,
+  ParamValueEntry,
+  QueryParam,
+  coerceParamValue,
+  recallParamEntries,
+  rememberParamEntries,
+} from "../lib/queryParams";
 
 type ResultPanel = "results" | "plan" | "messages";
+
+type PendingParamAction = {
+  kind: "run" | "explain" | "script";
+  sql: string;
+  connectionId: string;
+  params: QueryParam[];
+  analyze?: boolean;
+};
+
+function openParamsPanel(
+  kind: PendingParamAction["kind"],
+  sql: string,
+  connectionId: string,
+  setPendingParams: (action: PendingParamAction) => void,
+  extra: { analyze?: boolean } = {},
+): boolean {
+  const params = findQueryParams(sql);
+  if (params.length === 0) return false;
+  setPendingParams({ kind, sql, connectionId, params, ...extra });
+  return true;
+}
+
+/** If remembered values cover every param, bind and return SQL; else null. */
+function tryBindRemembered(sql: string, params: QueryParam[]): string | null {
+  const entries = recallParamEntries(params);
+  try {
+    const values = entries.map((entry) =>
+      coerceParamValue(entry.text, entry.isNull),
+    );
+    return bindQueryParams(sql, values);
+  } catch {
+    return null;
+  }
+}
 
 const STARTER_QUERY = `SELECT *
 FROM users
@@ -227,6 +271,9 @@ export function QueryWorkspace({
   const [exportError, setExportError] = useState("");
   const [saveQueryOpen, setSaveQueryOpen] = useState(false);
   const [pendingSaveSql, setPendingSaveSql] = useState("");
+  const [pendingParams, setPendingParams] = useState<PendingParamAction | null>(
+    null,
+  );
   const [formatError, setFormatError] = useState("");
   const [resultPanel, setResultPanel] = useState<ResultPanel>("results");
   const [analyzeEnabled, setAnalyzeEnabled] = useState(false);
@@ -518,10 +565,10 @@ export function QueryWorkspace({
     );
   }
 
-  function runExplainSql(
+  function executeBoundExplain(
     sql: string,
     analyze: boolean,
-    connectionId = queryConnectionId,
+    connectionId: string,
   ) {
     const profile =
       connections.find((item) => item.id === connectionId) ?? queryConnection;
@@ -539,7 +586,29 @@ export function QueryWorkspace({
     onRun(wrapped, connectionId);
   }
 
-  function runSql(sql: string, connectionId = queryConnectionId) {
+  function runExplainSql(
+    sql: string,
+    analyze: boolean,
+    connectionId = queryConnectionId,
+  ) {
+    const params = findQueryParams(sql);
+    if (params.length > 0) {
+      const bound = tryBindRemembered(sql, params);
+      if (bound) {
+        // Keep the sidebar open with the same params so values can be edited.
+        setPendingParams({ kind: "explain", sql, connectionId, params, analyze });
+        executeBoundExplain(bound, analyze, connectionId);
+        return;
+      }
+      openParamsPanel("explain", sql, connectionId, setPendingParams, {
+        analyze,
+      });
+      return;
+    }
+    executeBoundExplain(sql, analyze, connectionId);
+  }
+
+  function executeBoundRun(sql: string, connectionId: string) {
     setScriptRuns(null);
     const profile =
       connections.find((item) => item.id === connectionId) ?? queryConnection;
@@ -549,7 +618,7 @@ export function QueryWorkspace({
       canVisualizeExplain(profile.driver)
     ) {
       const analyze = explainHasAnalyze(sql) || analyzeEnabled;
-      runExplainSql(sql, analyze, connectionId);
+      executeBoundExplain(sql, analyze, connectionId);
       return;
     }
 
@@ -564,23 +633,28 @@ export function QueryWorkspace({
     onRun(sqlForPage(plan, 0), connectionId);
   }
 
+  function runSql(sql: string, connectionId = queryConnectionId) {
+    const params = findQueryParams(sql);
+    if (params.length > 0) {
+      const bound = tryBindRemembered(sql, params);
+      if (bound) {
+        setPendingParams({ kind: "run", sql, connectionId, params });
+        executeBoundRun(bound, connectionId);
+        return;
+      }
+      openParamsPanel("run", sql, connectionId, setPendingParams);
+      return;
+    }
+    executeBoundRun(sql, connectionId);
+  }
+
   function run() {
     if (!active || active.kind !== "query" || !queryConnectionId) return;
     runSql(editorRef.current?.getSqlToRun() ?? query, queryConnectionId);
   }
 
-  async function runScript() {
-    if (
-      !active ||
-      active.kind !== "query" ||
-      scriptBusy ||
-      !queryConnectionId
-    ) {
-      return;
-    }
-    const statements = splitStatements(
-      editorRef.current?.getSqlToRun() ?? query,
-    );
+  async function executeBoundScript(sql: string, connectionId: string) {
+    const statements = splitStatements(sql);
     if (statements.length === 0) return;
 
     const runs = toStatementRuns(statements);
@@ -604,10 +678,7 @@ export function QueryWorkspace({
       setScriptIndex(index);
       publish();
       try {
-        runs[index].result = await onExecute(
-          runs[index].sql,
-          queryConnectionId,
-        );
+        runs[index].result = await onExecute(runs[index].sql, connectionId);
         runs[index].status = "ok";
       } catch (error) {
         runs[index].status = "error";
@@ -628,6 +699,55 @@ export function QueryWorkspace({
     // Land on the first failure so it is not buried in a long script.
     const failure = runs.findIndex((item) => item.status === "error");
     if (failure >= 0) setScriptIndex(failure);
+  }
+
+  async function runScript() {
+    if (
+      !active ||
+      active.kind !== "query" ||
+      scriptBusy ||
+      !queryConnectionId
+    ) {
+      return;
+    }
+    const sql = editorRef.current?.getSqlToRun() ?? query;
+    const params = findQueryParams(sql);
+    if (params.length > 0) {
+      const bound = tryBindRemembered(sql, params);
+      if (bound) {
+        setPendingParams({
+          kind: "script",
+          sql,
+          connectionId: queryConnectionId,
+          params,
+        });
+        await executeBoundScript(bound, queryConnectionId);
+        return;
+      }
+      openParamsPanel("script", sql, queryConnectionId, setPendingParams);
+      return;
+    }
+    await executeBoundScript(sql, queryConnectionId);
+  }
+
+  function confirmQueryParams(
+    values: unknown[],
+    entries: ParamValueEntry[],
+  ) {
+    if (!pendingParams) return;
+    const action = pendingParams;
+    rememberParamEntries(action.params, entries);
+    const bound = bindQueryParams(action.sql, values);
+    // Keep the sidebar open so the same values can be re-run immediately.
+    if (action.kind === "run") {
+      executeBoundRun(bound, action.connectionId);
+      return;
+    }
+    if (action.kind === "explain") {
+      executeBoundExplain(bound, action.analyze ?? false, action.connectionId);
+      return;
+    }
+    void executeBoundScript(bound, action.connectionId);
   }
 
   function formatQuery() {
@@ -1365,7 +1485,15 @@ export function QueryWorkspace({
       </footer>
     </main>
 
-      {historyOpen && !activeExtensionView && (
+      {pendingParams && !activeExtensionView && (
+        <QueryParamsPanel
+          params={pendingParams.params}
+          busy={busy === "query" || scriptBusy}
+          onConfirm={confirmQueryParams}
+          onClose={() => setPendingParams(null)}
+        />
+      )}
+      {historyOpen && !activeExtensionView && !pendingParams && (
         <QueryHistoryPanel
           history={history}
           saved={saved}
