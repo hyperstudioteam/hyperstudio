@@ -33,7 +33,7 @@ export function ActivityBar({
 }: ActivityBarProps) {
   const extensionItems = useExtensionMenu("activity");
   return (
-    <aside className="flex flex-col items-center gap-[5px] border-r border-border bg-activity px-[5px] py-2">
+    <aside className="flex shrink-0 flex-col items-center gap-[5px] border-r border-border bg-activity px-[5px] py-2">
       <button
         className={cn(
           activityClass,

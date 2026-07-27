@@ -309,7 +309,6 @@ export function SchemaBrowser({
 
   return (
     <>
-      <div className="h-px mt-[3px] mx-2.5 bg-border" />
       <div className="min-h-[52px] py-2 pr-[9px] pl-3.5 flex items-start justify-between gap-2">
         <div className="min-w-0 flex flex-col gap-px">
           <small className="text-subtle text-[9px] uppercase tracking-[0.06em]">
