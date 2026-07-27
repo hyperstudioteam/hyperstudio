@@ -46,6 +46,13 @@ import {
   PagedQueryPlan,
   sqlForPage,
 } from "../lib/sql";
+import {
+  loadWorkspaceSession,
+  maxQueryCounter,
+  pruneWorkspaceTabs,
+  saveWorkspaceSession,
+  WorkspaceTab,
+} from "../lib/workspaceSession";
 import { ConnectionProfile, DriverInfo } from "../types/connection";
 import { ConnectionInfo, QueryResult } from "../types/query";
 import {
@@ -147,36 +154,6 @@ export type WorkspaceOpen =
   | { kind: "console"; nonce: number }
   | null;
 
-type QueryTab = {
-  id: string;
-  kind: "query";
-  title: string;
-  sql: string;
-  /** Connection this console was created on; user may switch later. */
-  connectionId: string;
-};
-
-type EditTab = {
-  id: string;
-  kind: "edit";
-  title: string;
-  schema: string;
-  table: string;
-  /** Connection this editor was opened on; does not follow sidebar selection. */
-  connectionId: string;
-};
-
-type ErTab = {
-  id: string;
-  kind: "er";
-  title: string;
-  schema: string;
-  /** Connection the diagram was opened against. */
-  connectionId: string;
-};
-
-type WorkspaceTab = QueryTab | EditTab | ErTab;
-
 interface QueryWorkspaceProps {
   selected: ConnectionProfile | null;
   /** All saved connections, for the per-console picker. */
@@ -227,6 +204,16 @@ function defaultWorkspaceTabs(): WorkspaceTab[] {
   ];
 }
 
+function readBootSession(): { tabs: WorkspaceTab[]; activeId: string } {
+  const saved = loadWorkspaceSession();
+  if (!saved) {
+    return { tabs: defaultWorkspaceTabs(), activeId: "query-1" };
+  }
+  return { tabs: saved.tabs, activeId: saved.activeId };
+}
+
+/** Loaded once so both useState initializers share the same snapshot. */
+const bootSession = readBootSession();
 
 function findTableMeta(
   connectionId: string,
@@ -261,8 +248,8 @@ export function QueryWorkspace({
   onExecuteBatch,
   onConfirmWrites,
 }: QueryWorkspaceProps) {
-  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => defaultWorkspaceTabs());
-  const [activeId, setActiveId] = useState("query-1");
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => bootSession.tabs);
+  const [activeId, setActiveId] = useState(() => bootSession.activeId);
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
   const [erDiagram, setErDiagram] = useState<ErDiagram | null>(null);
@@ -320,7 +307,7 @@ export function QueryWorkspace({
       ? ["workspace-main", "right-dock"]
       : ["workspace-main"],
   });
-  const queryCounter = useRef(1);
+  const queryCounter = useRef(Math.max(1, maxQueryCounter(bootSession.tabs)));
   const cancelScript = useRef(false);
   /** SQL awaiting its result so the run can be recorded once it settles. */
   const pendingRunRef = useRef<string | null>(null);
@@ -402,6 +389,29 @@ export function QueryWorkspace({
     });
   }, [selected?.id]);
 
+  // Drop edit/ER tabs whose connection was deleted; keep at least one query tab.
+  const connectionIdsKey = connections.map((profile) => profile.id).join("\0");
+  useEffect(() => {
+    const ids = new Set(connectionIdsKey ? connectionIdsKey.split("\0") : []);
+    setTabs((current) => {
+      const pruned = pruneWorkspaceTabs(current, ids);
+      if (pruned.length === current.length) return current;
+      return pruned.length > 0 ? pruned : defaultWorkspaceTabs();
+    });
+  }, [connectionIdsKey]);
+
+  useEffect(() => {
+    if (tabs.some((tab) => tab.id === activeId)) return;
+    setActiveId(tabs[0]?.id ?? "query-1");
+  }, [tabs, activeId]);
+
+  // Persist open panels so a restart restores the same workspace.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      saveWorkspaceSession({ version: 1, activeId, tabs });
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [tabs, activeId]);
 
   function setQueryConnectionId(connectionId: string) {
     if (!active || active.kind !== "query") return;
