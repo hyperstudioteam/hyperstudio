@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { Group, Panel, useDefaultLayout } from "react-resizable-panels";
 import { X } from "lucide-react";
 import { TitleBar } from "./components/TitleBar";
 import { ActivityBar } from "./components/ActivityBar";
 import { ConnectionSidebar } from "./components/ConnectionSidebar";
+import { PanelResizeHandle } from "./components/PanelResizeHandle";
 import {
   QueryWorkspace,
   WorkspaceOpen,
@@ -565,10 +567,15 @@ function App() {
       (session.activeId === tree.selected.id && session.schemas.length > 0)
     : false;
 
+  const shellLayout = useDefaultLayout({
+    id: "studio-shell",
+    storage: localStorage,
+  });
+
   return (
     <div className="h-full w-full bg-bg">
       <TitleBar />
-      <div className="grid h-[calc(100%-38px)] grid-cols-[44px_250px_minmax(0,1fr)] max-[760px]:grid-cols-[42px_210px_minmax(420px,1fr)]">
+      <div className="flex h-[calc(100%-38px)] min-h-0 overflow-hidden">
         <ActivityBar
           active="databases"
           onSelect={() => undefined}
@@ -576,173 +583,195 @@ function App() {
           vaultUnlocked={hasVault ? vaultUnlocked : null}
           onOpenVault={() => setVaultSettingsOpen(true)}
         />
-        <ConnectionSidebar
-          tree={tree.tree}
-          selection={tree.selection}
-          expanded={tree.expanded}
-          connectedId={session.connectedId}
-          liveConnectionIds={session.liveIds}
-          selected={tree.selected}
-          busy={session.busy}
-          busyDetail={session.busyDetail}
-          schemas={session.schemas}
-          objectSubgroups={session.objectSubgroups}
-          schemaExpanded={session.schemaExpanded}
-          hasSchemaCache={hasSchemaCacheUi}
-          onSelect={tree.setSelection}
-          onToggleFolder={tree.toggleExpanded}
-          onToggleSchema={(key) => {
-            if (!tree.selected) return;
-            void withVaultGate(() =>
-              session.toggleSchemaExpanded(tree.selected!, key),
-            );
-          }}
-          onConnect={(profile) => {
-            tree.setSelection({ kind: "connection", id: profile.id });
-            void withVaultGate(() => session.connect(profile));
-          }}
-          onRefreshDatabase={(profile) =>
-            void withVaultGate(() => session.refreshDatabase(profile))
-          }
-          onRefreshSchema={(profile, schema) =>
-            void withVaultGate(() => session.refreshSchema(profile, schema))
-          }
-          onRefreshGroup={(profile, schema, group) =>
-            void withVaultGate(() =>
-              session.refreshGroup(profile, schema, group),
-            )
-          }
-          onMove={tree.moveNode}
-          onNewConnection={openNewConnection}
-          onEditConnection={openEditConnection}
-          onNewFolder={(parentId) =>
-            setFolderModal({ name: "", parentId })
-          }
-          onEditFolder={(id, name, parentId) =>
-            setFolderModal({ id, name, parentId })
-          }
-          onDelete={(id) => {
-            onConnectionDeleted(id);
-            tree.deleteNode(id);
-            session.onDeleted(id);
-          }}
-          onExportConnections={() => void handleExportConnections()}
-          onImportConnections={() => void handleImportConnections()}
-          syncBusy={syncBusy}
-          onGithubPull={() => void handleGithubPull()}
-          onGithubPush={() => void handleGithubPush()}
-          onGithubSyncSettings={() => setGithubSettingsOpen(true)}
-          onViewTable={(schema, table) => {
-            setOpenRequest({
-              kind: "view",
-              schema,
-              table,
-              nonce: Date.now(),
-            });
-          }}
-          onEditTable={(schema, table) => {
-            setOpenRequest({
-              kind: "edit",
-              schema,
-              table,
-              nonce: Date.now(),
-            });
-          }}
-          onShowEr={(schema) => {
-            setOpenRequest({
-              kind: "er",
-              schema,
-              nonce: Date.now(),
-            });
-          }}
-          onNewConsole={() => {
-            setOpenRequest({
-              kind: "console",
-              nonce: Date.now(),
-            });
-          }}
-          onImportCsv={(schema, table, columns) =>
-            setImportTarget({ schema, table, columns })
-          }
-          schemaReadonly={
-            (drivers.find((driver) => driver.id === tree.selected?.driver)
-              ?.capabilities.readonly ??
-              false) ||
-            (tree.selected ? safetyOf(tree.selected) === "readOnly" : false)
-          }
-          findConnection={tree.findConnection}
-          findFolder={tree.findFolder}
-          parentOf={tree.parentOf}
-        />
-        <QueryWorkspace
-          selected={tree.selected}
-          connections={collectConnections(tree.tree)}
-          liveConnectionIds={session.liveIds}
-          connectedId={session.connectedId}
-          connectionInfo={session.connectionInfo}
-          busy={session.busy}
-          result={session.result}
-          error={session.error}
-          schemas={session.schemas}
-          drivers={drivers}
-          openRequest={openRequest}
-          txnOpenById={session.txnOpenById}
-          onCancel={(connectionId) => void session.cancelQuery(connectionId)}
-          onBeginTransaction={(connectionId) => {
-            const profile = tree.findConnection(connectionId);
-            if (!profile) return;
-            void withVaultGate(() => session.beginTransaction(profile));
-          }}
-          onEndTransaction={(connectionId, commit) => {
-            const profile = tree.findConnection(connectionId);
-            if (!profile) return;
-            void session
-              .endTransaction(profile, commit)
-              .catch((error) => session.setError(errorMessage(error)));
-          }}
-          onRun={(sql, connectionId) => {
-            const profile = tree.findConnection(connectionId);
-            if (!profile) {
-              session.setError("Select a connection before running a query.");
-              return;
-            }
-            runQueryGuarded(profile, sql);
-          }}
-          onExecute={(sql, connectionId, confirmedWrite) =>
-            executeWithVault(sql, connectionId, confirmedWrite)
-          }
-          onExecuteBatch={executeBatchWithVault}
-          onConfirmWrites={confirmWrites}
-          onLoadEr={(schema) => {
-            if (!tree.selected) {
-              return Promise.reject(
-                new Error("Select a connection before opening an ER diagram."),
+        <Group
+          id="studio-shell"
+          orientation="horizontal"
+          className="min-w-0 flex-1"
+          defaultLayout={shellLayout.defaultLayout}
+          onLayoutChanged={shellLayout.onLayoutChanged}
+        >
+          <Panel
+            id="connections"
+            defaultSize={250}
+            minSize={180}
+            maxSize={480}
+            className="min-w-0"
+          >
+          <ConnectionSidebar
+            tree={tree.tree}
+            selection={tree.selection}
+            expanded={tree.expanded}
+            connectedId={session.connectedId}
+            liveConnectionIds={session.liveIds}
+            selected={tree.selected}
+            busy={session.busy}
+            busyDetail={session.busyDetail}
+            schemas={session.schemas}
+            objectSubgroups={session.objectSubgroups}
+            schemaExpanded={session.schemaExpanded}
+            hasSchemaCache={hasSchemaCacheUi}
+            onSelect={tree.setSelection}
+            onToggleFolder={tree.toggleExpanded}
+            onToggleSchema={(key) => {
+              if (!tree.selected) return;
+              void withVaultGate(() =>
+                session.toggleSchemaExpanded(tree.selected!, key),
               );
+            }}
+            onConnect={(profile) => {
+              tree.setSelection({ kind: "connection", id: profile.id });
+              void withVaultGate(() => session.connect(profile));
+            }}
+            onRefreshDatabase={(profile) =>
+              void withVaultGate(() => session.refreshDatabase(profile))
             }
-            const profile = tree.selected;
-            return new Promise((resolve, reject) => {
-              const attempt = () => {
-                void session
-                  .loadErDiagram(profile, schema)
-                  .then(resolve)
-                  .catch((error) => {
-                    if (error instanceof VaultLockedError) {
-                      vaultRetry.current = attempt;
-                      setVaultPrompt("unlock");
-                      return;
-                    }
-                    if (error instanceof VaultMissingError) {
-                      vaultRetry.current = attempt;
-                      setVaultPrompt("create");
-                      return;
-                    }
-                    reject(error);
-                  });
-              };
-              attempt();
-            });
-          }}
-        />
+            onRefreshSchema={(profile, schema) =>
+              void withVaultGate(() => session.refreshSchema(profile, schema))
+            }
+            onRefreshGroup={(profile, schema, group) =>
+              void withVaultGate(() =>
+                session.refreshGroup(profile, schema, group),
+              )
+            }
+            onMove={tree.moveNode}
+            onNewConnection={openNewConnection}
+            onEditConnection={openEditConnection}
+            onNewFolder={(parentId) =>
+              setFolderModal({ name: "", parentId })
+            }
+            onEditFolder={(id, name, parentId) =>
+              setFolderModal({ id, name, parentId })
+            }
+            onDelete={(id) => {
+              onConnectionDeleted(id);
+              tree.deleteNode(id);
+              session.onDeleted(id);
+            }}
+            onExportConnections={() => void handleExportConnections()}
+            onImportConnections={() => void handleImportConnections()}
+            syncBusy={syncBusy}
+            onGithubPull={() => void handleGithubPull()}
+            onGithubPush={() => void handleGithubPush()}
+            onGithubSyncSettings={() => setGithubSettingsOpen(true)}
+            onViewTable={(schema, table) => {
+              setOpenRequest({
+                kind: "view",
+                schema,
+                table,
+                nonce: Date.now(),
+              });
+            }}
+            onEditTable={(schema, table) => {
+              setOpenRequest({
+                kind: "edit",
+                schema,
+                table,
+                nonce: Date.now(),
+              });
+            }}
+            onShowEr={(schema) => {
+              setOpenRequest({
+                kind: "er",
+                schema,
+                nonce: Date.now(),
+              });
+            }}
+            onNewConsole={() => {
+              setOpenRequest({
+                kind: "console",
+                nonce: Date.now(),
+              });
+            }}
+            onImportCsv={(schema, table, columns) =>
+              setImportTarget({ schema, table, columns })
+            }
+            schemaReadonly={
+              (drivers.find((driver) => driver.id === tree.selected?.driver)
+                ?.capabilities.readonly ??
+                false) ||
+              (tree.selected ? safetyOf(tree.selected) === "readOnly" : false)
+            }
+            findConnection={tree.findConnection}
+            findFolder={tree.findFolder}
+            parentOf={tree.parentOf}
+          />
+          </Panel>
+          <PanelResizeHandle />
+          <Panel id="workspace" minSize={360} className="min-w-0">
+          <QueryWorkspace
+            selected={tree.selected}
+            connections={collectConnections(tree.tree)}
+            liveConnectionIds={session.liveIds}
+            connectedId={session.connectedId}
+            connectionInfo={session.connectionInfo}
+            busy={session.busy}
+            result={session.result}
+            error={session.error}
+            schemas={session.schemas}
+            drivers={drivers}
+            openRequest={openRequest}
+            txnOpenById={session.txnOpenById}
+            onCancel={(connectionId) => void session.cancelQuery(connectionId)}
+            onBeginTransaction={(connectionId) => {
+              const profile = tree.findConnection(connectionId);
+              if (!profile) return;
+              void withVaultGate(() => session.beginTransaction(profile));
+            }}
+            onEndTransaction={(connectionId, commit) => {
+              const profile = tree.findConnection(connectionId);
+              if (!profile) return;
+              void session
+                .endTransaction(profile, commit)
+                .catch((error) => session.setError(errorMessage(error)));
+            }}
+            onRun={(sql, connectionId) => {
+              const profile = tree.findConnection(connectionId);
+              if (!profile) {
+                session.setError("Select a connection before running a query.");
+                return;
+              }
+              runQueryGuarded(profile, sql);
+            }}
+            onExecute={(sql, connectionId, confirmedWrite) =>
+              executeWithVault(sql, connectionId, confirmedWrite)
+            }
+            onExecuteBatch={executeBatchWithVault}
+            onConfirmWrites={confirmWrites}
+            onLoadEr={(schema, connectionId) => {
+              const profile =
+                tree.findConnection(connectionId) ?? tree.selected;
+              if (!profile) {
+                return Promise.reject(
+                  new Error(
+                    "Select a connection before opening an ER diagram.",
+                  ),
+                );
+              }
+              return new Promise((resolve, reject) => {
+                const attempt = () => {
+                  void session
+                    .loadErDiagram(profile, schema)
+                    .then(resolve)
+                    .catch((error) => {
+                      if (error instanceof VaultLockedError) {
+                        vaultRetry.current = attempt;
+                        setVaultPrompt("unlock");
+                        return;
+                      }
+                      if (error instanceof VaultMissingError) {
+                        vaultRetry.current = attempt;
+                        setVaultPrompt("create");
+                        return;
+                      }
+                      reject(error);
+                    });
+                };
+                attempt();
+              });
+            }}
+          />
+          </Panel>
+        </Group>
       </div>
 
       {writeGate && (

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { Group, Panel, useDefaultLayout } from "react-resizable-panels";
 import { cn } from "../../lib/cn";
 import { ExplainPlan, PlanNode } from "../../lib/explain";
 import { JsonTree } from "../viewers/JsonTree";
+import { PanelResizeHandle } from "../PanelResizeHandle";
 import { PlanNodeDetail } from "./PlanNodeDetail";
 import { PlanTree } from "./PlanTree";
 
@@ -29,6 +31,10 @@ function findNode(root: PlanNode, id: string): PlanNode | null {
 export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
   const [selectedId, setSelectedId] = useState(plan.root.id);
   const [showRaw, setShowRaw] = useState(false);
+  const layout = useDefaultLayout({
+    id: "explain-plan",
+    storage: localStorage,
+  });
 
   useEffect(() => {
     setSelectedId(plan.root.id);
@@ -121,23 +127,36 @@ export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
           />
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.4fr)_minmax(220px,0.85fr)] overflow-hidden">
-          <div className="flex min-h-0 min-w-0 flex-col border-r border-border">
-            <PlanTree
-              root={plan.root}
-              analyzed={plan.analyzed}
-              selectedId={selectedId}
-              onSelect={(node) => setSelectedId(node.id)}
-              costDenom={costDenom}
-              timeDenom={timeDenom}
-            />
-          </div>
-          <div className="flex min-h-0 min-w-0 flex-col bg-[#13161b]">
-            <div className="shrink-0 border-b border-border px-3 py-1.5 text-[10px] font-semibold tracking-wide text-muted uppercase">
-              Node details
-            </div>
-            <PlanNodeDetail node={selected} analyzed={plan.analyzed} />
-          </div>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <Group
+            id="explain-plan"
+            orientation="horizontal"
+            className="h-full"
+            defaultLayout={layout.defaultLayout}
+            onLayoutChanged={layout.onLayoutChanged}
+          >
+            <Panel id="plan-tree" defaultSize="62%" minSize={220}>
+              <div className="flex h-full min-h-0 min-w-0 flex-col">
+                <PlanTree
+                  root={plan.root}
+                  analyzed={plan.analyzed}
+                  selectedId={selectedId}
+                  onSelect={(node) => setSelectedId(node.id)}
+                  costDenom={costDenom}
+                  timeDenom={timeDenom}
+                />
+              </div>
+            </Panel>
+            <PanelResizeHandle />
+            <Panel id="plan-detail" defaultSize="38%" minSize={180}>
+              <div className="flex h-full min-h-0 min-w-0 flex-col bg-[#13161b]">
+                <div className="shrink-0 border-b border-border px-3 py-1.5 text-[10px] font-semibold tracking-wide text-muted uppercase">
+                  Node details
+                </div>
+                <PlanNodeDetail node={selected} analyzed={plan.analyzed} />
+              </div>
+            </Panel>
+          </Group>
         </div>
       )}
     </div>

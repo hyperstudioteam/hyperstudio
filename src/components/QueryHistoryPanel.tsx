@@ -58,7 +58,7 @@ export function QueryHistoryPanel({
   }, [saved, needle]);
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-l border-border bg-panel">
+    <aside className="flex h-full min-w-0 flex-col bg-panel">
       <header className="flex h-9 shrink-0 items-center border-b border-border bg-[#14171b]">
         <button
           type="button"

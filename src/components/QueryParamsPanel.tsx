@@ -65,7 +65,7 @@ export function QueryParamsPanel({
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-l border-border bg-panel">
+    <aside className="flex h-full min-w-0 flex-col bg-panel">
       <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-[#14171b] px-3">
         <div className="flex items-center gap-1.5 text-[10px] text-[#d5dae3]">
           <Braces size={12} className="text-accent" />

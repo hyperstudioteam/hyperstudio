@@ -308,7 +308,7 @@ export function ConnectionTree({
 
   return (
     <div
-      className="px-[7px] pb-[5px] max-h-[42%] overflow-auto scrollbar-thin-app"
+      className="h-full min-h-0 overflow-auto px-[7px] pb-[5px] scrollbar-thin-app"
       onDragOver={(event) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
