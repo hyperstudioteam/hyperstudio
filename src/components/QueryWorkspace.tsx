@@ -29,6 +29,7 @@ import {
   hasCompletionData,
 } from "../lib/completionSchema";
 import { PanelResizeHandle } from "./PanelResizeHandle";
+import { SelectMenu } from "./SelectMenu";
 import {
   ExplainPlan,
   canVisualizeExplain,
@@ -1019,23 +1020,20 @@ export function QueryWorkspace({
               />
               <label className="flex items-center gap-1.5 text-[10px] text-muted">
                 <span className="sr-only">Connection</span>
-                <select
-                  className="h-[22px] max-w-[200px] cursor-pointer rounded-[5px] border border-border bg-transparent px-1.5 text-[10px] text-[#c4cad4] outline-none hover:border-border-bright focus:border-accent"
+                <SelectMenu
                   value={queryConnectionId}
                   disabled={connections.length === 0}
-                  onChange={(event) => setQueryConnectionId(event.target.value)}
+                  placeholder="No connections"
                   title="Run this console against this connection"
-                >
-                  {connections.length === 0 && (
-                    <option value="">No connections</option>
-                  )}
-                  {connections.map((profile) => (
-                    <option key={profile.id} value={profile.id}>
-                      {profile.name || profile.database || profile.host}
-                      {liveConnectionIds.has(profile.id) ? "" : " · cached"}
-                    </option>
-                  ))}
-                </select>
+                  aria-label="Connection"
+                  options={connections.map((profile) => ({
+                    value: profile.id,
+                    label: `${profile.name || profile.database || profile.host}${
+                      liveConnectionIds.has(profile.id) ? "" : " · cached"
+                    }`,
+                  }))}
+                  onChange={setQueryConnectionId}
+                />
               </label>
             </>
           ) : (
