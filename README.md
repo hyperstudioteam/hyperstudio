@@ -53,6 +53,7 @@ selection, and clipboard extractors — in a small, auditable, MIT-licensed app.
 - [x] External driver plugins (JSON-RPC over stdin/stdout) with local folder/zip install
 - [x] SSH tunnels
 - [x] Connection colour coding and read-only / production guards
+- [x] GitHub sync (push/pull connection tree; vault secrets as ciphertext)
 
 ### Password storage
 
@@ -167,6 +168,12 @@ credential store needs no master password and is greyed out where the system has
 Authenticate with a password, a private key file (`~/.ssh/…` is expanded), or the local
 SSH agent. The host and port on the General tab are the database address *as seen from the
 SSH server* (often a private IP or `localhost`).
+
+**2c. Optional GitHub sync.** Use **⋯ → Sync settings…**, connect with GitHub, and pick a
+repository. **Push** / **Pull** write `hyperstudio.connections.json` on the repo default
+branch. Vault passwords sync as ciphertext (same master password on each machine). Raw and
+keychain secrets stay local. Set `VITE_GITHUB_CLIENT_ID` for a GitHub OAuth App with Device
+Flow enabled.
 
 **3. Browse.** Expand a schema to load its tables. Everything is cached locally, so
 reopening the app shows the tree immediately without connecting. The pool opens on your
