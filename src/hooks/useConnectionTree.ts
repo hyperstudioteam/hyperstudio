@@ -120,6 +120,18 @@ export function useConnectionTree() {
     if (position === "into") expandFolder(targetId);
   }
 
+  function replaceTree(next: TreeNode[]) {
+    setTree(next);
+    const first = firstConnectionId(next);
+    setSelection(first ? { kind: "connection", id: first } : null);
+  }
+
+  function mergeTree(incoming: TreeNode[]) {
+    setTree((current) => [...current, ...incoming]);
+    const first = firstConnectionId(incoming);
+    if (first) setSelection({ kind: "connection", id: first });
+  }
+
   function parentOf(id: string) {
     return findParentFolderId(tree, id) ?? null;
   }
@@ -140,6 +152,8 @@ export function useConnectionTree() {
     saveFolder,
     deleteNode,
     moveNode,
+    replaceTree,
+    mergeTree,
     parentOf,
     findConnection: (id: string) => findConnection(tree, id),
     findFolder: (id: string) => findFolder(tree, id),

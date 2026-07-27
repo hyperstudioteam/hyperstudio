@@ -1,12 +1,14 @@
 import { MouseEvent, useEffect, useState } from "react";
 import {
   CirclePlus,
+  Download,
   FolderPlus,
   Pencil,
   Plug,
   Puzzle,
   RefreshCw,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { ConnectionTree } from "./ConnectionTree";
 import { SchemaBrowser } from "./SchemaBrowser";
@@ -51,6 +53,8 @@ interface ConnectionSidebarProps {
   onNewFolder: (parentId: string | null) => void;
   onEditFolder: (id: string, name: string, parentId: string | null) => void;
   onDelete: (id: string) => void;
+  onExportConnections: () => void;
+  onImportConnections: () => void;
   onViewTable: (schema: string, table: string) => void;
   onEditTable: (schema: string, table: string) => void;
   onShowEr: (schema: string) => void;
@@ -98,6 +102,23 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
       <div className="h-11 px-[11px] pl-3.5 flex items-center justify-between text-[#aab1be] text-[10px] font-bold tracking-[0.08em] uppercase">
         <span>Connections</span>
         <div className="flex gap-0.5">
+          <button
+            className={iconButtonClass}
+            aria-label="Import connections"
+            title="Import connections"
+            onClick={props.onImportConnections}
+          >
+            <Upload size={15} />
+          </button>
+          <button
+            className={iconButtonClass}
+            aria-label="Export connections"
+            title="Export connections"
+            onClick={props.onExportConnections}
+            disabled={props.tree.length === 0}
+          >
+            <Download size={15} />
+          </button>
           <button
             className={iconButtonClass}
             aria-label="New folder"
