@@ -10,8 +10,49 @@ permissions:
   contents: write
 
 jobs:
+  prepare:
+    name: Prepare release notes
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      body: ${{ steps.notes.outputs.body }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: meta
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v$(jq -r .version src-tauri/tauri.conf.json)"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NOTES=$(gh api "repos/${{ github.repository }}/releases/generate-notes" \
+            -f tag_name="$TAG" \
+            -f target_commitish="${{ github.sha }}" \
+            --jq .body)
+          {
+            echo "body<<EOF"
+            printf '%s\n' "$NOTES"
+            echo ""
+            echo "Download the installer for your platform from the assets below."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
   publish-tauri:
     name: Build ${{ matrix.platform }}
+    needs: prepare
     strategy:
       fail-fast: false
       matrix:
@@ -61,12 +102,9 @@ jobs:
           VITE_GITHUB_CLIENT_ID: ${{ secrets.VITE_GITHUB_CLIENT_ID }}
         with:
           tauriScript: pnpm tauri
-          tagName: v__VERSION__
-          releaseName: HyperStudio v__VERSION__
-          releaseBody: |
-            HyperStudio ${{ github.ref_name }}
-
-            Download the installer for your platform from the assets below.
+          tagName: ${{ needs.prepare.outputs.tag }}
+          releaseName: HyperStudio ${{ needs.prepare.outputs.tag }}
+          releaseBody: ${{ needs.prepare.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
