@@ -5,9 +5,11 @@ import {
   LoaderCircle,
   MinusCircle,
 } from "lucide-react";
+import { Group, Panel, useDefaultLayout } from "react-resizable-panels";
 import { cn } from "../lib/cn";
 import { StatementRun, statementLabel, summarize } from "../lib/scriptRun";
 import { ConnectionProfile } from "../types/connection";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 import { ResultGrid } from "./ResultGrid";
 
 interface ScriptResultsProps {
@@ -37,47 +39,62 @@ export function ScriptResults({
   onSelect,
 }: ScriptResultsProps) {
   const active = runs[activeIndex] ?? null;
+  const layout = useDefaultLayout({
+    id: "script-results",
+    storage: localStorage,
+  });
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(180px,240px)_1fr] overflow-hidden">
-      <ol className="m-0 min-h-0 list-none overflow-y-auto border-r border-border bg-[#12151a] p-0">
-        {runs.map((run, index) => (
-          <li key={`${index}-${run.line}`}>
-            <button
-              type="button"
-              className={cn(
-                "flex w-full cursor-pointer items-start gap-1.5 border-0 border-b border-border bg-transparent px-2 py-1.5 text-left hover:bg-panel-soft",
-                index === activeIndex && "bg-accent-soft",
-              )}
-              onClick={() => onSelect(index)}
-            >
-              <span className="mt-px shrink-0">
-                <StatusIcon status={run.status} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-mono text-[10px] text-[#c4cad4]">
-                  {statementLabel(run.sql)}
+    <Group
+      id="script-results"
+      orientation="horizontal"
+      className="min-h-0 flex-1"
+      defaultLayout={layout.defaultLayout}
+      onLayoutChanged={layout.onLayoutChanged}
+    >
+      <Panel id="script-list" defaultSize={240} minSize={160} maxSize={420}>
+        <ol className="m-0 h-full min-h-0 list-none overflow-y-auto bg-[#12151a] p-0">
+          {runs.map((run, index) => (
+            <li key={`${index}-${run.line}`}>
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full cursor-pointer items-start gap-1.5 border-0 border-b border-border bg-transparent px-2 py-1.5 text-left hover:bg-panel-soft",
+                  index === activeIndex && "bg-accent-soft",
+                )}
+                onClick={() => onSelect(index)}
+              >
+                <span className="mt-px shrink-0">
+                  <StatusIcon status={run.status} />
                 </span>
-                <span
-                  className={cn(
-                    "block truncate text-[9px] text-subtle",
-                    run.status === "error" && "text-red",
-                  )}
-                >
-                  {summarize(run) || `line ${run.line}`}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-[10px] text-[#c4cad4]">
+                    {statementLabel(run.sql)}
+                  </span>
+                  <span
+                    className={cn(
+                      "block truncate text-[9px] text-subtle",
+                      run.status === "error" && "text-red",
+                    )}
+                  >
+                    {summarize(run) || `line ${run.line}`}
+                  </span>
                 </span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
-      <div className="flex min-h-0 flex-col overflow-hidden">
-        <ResultGrid
-          result={active?.status === "ok" ? active.result : null}
-          error={active?.status === "error" ? active.error : ""}
-          driver={driver}
-        />
-      </div>
-    </div>
+              </button>
+            </li>
+          ))}
+        </ol>
+      </Panel>
+      <PanelResizeHandle />
+      <Panel id="script-result" minSize={200}>
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <ResultGrid
+            result={active?.status === "ok" ? active.result : null}
+            error={active?.status === "error" ? active.error : ""}
+            driver={driver}
+          />
+        </div>
+      </Panel>
+    </Group>
   );
 }

@@ -172,9 +172,9 @@ export function ExtensionView({
   return (
     <aside
       className={cn(
-        "relative flex w-[340px] shrink-0 flex-col border-l border-border bg-panel",
+        "relative flex h-full min-w-0 flex-col bg-panel",
         view.location === "panel.modal" &&
-          "fixed left-1/2 top-1/2 z-30 h-[min(680px,calc(100vh-48px))] w-[min(520px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 rounded-lg border shadow-2xl",
+          "fixed left-1/2 top-1/2 z-30 h-[min(680px,calc(100vh-48px))] w-[min(520px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border shadow-2xl",
       )}
     >
       <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-[#14171b] px-3">

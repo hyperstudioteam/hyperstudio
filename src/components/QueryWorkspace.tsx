@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Group, Panel, useDefaultLayout } from "react-resizable-panels";
 import {
   Check,
   ChevronLeft,
@@ -27,6 +28,7 @@ import {
   defaultSchemaFor,
   hasCompletionData,
 } from "../lib/completionSchema";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 import {
   ExplainPlan,
   canVisualizeExplain,
@@ -168,6 +170,8 @@ type ErTab = {
   kind: "er";
   title: string;
   schema: string;
+  /** Connection the diagram was opened against. */
+  connectionId: string;
 };
 
 type WorkspaceTab = QueryTab | EditTab | ErTab;
@@ -194,7 +198,7 @@ interface QueryWorkspaceProps {
     connectionId: string,
     confirmedWrite?: boolean,
   ) => Promise<QueryResult>;
-  onLoadEr: (schema: string) => Promise<ErDiagram>;
+  onLoadEr: (schema: string, connectionId: string) => Promise<ErDiagram>;
   onCancel?: (connectionId: string) => void;
   onBeginTransaction?: (connectionId: string) => void;
   onEndTransaction?: (connectionId: string, commit: boolean) => void;
@@ -209,6 +213,19 @@ interface QueryWorkspaceProps {
     preview: string,
   ) => Promise<boolean>;
 }
+
+function defaultWorkspaceTabs(): WorkspaceTab[] {
+  return [
+    {
+      id: "query-1",
+      kind: "query",
+      title: "Query 1",
+      sql: STARTER_QUERY,
+      connectionId: "",
+    },
+  ];
+}
+
 
 function findTableMeta(
   connectionId: string,
@@ -243,15 +260,7 @@ export function QueryWorkspace({
   onExecuteBatch,
   onConfirmWrites,
 }: QueryWorkspaceProps) {
-  const [tabs, setTabs] = useState<WorkspaceTab[]>([
-    {
-      id: "query-1",
-      kind: "query",
-      title: "Query 1",
-      sql: STARTER_QUERY,
-      connectionId: "",
-    },
-  ]);
+  const [tabs, setTabs] = useState<WorkspaceTab[]>(() => defaultWorkspaceTabs());
   const [activeId, setActiveId] = useState("query-1");
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
@@ -286,6 +295,30 @@ export function QueryWorkspace({
   const editorRef = useRef<SqlEditorHandle>(null);
   const activeExtensionView = useActiveExtensionView();
   const extensionStatusItems = useExtensionStatusItems();
+  const showParamsDock = Boolean(pendingParams && !activeExtensionView);
+  const showHistoryDock = Boolean(
+    historyOpen && !activeExtensionView && !pendingParams,
+  );
+  const showExtensionDock = Boolean(
+    activeExtensionView &&
+      activeExtensionView.view.location === "panel.right",
+  );
+  const showRightDock = showParamsDock || showHistoryDock || showExtensionDock;
+  const showExtensionModal = Boolean(
+    activeExtensionView &&
+      activeExtensionView.view.location === "panel.modal",
+  );
+  const editorResultsLayout = useDefaultLayout({
+    id: "editor-results",
+    storage: localStorage,
+  });
+  const workspaceLayout = useDefaultLayout({
+    id: "query-workspace",
+    storage: localStorage,
+    panelIds: showRightDock
+      ? ["workspace-main", "right-dock"]
+      : ["workspace-main"],
+  });
   const queryCounter = useRef(1);
   const cancelScript = useRef(false);
   /** SQL awaiting its result so the run can be recorded once it settles. */
@@ -294,7 +327,7 @@ export function QueryWorkspace({
 
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0] ?? null;
   const activeConnectionId =
-    active?.kind === "query" || active?.kind === "edit"
+    active?.kind === "query" || active?.kind === "edit" || active?.kind === "er"
       ? active.connectionId
       : selected?.id ?? "";
   const activeConnection =
@@ -358,11 +391,16 @@ export function QueryWorkspace({
           changed = true;
           return { ...tab, connectionId: selected.id };
         }
+        if (tab.kind === "er" && !tab.connectionId) {
+          changed = true;
+          return { ...tab, connectionId: selected.id };
+        }
         return tab;
       });
       return changed ? next : current;
     });
   }, [selected?.id]);
+
 
   function setQueryConnectionId(connectionId: string) {
     if (!active || active.kind !== "query") return;
@@ -505,9 +543,23 @@ export function QueryWorkspace({
     }
 
     if (openRequest.kind === "er") {
-      const id = `er-${openRequest.schema}`;
+      const id = `er-${selected.id}:${openRequest.schema}`;
+      const legacyId = `er-${openRequest.schema}`;
       setTabs((current) => {
-        if (current.some((tab) => tab.id === id)) return current;
+        const existing = current.find(
+          (tab) =>
+            tab.kind === "er" && (tab.id === id || tab.id === legacyId),
+        );
+        if (existing) {
+          setActiveId(existing.id);
+          if (existing.connectionId) return current;
+          return current.map((tab) =>
+            tab.id === existing.id
+              ? { ...tab, connectionId: selected.id }
+              : tab,
+          );
+        }
+        setActiveId(id);
         return [
           ...current,
           {
@@ -515,11 +567,11 @@ export function QueryWorkspace({
             kind: "er",
             title: `${openRequest.schema} · ER`,
             schema: openRequest.schema,
+            connectionId: selected.id,
           },
         ];
       });
-      setActiveId(id);
-      void loadErDiagram(openRequest.schema);
+      void loadErDiagram(openRequest.schema, selected.id);
       return;
     }
 
@@ -543,11 +595,20 @@ export function QueryWorkspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openRequest?.nonce]);
 
-  async function loadErDiagram(schema: string) {
+  async function loadErDiagram(schema: string, connectionId?: string) {
+    const resolvedConnectionId =
+      connectionId ||
+      (active?.kind === "er" ? active.connectionId : "") ||
+      selected?.id ||
+      "";
+    if (!resolvedConnectionId) {
+      setErError("Select a connection before opening an ER diagram.");
+      return;
+    }
     setErBusy(true);
     setErError("");
     try {
-      setErDiagram(await onLoadEr(schema));
+      setErDiagram(await onLoadEr(schema, resolvedConnectionId));
     } catch (nextError) {
       setErDiagram(null);
       setErError(errorMessage(nextError));
@@ -555,6 +616,15 @@ export function QueryWorkspace({
       setErBusy(false);
     }
   }
+
+  // Restore ER diagrams for persisted tabs when they become active.
+  useEffect(() => {
+    if (active?.kind !== "er") return;
+    if (erDiagram?.schema === active.schema) return;
+    void loadErDiagram(active.schema, active.connectionId);
+    // Only react to tab switches; loadErDiagram closes over the latest callbacks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
 
   function setQuerySql(sql: string) {
     if (!active || active.kind !== "query") return;
@@ -882,15 +952,16 @@ export function QueryWorkspace({
   }
 
   return (
-    <div className="flex min-w-0 overflow-hidden">
-    <main
-      className={cn(
-        "min-w-0 flex-1 grid overflow-hidden bg-bg",
-        active?.kind === "edit" || active?.kind === "er"
-          ? "grid-rows-[36px_1fr_23px]"
-          : "grid-rows-[36px_minmax(190px,42%)_1fr_23px]",
-      )}
-    >
+    <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
+      <Group
+        id="query-workspace"
+        orientation="horizontal"
+        className="h-full min-w-0 flex-1"
+        defaultLayout={workspaceLayout.defaultLayout}
+        onLayoutChanged={workspaceLayout.onLayoutChanged}
+      >
+        <Panel id="workspace-main" minSize={320} className="min-w-0">
+          <main className="grid h-full min-h-0 grid-rows-[36px_1fr_23px] overflow-hidden bg-bg">
       <div className="flex items-stretch overflow-x-auto border-b border-border bg-titlebar">
         {tabs.map((tab) => (
           <button
@@ -1023,11 +1094,20 @@ export function QueryWorkspace({
           diagram={erDiagram?.schema === active.schema ? erDiagram : null}
           busy={erBusy}
           error={erError}
-          onRefresh={() => void loadErDiagram(active.schema)}
+          onRefresh={() =>
+            void loadErDiagram(active.schema, active.connectionId)
+          }
         />
       ) : (
-        <>
-          <section className="flex min-h-0 flex-col border-b border-border">
+        <Group
+          id="editor-results"
+          orientation="vertical"
+          className="min-h-0"
+          defaultLayout={editorResultsLayout.defaultLayout}
+          onLayoutChanged={editorResultsLayout.onLayoutChanged}
+        >
+          <Panel id="sql-editor" defaultSize="42%" minSize={120}>
+          <section className="flex h-full min-h-0 flex-col">
             <div className="flex h-9 shrink-0 items-center gap-[9px] border-b border-border bg-[#14171b] px-[9px]">
               <button
                 className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-2 text-[10px] font-semibold text-[#c9c2ff] hover:border-accent hover:bg-[rgba(139,124,246,.22)] hover:text-white disabled:opacity-60"
@@ -1238,8 +1318,12 @@ export function QueryWorkspace({
               />
             </div>
           </section>
+          </Panel>
 
-          <section className="flex min-h-0 flex-col overflow-hidden">
+          <PanelResizeHandle />
+
+          <Panel id="query-results" minSize={100}>
+          <section className="flex h-full min-h-0 flex-col overflow-hidden">
             <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-border bg-[#14171b]">
               <div className="flex">
                 <button
@@ -1402,7 +1486,8 @@ export function QueryWorkspace({
               />
             )}
           </section>
-        </>
+          </Panel>
+        </Group>
       )}
 
       {exportOpen && result && (
@@ -1483,29 +1568,66 @@ export function QueryWorkspace({
           UTF-8 <span>LF</span> SQL
         </span>
       </footer>
-    </main>
+          </main>
+        </Panel>
 
-      {pendingParams && !activeExtensionView && (
-        <QueryParamsPanel
-          params={pendingParams.params}
-          busy={busy === "query" || scriptBusy}
-          onConfirm={confirmQueryParams}
-          onClose={() => setPendingParams(null)}
-        />
-      )}
-      {historyOpen && !activeExtensionView && !pendingParams && (
-        <QueryHistoryPanel
-          history={history}
-          saved={saved}
-          connectionId={queryConnectionId || selected?.id || null}
-          onClose={() => setHistoryOpen(false)}
-          onUse={useHistorySql}
-          onDeleteHistory={(id) => setHistory(removeHistoryEntry(id))}
-          onClearHistory={() => setHistory(clearHistory())}
-          onDeleteSaved={(id) => setSaved(removeSavedQuery(id))}
-        />
-      )}
-      {activeExtensionView && (
+        {showRightDock && (
+          <>
+            <PanelResizeHandle />
+            <Panel
+              id="right-dock"
+              defaultSize={300}
+              minSize={220}
+              maxSize={560}
+              className="min-w-0"
+            >
+              {showParamsDock && pendingParams && (
+                <QueryParamsPanel
+                  params={pendingParams.params}
+                  busy={busy === "query" || scriptBusy}
+                  onConfirm={confirmQueryParams}
+                  onClose={() => setPendingParams(null)}
+                />
+              )}
+              {showHistoryDock && (
+                <QueryHistoryPanel
+                  history={history}
+                  saved={saved}
+                  connectionId={queryConnectionId || selected?.id || null}
+                  onClose={() => setHistoryOpen(false)}
+                  onUse={useHistorySql}
+                  onDeleteHistory={(id) => setHistory(removeHistoryEntry(id))}
+                  onClearHistory={() => setHistory(clearHistory())}
+                  onDeleteSaved={(id) => setSaved(removeSavedQuery(id))}
+                />
+              )}
+              {showExtensionDock && activeExtensionView && (
+                <ExtensionView
+                  view={activeExtensionView.view}
+                  context={{
+                    ...activeExtensionView.context,
+                    sql: editorRef.current?.getSql() ?? query,
+                    selectedSql: editorRef.current?.getSelectedSql() ?? "",
+                    driver: queryConnection?.driver,
+                    connectionId: queryConnectionId || null,
+                  }}
+                  onClose={() => extensionRegistry.closeView()}
+                  getEditorSql={() => editorRef.current?.getSql() ?? query}
+                  getSelectedSql={() =>
+                    editorRef.current?.getSelectedSql() ?? ""
+                  }
+                  insertEditorSql={(sql) => editorRef.current?.insertSql(sql)}
+                  replaceSelection={(sql) =>
+                    editorRef.current?.replaceSelection(sql)
+                  }
+                />
+              )}
+            </Panel>
+          </>
+        )}
+      </Group>
+
+      {showExtensionModal && activeExtensionView && (
         <ExtensionView
           view={activeExtensionView.view}
           context={{

@@ -1,4 +1,5 @@
 import { MouseEvent, useEffect, useRef, useState } from "react";
+import { Group, Panel, useDefaultLayout } from "react-resizable-panels";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -17,6 +18,7 @@ import {
 import { ConnectionTree } from "./ConnectionTree";
 import { SchemaBrowser } from "./SchemaBrowser";
 import { ContextMenu, ContextMenuSeparator } from "./ContextMenu";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 import {
   ConnectionProfile,
   DropPosition,
@@ -85,6 +87,13 @@ const contextDangerClass =
 
 export function ConnectionSidebar(props: ConnectionSidebarProps) {
   const extensionMenu = useExtensionMenu("connection/context");
+  const sidebarLayout = useDefaultLayout({
+    id: "connection-sidebar",
+    storage: localStorage,
+    panelIds: props.selected
+      ? ["connection-tree", "schema-browser"]
+      : ["connection-tree"],
+  });
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -131,8 +140,8 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
     props.selection?.kind === "folder" ? props.selection.id : null;
 
   return (
-    <aside className="min-w-0 flex flex-col bg-panel border-r border-border overflow-hidden">
-      <div className="h-11 px-[11px] pl-3.5 flex items-center justify-between text-[#aab1be] text-[10px] font-bold tracking-[0.08em] uppercase">
+    <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-panel">
+      <div className="flex h-11 shrink-0 items-center justify-between px-[11px] pl-3.5 text-[10px] font-bold tracking-[0.08em] text-[#aab1be] uppercase">
         <span>Connections</span>
         <div className="flex gap-0.5">
           <div className="relative" ref={actionsMenuRef}>
@@ -241,62 +250,79 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
         </div>
       </div>
 
-      {props.tree.length === 0 ? (
-        <div className="px-[7px] pb-[5px] max-h-[42%] overflow-auto scrollbar-thin-app">
-          <button
-            className="w-full py-[18px] px-2 border border-dashed border-border-bright text-muted rounded-[7px] bg-transparent flex flex-col items-center gap-[7px] cursor-pointer text-[11px] hover:text-text hover:border-accent hover:bg-accent-soft"
-            onClick={() => props.onNewConnection(null)}
-          >
-            <CirclePlus size={18} />
-            <span>Add your first database</span>
-          </button>
-        </div>
-      ) : (
-        <ConnectionTree
-          nodes={props.tree}
-          selection={props.selection}
-          expanded={props.expanded}
-          liveConnectionIds={props.liveConnectionIds}
-          onSelect={props.onSelect}
-          onToggle={props.onToggleFolder}
-          onConnect={(id) => {
-            const profile = props.findConnection(id);
-            if (profile) props.onConnect(profile);
-          }}
-          onContextMenu={openContextMenu}
-          onMove={props.onMove}
-        />
-      )}
-
-      {props.selected && (
-        <SchemaBrowser
-          profile={props.selected}
-          live={props.liveConnectionIds.has(props.selected.id)}
-          hasCache={props.hasSchemaCache}
-          busy={props.busy}
-          busyDetail={props.busyDetail}
-          schemas={props.schemas}
-          objectSubgroups={props.objectSubgroups}
-          expanded={props.schemaExpanded}
-          onConnect={() => props.onConnect(props.selected!)}
-          onRefreshDatabase={() => props.onRefreshDatabase(props.selected!)}
-          onRefreshSchema={(schema) =>
-            props.onRefreshSchema(props.selected!, schema)
-          }
-          onRefreshGroup={(schema, group) =>
-            props.onRefreshGroup(props.selected!, schema, group)
-          }
-          onEdit={() => props.onEditConnection(props.selected!)}
-          onToggle={props.onToggleSchema}
-          onViewTable={props.onViewTable}
-          onEditTable={props.onEditTable}
-          onShowEr={props.onShowEr}
-          onNewConsole={props.onNewConsole}
-          onImportCsv={props.onImportCsv}
-          readonly={props.schemaReadonly}
-        />
-      )}
-
+      <Group
+        id="connection-sidebar"
+        orientation="vertical"
+        className="min-h-0 flex-1"
+        defaultLayout={sidebarLayout.defaultLayout}
+        onLayoutChanged={sidebarLayout.onLayoutChanged}
+      >
+        <Panel id="connection-tree" defaultSize="42%" minSize={100}>
+          {props.tree.length === 0 ? (
+            <div className="h-full min-h-0 overflow-auto px-[7px] pb-[5px] scrollbar-thin-app">
+              <button
+                className="flex w-full cursor-pointer flex-col items-center gap-[7px] rounded-[7px] border border-dashed border-border-bright bg-transparent px-2 py-[18px] text-[11px] text-muted hover:border-accent hover:bg-accent-soft hover:text-text"
+                onClick={() => props.onNewConnection(null)}
+              >
+                <CirclePlus size={18} />
+                <span>Add your first database</span>
+              </button>
+            </div>
+          ) : (
+            <ConnectionTree
+              nodes={props.tree}
+              selection={props.selection}
+              expanded={props.expanded}
+              liveConnectionIds={props.liveConnectionIds}
+              onSelect={props.onSelect}
+              onToggle={props.onToggleFolder}
+              onConnect={(id) => {
+                const profile = props.findConnection(id);
+                if (profile) props.onConnect(profile);
+              }}
+              onContextMenu={openContextMenu}
+              onMove={props.onMove}
+            />
+          )}
+        </Panel>
+        {props.selected && (
+          <>
+            <PanelResizeHandle />
+            <Panel id="schema-browser" minSize={140}>
+              <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                <SchemaBrowser
+                  profile={props.selected}
+                  live={props.liveConnectionIds.has(props.selected.id)}
+                  hasCache={props.hasSchemaCache}
+                  busy={props.busy}
+                  busyDetail={props.busyDetail}
+                  schemas={props.schemas}
+                  objectSubgroups={props.objectSubgroups}
+                  expanded={props.schemaExpanded}
+                  onConnect={() => props.onConnect(props.selected!)}
+                  onRefreshDatabase={() =>
+                    props.onRefreshDatabase(props.selected!)
+                  }
+                  onRefreshSchema={(schema) =>
+                    props.onRefreshSchema(props.selected!, schema)
+                  }
+                  onRefreshGroup={(schema, group) =>
+                    props.onRefreshGroup(props.selected!, schema, group)
+                  }
+                  onEdit={() => props.onEditConnection(props.selected!)}
+                  onToggle={props.onToggleSchema}
+                  onViewTable={props.onViewTable}
+                  onEditTable={props.onEditTable}
+                  onShowEr={props.onShowEr}
+                  onNewConsole={props.onNewConsole}
+                  onImportCsv={props.onImportCsv}
+                  readonly={props.schemaReadonly}
+                />
+              </div>
+            </Panel>
+          </>
+        )}
+      </Group>
       {contextMenu && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y}>
           {contextMenu.target?.kind === "folder" && (
