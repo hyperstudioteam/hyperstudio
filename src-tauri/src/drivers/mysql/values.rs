@@ -46,7 +46,7 @@ pub fn decode(row: &MySqlRow, index: usize) -> Value {
     } else if kind.starts_with("TIME") {
         row.try_get::<chrono::NaiveTime, _>(index)
             .map(|value| Value::String(value.to_string()))
-    } else if (kind.contains("BLOB") || kind.contains("BINARY")) {
+    } else if kind.contains("BLOB") || kind.contains("BINARY") {
         match row.try_get::<Vec<u8>, _>(index) {
             Ok(bytes) => {
                 // DESCRIBE / SHOW and some metadata columns arrive as BINARY

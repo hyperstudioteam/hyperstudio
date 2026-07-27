@@ -1,3 +1,4 @@
+import { databaseApi } from "../api/database";
 import { ConnectionProfile } from "../types/connection";
 import {
   ConnectionSchemaCache,
@@ -8,40 +9,32 @@ import {
   TABLES_GROUP,
 } from "../types/schema";
 
+/** Legacy localStorage keys — migrated once into the app-data file. */
 const STORAGE_KEY = "hyperstudio.schema-cache.v2";
 const LEGACY_STORAGE_KEY = "hyperstudio.schema-cache.v1";
 
 const cacheByConnection = new Map<string, ConnectionSchemaCache>();
 
-function hydrate() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, ConnectionSchemaCache>;
-      if (parsed && typeof parsed === "object") {
-        for (const [connectionId, cache] of Object.entries(parsed)) {
-          if (!cache || !Array.isArray(cache.schemas)) continue;
-          cacheByConnection.set(connectionId, {
-            schemas: cache.schemas,
-            objectsBySchema:
-              cache.objectsBySchema && typeof cache.objectsBySchema === "object"
-                ? cache.objectsBySchema
-                : {},
-          });
-        }
-      }
-      return;
-    }
-    hydrateLegacy();
-  } catch {
-    // Ignore corrupt cache and start fresh.
+let hydratePromise: Promise<void> | null = null;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let persistChain: Promise<void> = Promise.resolve();
+
+function applyParsed(parsed: Record<string, ConnectionSchemaCache>) {
+  cacheByConnection.clear();
+  for (const [connectionId, cache] of Object.entries(parsed)) {
+    if (!cache || !Array.isArray(cache.schemas)) continue;
+    cacheByConnection.set(connectionId, {
+      schemas: cache.schemas,
+      objectsBySchema:
+        cache.objectsBySchema && typeof cache.objectsBySchema === "object"
+          ? cache.objectsBySchema
+          : {},
+    });
   }
 }
 
 /** Fold the v1 shape (tables only) into the "tables" group. */
-function hydrateLegacy() {
-  const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
-  if (!raw) return;
+function parseLegacy(raw: string): Record<string, ConnectionSchemaCache> {
   const parsed = JSON.parse(raw) as Record<
     string,
     {
@@ -52,7 +45,8 @@ function hydrateLegacy() {
       >;
     }
   >;
-  if (!parsed || typeof parsed !== "object") return;
+  if (!parsed || typeof parsed !== "object") return {};
+  const next: Record<string, ConnectionSchemaCache> = {};
   for (const [connectionId, cache] of Object.entries(parsed)) {
     if (!cache || !Array.isArray(cache.schemas)) continue;
     const objectsBySchema: Record<string, ObjectsByGroup> = {};
@@ -65,24 +59,92 @@ function hydrateLegacy() {
         })),
       };
     }
-    cacheByConnection.set(connectionId, {
+    next[connectionId] = {
       schemas: cache.schemas,
       objectsBySchema,
-    });
+    };
   }
-  localStorage.removeItem(LEGACY_STORAGE_KEY);
-  persist();
+  return next;
 }
 
-function persist() {
+function loadFromLocalStorage(): Record<string, ConnectionSchemaCache> | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, ConnectionSchemaCache>;
+      if (parsed && typeof parsed === "object") return parsed;
+    }
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy) return parseLegacy(legacy);
+  } catch {
+    // Ignore corrupt cache and start fresh.
+  }
+  return null;
+}
+
+function clearLocalStorageCache() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
+  } catch {
+    // Best-effort cleanup.
+  }
+}
+
+function serialize(): string {
   const payload: Record<string, ConnectionSchemaCache> = {};
   for (const [connectionId, cache] of cacheByConnection.entries()) {
     payload[connectionId] = cache;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  return JSON.stringify(payload);
 }
 
-hydrate();
+function persist() {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const contents = serialize();
+    persistChain = persistChain
+      .then(() => databaseApi.writeSchemaCache(contents))
+      .then(() => {
+        clearLocalStorageCache();
+      })
+      .catch(() => {
+        // Disk write failed; keep the in-memory cache usable.
+      });
+  }, 100);
+}
+
+/**
+ * Load schema cache from the app-data file (or migrate from localStorage).
+ * Safe to call multiple times; subsequent calls share the same promise.
+ */
+export function hydrateSchemaCache(): Promise<void> {
+  if (!hydratePromise) {
+    hydratePromise = (async () => {
+      try {
+        const raw = await databaseApi.readSchemaCache();
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, ConnectionSchemaCache>;
+          if (parsed && typeof parsed === "object") {
+            applyParsed(parsed);
+            clearLocalStorageCache();
+            return;
+          }
+        }
+      } catch {
+        // Fall through to localStorage migration.
+      }
+
+      const fromLocal = loadFromLocalStorage();
+      if (fromLocal) {
+        applyParsed(fromLocal);
+        persist();
+      }
+    })();
+  }
+  return hydratePromise;
+}
 
 export function getSchemaCache(
   connectionId: string,

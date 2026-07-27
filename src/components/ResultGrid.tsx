@@ -16,6 +16,7 @@ import { presentCell } from "../plugins/contributions";
 import {
   CellRange,
   ExtractorId,
+  extractSelection,
   isCellInRange,
   selectionStats,
 } from "../lib/extractors";
@@ -60,6 +61,7 @@ export function ResultGrid({
   const [sort, setSort] = useState<ColumnSort | null>(null);
   const [filters, setFilters] = useState<ColumnFilter[]>([]);
   const dragging = useRef(false);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo(() => result?.columns ?? [], [result]);
   const sourceRows = useMemo(() => result?.rows ?? [], [result]);
@@ -111,28 +113,47 @@ export function ResultGrid({
   }, [contextMenu]);
 
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "c") {
-        return;
-      }
-      if (!cellRange || !result) return;
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.isContentEditable)
-      ) {
-        return;
-      }
-      event.preventDefault();
-      void handleCopy(extractor);
+    function isEditingField(target: EventTarget | null) {
+      const el = target as HTMLElement | null;
+      return Boolean(
+        el &&
+          (el.tagName === "INPUT" ||
+            el.tagName === "TEXTAREA" ||
+            el.isContentEditable),
+      );
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [cellRange, extractor, includeHeader, result]);
+
+    function onCopy(event: ClipboardEvent) {
+      if (!cellRange || !result || isEditingField(event.target)) return;
+      try {
+        const text = extractSelection({
+          extractor,
+          driver,
+          columns: result.columns,
+          matrix,
+          range: cellRange,
+          includeHeader,
+        });
+        event.preventDefault();
+        event.clipboardData?.setData("text/plain", text);
+        setCopyFlash("Copied");
+        setCopyError("");
+        window.setTimeout(() => setCopyFlash(""), 1200);
+      } catch (nextError) {
+        setCopyError(errorMessage(nextError));
+      }
+    }
+
+    window.addEventListener("copy", onCopy);
+    return () => window.removeEventListener("copy", onCopy);
+  }, [cellRange, extractor, includeHeader, result, matrix, driver]);
+
+  function focusGrid() {
+    gridRef.current?.focus({ preventScroll: true });
+  }
 
   function beginSelect(row: number, col: number, extend: boolean) {
+    focusGrid();
     setCellRange((current) => {
       if (extend && current) {
         return { anchor: current.anchor, focus: { row, col } };
@@ -248,7 +269,9 @@ export function ResultGrid({
         </span>
       </div>
       <div
-        className="scrollbar-thin-app flex-1 overflow-auto"
+        ref={gridRef}
+        tabIndex={0}
+        className="scrollbar-thin-app flex-1 overflow-auto outline-none"
         onMouseLeave={() => {
           dragging.current = false;
         }}

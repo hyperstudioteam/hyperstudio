@@ -140,6 +140,18 @@ export const databaseApi = {
   alterKey(connectionId: string, request: AlterKeyRequest) {
     return invoke<void>("alter_key", { connectionId, request });
   },
+  readSchemaCache() {
+    return invoke<string | null>("read_schema_cache");
+  },
+  writeSchemaCache(contents: string) {
+    return invoke<void>("write_schema_cache", { contents });
+  },
+  writeTextFile(path: string, contents: string, append = false) {
+    return invoke<void>("write_export_chunk", { path, contents, append });
+  },
+  readTextFile(path: string) {
+    return invoke<string>("read_text_file", { path });
+  },
 };
 
 export const pluginsApi = {

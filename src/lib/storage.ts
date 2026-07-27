@@ -71,7 +71,7 @@ function prepareTreeForDisk(nodes: TreeNode[]): TreeNode[] {
   });
 }
 
-function normalizeLoadedProfile(
+export function normalizeLoadedProfile(
   profile: Partial<ConnectionProfile>,
 ): ConnectionProfile {
   const passwordStorage = normalizeStorage(profile.passwordStorage);
@@ -103,7 +103,7 @@ function normalizeLoadedProfile(
   };
 }
 
-function normalizeTree(nodes: TreeNode[]): TreeNode[] {
+export function normalizeTree(nodes: TreeNode[]): TreeNode[] {
   return nodes.map((node) => {
     if (node.kind === "folder") {
       return { ...node, children: normalizeTree(node.children) };
@@ -113,6 +113,11 @@ function normalizeTree(nodes: TreeNode[]): TreeNode[] {
       profile: normalizeLoadedProfile(node.profile),
     };
   });
+}
+
+/** Strip managed secrets the same way local persistence does. */
+export function sanitizeTreeForDisk(nodes: TreeNode[]): TreeNode[] {
+  return prepareTreeForDisk(nodes);
 }
 
 function migrateLegacyProfiles(raw: unknown): TreeNode[] {
