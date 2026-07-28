@@ -155,6 +155,7 @@ impl From<&ManifestCapabilities> for DriverCapabilities {
     fn from(value: &ManifestCapabilities) -> Self {
         Self {
             schemas: value.schemas,
+            databases: false,
             views: value.views,
             file_based: value.file_based,
             folder_based: value.folder_based,

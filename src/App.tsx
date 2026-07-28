@@ -87,6 +87,7 @@ function App() {
   );
   const [modalFolderId, setModalFolderId] = useState<string | null>(null);
   const [modalSchemas, setModalSchemas] = useState<SchemaInfo[]>([]);
+  const [modalDatabases, setModalDatabases] = useState<SchemaInfo[]>([]);
   const [folderModal, setFolderModal] = useState<{
     id?: string;
     name: string;
@@ -202,6 +203,7 @@ function App() {
     setModalProfile(tree.createBlank());
     setModalFolderId(folderId);
     setModalSchemas([]);
+    setModalDatabases([]);
   }
 
   async function handleExportConnections() {
@@ -415,6 +417,7 @@ function App() {
     setModalProfile(next);
     setModalFolderId(tree.parentOf(profile.id));
     setModalSchemas(session.availableSchemas);
+    setModalDatabases(session.availableDatabases);
   }
 
   async function withVaultGate(action: () => Promise<void>) {
@@ -607,7 +610,9 @@ function App() {
             busy={session.busy}
             busyDetail={session.busyDetail}
             schemas={session.schemas}
+            schemasByDatabase={session.schemasByDatabase}
             objectSubgroups={session.objectSubgroups}
+            availableDatabases={session.availableDatabases}
             schemaExpanded={session.schemaExpanded}
             hasSchemaCache={hasSchemaCacheUi}
             onSelect={tree.setSelection}
@@ -625,6 +630,14 @@ function App() {
             onRefreshDatabase={(profile) =>
               void withVaultGate(() => session.refreshDatabase(profile))
             }
+            onSwitchDatabase={(profile, database) => {
+              void withVaultGate(async () => {
+                const next = await session.switchDatabase(profile, database);
+                if (next && next.database !== profile.database) {
+                  tree.saveConnection(next, tree.parentOf(profile.id));
+                }
+              });
+            }}
             onRefreshSchema={(profile, schema) =>
               void withVaultGate(() => session.refreshSchema(profile, schema))
             }
@@ -796,8 +809,10 @@ function App() {
           folderId={modalFolderId}
           folderOptions={tree.folderOptions}
           availableSchemas={modalSchemas}
+          availableDatabases={modalDatabases}
           onFolderChange={setModalFolderId}
           onAvailableSchemas={setModalSchemas}
+          onAvailableDatabases={setModalDatabases}
           isAlreadyConnected={session.connectedId === modalProfile.id}
           onSave={(profile, folderId) => {
             tree.saveConnection(profile, folderId);

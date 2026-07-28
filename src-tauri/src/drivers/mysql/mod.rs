@@ -61,6 +61,7 @@ impl DatabaseDriver for NativeMySql {
     fn capabilities(&self) -> DriverCapabilities {
         DriverCapabilities {
             schemas: true,
+            databases: false,
             views: true,
             file_based: false,
             folder_based: false,

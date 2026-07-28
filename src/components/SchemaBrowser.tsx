@@ -32,10 +32,12 @@ import {
   Server,
   SquareTerminal,
   Table2,
+  Database,
   X,
   Zap,
 } from "lucide-react";
 import { databaseApi } from "../api/database";
+import { selectableDatabases } from "../lib/databases";
 import { objectGroupsFor } from "../lib/driverGroups";
 import { filterSchemaTree } from "../lib/schemaSearch";
 import { treeKeys, type SessionBusy } from "../hooks/useDatabaseSession";
@@ -44,6 +46,7 @@ import {
   ColumnNode,
   ObjectGroupDef,
   ObjectNode,
+  SchemaInfo,
   SchemaNode,
   TABLES_GROUP,
 } from "../types/schema";
@@ -150,10 +153,13 @@ interface SchemaBrowserProps {
   busy: "connect" | "query" | "schema" | null;
   busyDetail: BusyDetail;
   schemas: SchemaNode[];
+  schemasByDatabase: Record<string, SchemaNode[]>;
   objectSubgroups: Record<string, ObjectNode[]>;
+  availableDatabases: SchemaInfo[];
   expanded: Set<string>;
   onConnect: () => void;
   onRefreshDatabase: () => void;
+  onSwitchDatabase: (database: string) => void;
   onRefreshSchema: (schema: string) => void;
   onRefreshGroup: (schema: string, group: string) => void;
   onEdit: () => void;
@@ -203,6 +209,9 @@ const treeRowMainClass =
 const treeRowActionClass =
   "size-[22px] shrink-0 opacity-0 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer hover:enabled:text-text hover:enabled:bg-panel-soft disabled:cursor-default disabled:opacity-40";
 
+const treeBadgeClass =
+  "ml-auto shrink-0 rounded-[4px] bg-[#2a303a] px-1.5 py-px text-[9px] font-medium text-[#9aa3b2]";
+
 export function SchemaBrowser({
   profile,
   live,
@@ -211,10 +220,13 @@ export function SchemaBrowser({
   busy,
   busyDetail,
   schemas,
+  schemasByDatabase,
   objectSubgroups,
+  availableDatabases,
   expanded,
   onConnect,
   onRefreshDatabase,
+  onSwitchDatabase,
   onRefreshSchema,
   onRefreshGroup,
   onEdit,
@@ -242,18 +254,34 @@ export function SchemaBrowser({
   const showConnect = !hasCache && !live;
   const canInteract = hasCache || live;
   const canMutate = live && !readonly;
-  const databaseLabel = profile.database || profile.host || profile.name;
+  const connectionLabel = profile.name || profile.host || profile.database;
+  const databaseChoices = useMemo(
+    () => selectableDatabases(profile, availableDatabases),
+    [profile, availableDatabases],
+  );
+  const showDatabaseGroups = profile.driver === "postgres";
+
+  const activeSchemas = useMemo(() => {
+    if (!showDatabaseGroups) return schemas;
+    if (profile.database && schemasByDatabase[profile.database]) {
+      return schemasByDatabase[profile.database];
+    }
+    return schemas;
+  }, [showDatabaseGroups, schemas, schemasByDatabase, profile.database]);
 
   const filtered = useMemo(
-    () => filterSchemaTree(schemas, groups, search),
-    [schemas, groups, search],
+    () => filterSchemaTree(activeSchemas, groups, search),
+    [activeSchemas, groups, search],
   );
 
   // While searching, matches drive expansion so hits are visible immediately.
-  const visibleSchemas = filtered ? filtered.schemas : schemas;
+  const visibleSchemas = filtered ? filtered.schemas : activeSchemas;
   const effectiveExpanded = useMemo(() => {
     if (!filtered) return expanded;
     const keys = new Set<string>();
+    if (showDatabaseGroups && profile.database) {
+      keys.add(treeKeys.database(profile.database));
+    }
     for (const name of filtered.openSchemas) keys.add(treeKeys.schema(name));
     for (const item of filtered.openGroups) {
       keys.add(treeKeys.group(item.schema, item.group));
@@ -262,10 +290,117 @@ export function SchemaBrowser({
       keys.add(treeKeys.object(item.schema, item.group, item.object));
     }
     return keys;
-  }, [filtered, expanded]);
+  }, [filtered, expanded, showDatabaseGroups, profile.database]);
 
   // Expansion is derived from the query, so toggling is inert until it clears.
   const handleToggle = filtered ? () => {} : onToggle;
+
+  function schemasForDatabase(name: string): SchemaNode[] {
+    if (name === profile.database) return activeSchemas;
+    return schemasByDatabase[name] ?? [];
+  }
+
+  function toggleDatabase(name: string) {
+    const key = treeKeys.database(name);
+    const opening = !expanded.has(key);
+    onToggle(key);
+    if (!opening) return;
+    if (profile.database !== name) {
+      onSwitchDatabase(name);
+    } else if (schemasForDatabase(name).length === 0) {
+      onRefreshDatabase();
+    }
+  }
+
+  function renderSchemaBranch(schema: SchemaNode, indent = false) {
+    const schemaKey = treeKeys.schema(schema.name);
+    const schemaOpen = effectiveExpanded.has(schemaKey);
+    return (
+      <div key={schema.name} className={cn(indent && "pl-3")}>
+        <div
+          className={cn(
+            treeRowBaseClass,
+            "pr-0.5 gap-0 group/db-schema",
+            schemaOpen && "open",
+          )}
+        >
+          <button
+            type="button"
+            className={treeRowMainClass}
+            onClick={() => handleToggle(schemaKey)}
+            onContextMenu={(event) =>
+              openMenu(event, {
+                kind: "schema",
+                name: schema.name,
+                x: event.clientX,
+                y: event.clientY,
+              })
+            }
+          >
+            {schemaOpen ? (
+              <ChevronDown size={13} />
+            ) : (
+              <ChevronRight size={13} />
+            )}
+            {indent ? (
+              <Network size={14} className="text-[#8b93a3]" />
+            ) : (
+              <Server size={14} />
+            )}
+            <span>{schema.name}</span>
+            {schema.isSystem && (
+              <Zap size={11} className="text-[#8ea0b8] shrink-0" />
+            )}
+          </button>
+          <button
+            type="button"
+            className={cn(
+              treeRowActionClass,
+              "group-hover/db-schema:opacity-100 group-[.open]/db-schema:opacity-100",
+            )}
+            aria-label={`Refresh ${schema.name}`}
+            title="Refresh schema"
+            disabled={busy === "schema"}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRefreshSchema(schema.name);
+            }}
+          >
+            <RefreshCw
+              size={12}
+              className={
+                refreshingObjects?.schema === schema.name
+                  ? "animate-spin-slow"
+                  : ""
+              }
+            />
+          </button>
+        </div>
+        {schemaOpen &&
+          groups.map((group) => (
+            <ObjectGroupBranch
+              key={group.id}
+              schema={schema}
+              group={group}
+              expanded={effectiveExpanded}
+              objectSubgroups={objectSubgroups}
+              busyDetail={busyDetail}
+              busy={busy}
+              refreshing={
+                refreshingObjects?.schema === schema.name &&
+                refreshingObjects.group === group.id
+              }
+              canMutate={canMutate}
+              onToggle={handleToggle}
+              onRefreshGroup={onRefreshGroup}
+              onOpenMenu={openMenu}
+              onViewTable={onViewTable}
+              onEditTable={onEditTable}
+            />
+          ))}
+      </div>
+    );
+  }
 
   useEffect(() => setSearch(""), [profile.id]);
 
@@ -312,17 +447,22 @@ export function SchemaBrowser({
       <div className="min-h-[52px] py-2 pr-[9px] pl-3.5 flex items-start justify-between gap-2">
         <div className="min-w-0 flex flex-col gap-px">
           <small className="text-subtle text-[9px] uppercase tracking-[0.06em]">
-            Database
+            Connection
           </small>
           <strong className="text-[#c8ced8] text-[11px] font-[590] overflow-hidden text-ellipsis">
-            {databaseLabel}
+            {connectionLabel}
           </strong>
-          {!profile.allSchemas && profile.schemas.length > 0 && (
+          {showDatabaseGroups ? (
+            <em className="text-subtle text-[9px] not-italic mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
+              {databaseChoices.length} database
+              {databaseChoices.length === 1 ? "" : "s"}
+              {profile.database ? ` · active ${profile.database}` : ""}
+            </em>
+          ) : !profile.allSchemas && profile.schemas.length > 0 ? (
             <em className="text-subtle text-[9px] not-italic mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
               Schemas: {profile.schemas.join(", ")}
             </em>
-          )}
-          {profile.allSchemas && (
+          ) : (
             <em className="text-subtle text-[9px] not-italic mt-0.5 overflow-hidden text-ellipsis whitespace-nowrap">
               All schemas
             </em>
@@ -413,6 +553,82 @@ export function SchemaBrowser({
             )}
             Connect
           </button>
+        ) : showDatabaseGroups ? (
+          databaseChoices.length === 0 ? (
+            <div className="p-3 text-center text-subtle text-[11px]">
+              {refreshingSchemas ? "Loading databases…" : "No databases found"}
+            </div>
+          ) : (
+            databaseChoices.map((database) => {
+              const dbKey = treeKeys.database(database.name);
+              const dbOpen = effectiveExpanded.has(dbKey);
+              const dbSchemas = schemasForDatabase(database.name);
+              const isActive = database.name === profile.database;
+              const loadingThis =
+                isActive && (busy === "connect" || refreshingSchemas);
+              return (
+                <div key={database.name}>
+                  <div
+                    className={cn(
+                      treeRowBaseClass,
+                      "pr-0.5 gap-0 group/db-node",
+                      dbOpen && "open",
+                      isActive && "bg-[rgba(76,141,255,0.12)]",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className={treeRowMainClass}
+                      onClick={() => {
+                        if (filtered) return;
+                        toggleDatabase(database.name);
+                      }}
+                      onContextMenu={(event) =>
+                        openMenu(event, {
+                          kind: "database",
+                          x: event.clientX,
+                          y: event.clientY,
+                        })
+                      }
+                    >
+                      {dbOpen ? (
+                        <ChevronDown size={13} />
+                      ) : (
+                        <ChevronRight size={13} />
+                      )}
+                      <Database size={14} className="text-[#8fb9e8]" />
+                      <span>{database.name}</span>
+                      {database.isSystem && (
+                        <Zap size={11} className="text-[#8ea0b8] shrink-0" />
+                      )}
+                      {loadingThis ? (
+                        <LoaderCircle
+                          size={12}
+                          className="ml-auto shrink-0 animate-spin-slow text-subtle"
+                        />
+                      ) : dbSchemas.length > 0 ? (
+                        <span className={treeBadgeClass}>{dbSchemas.length}</span>
+                      ) : null}
+                    </button>
+                  </div>
+                  {dbOpen &&
+                    (dbSchemas.length === 0 ? (
+                      <div className="pl-7 py-1 text-[10px] text-subtle">
+                        {loadingThis
+                          ? "Loading schemas…"
+                          : isActive
+                            ? "No schemas found"
+                            : "Expand to load schemas"}
+                      </div>
+                    ) : (
+                      (isActive ? visibleSchemas : dbSchemas).map((schema) =>
+                        renderSchemaBranch(schema, true),
+                      )
+                    ))}
+                </div>
+              );
+            })
+          )
         ) : visibleSchemas.length === 0 ? (
           <div className="p-3 text-center text-subtle text-[11px]">
             {filtered
@@ -422,91 +638,7 @@ export function SchemaBrowser({
                 : "No schemas found"}
           </div>
         ) : (
-          visibleSchemas.map((schema) => {
-            const schemaKey = treeKeys.schema(schema.name);
-            const schemaOpen = effectiveExpanded.has(schemaKey);
-            return (
-              <div key={schema.name}>
-                <div
-                  className={cn(
-                    treeRowBaseClass,
-                    "pr-0.5 gap-0 group/db-schema",
-                    schemaOpen && "open",
-                  )}
-                >
-                  <button
-                    type="button"
-                    className={treeRowMainClass}
-                    onClick={() => handleToggle(schemaKey)}
-                    onContextMenu={(event) =>
-                      openMenu(event, {
-                        kind: "schema",
-                        name: schema.name,
-                        x: event.clientX,
-                        y: event.clientY,
-                      })
-                    }
-                  >
-                    {schemaOpen ? (
-                      <ChevronDown size={13} />
-                    ) : (
-                      <ChevronRight size={13} />
-                    )}
-                    <Server size={14} />
-                    <span>{schema.name}</span>
-                    {schema.isSystem && (
-                      <Zap size={11} className="text-[#8ea0b8] shrink-0" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      treeRowActionClass,
-                      "group-hover/db-schema:opacity-100 group-[.open]/db-schema:opacity-100",
-                    )}
-                    aria-label={`Refresh ${schema.name}`}
-                    title="Refresh schema"
-                    disabled={busy === "schema"}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRefreshSchema(schema.name);
-                    }}
-                  >
-                    <RefreshCw
-                      size={12}
-                      className={
-                        refreshingObjects?.schema === schema.name
-                          ? "animate-spin-slow"
-                          : ""
-                      }
-                    />
-                  </button>
-                </div>
-                {schemaOpen &&
-                  groups.map((group) => (
-                    <ObjectGroupBranch
-                      key={group.id}
-                      schema={schema}
-                      group={group}
-                      expanded={effectiveExpanded}
-                      objectSubgroups={objectSubgroups}
-                      busyDetail={busyDetail}
-                      busy={busy}
-                      refreshing={
-                        refreshingObjects?.schema === schema.name &&
-                        refreshingObjects.group === group.id
-                      }
-                      canMutate={canMutate}
-                      onToggle={handleToggle}
-                      onRefreshGroup={onRefreshGroup}
-                      onOpenMenu={openMenu}
-                      onViewTable={onViewTable}
-                      onEditTable={onEditTable}
-                    />
-                  ))}
-              </div>
-            );
-          })
+          visibleSchemas.map((schema) => renderSchemaBranch(schema))
         )}
       </div>
 

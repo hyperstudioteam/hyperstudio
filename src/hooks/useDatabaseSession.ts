@@ -17,6 +17,7 @@ import {
   filterSchemasForProfile,
   getSchemaCache,
   hasSchemaObjects,
+  setDatabaseList,
   setSchemaList,
   setSchemaObjects,
   toSchemaNodes,
@@ -41,6 +42,7 @@ export type SessionBusy =
 
 /** Tree keys are stable strings so expansion state survives re-renders. */
 export const treeKeys = {
+  database: (database: string) => `database:${database}`,
   schema: (schema: string) => `schema:${schema}`,
   group: (schema: string, group: string) => `group:${schema}\u0000${group}`,
   object: (schema: string, group: string, name: string) =>
@@ -52,6 +54,12 @@ export const treeKeys = {
     subgroup: string,
   ) => `subgroup:${schema}\u0000${group}\u0000${object}\u0000${subgroup}`,
 };
+
+function parseDatabaseKey(key: string): string | null {
+  if (!key.startsWith("database:")) return null;
+  const name = key.slice("database:".length);
+  return name || null;
+}
 
 function parseGroupKey(key: string): { schema: string; group: string } | null {
   if (!key.startsWith("group:")) return null;
@@ -88,6 +96,13 @@ export function useDatabaseSession() {
   );
   const [schemas, setSchemas] = useState<SchemaNode[]>([]);
   const [availableSchemas, setAvailableSchemas] = useState<SchemaInfo[]>([]);
+  const [availableDatabases, setAvailableDatabases] = useState<SchemaInfo[]>(
+    [],
+  );
+  /** Schema lists keyed by database name (Postgres multi-DB browsing). */
+  const [schemasByDatabase, setSchemasByDatabase] = useState<
+    Record<string, SchemaNode[]>
+  >({});
   const [schemaExpanded, setSchemaExpanded] = useState<Set<string>>(new Set());
   const [objectSubgroups, setObjectSubgroups] = useState<
     Record<string, ObjectNode[]>
@@ -98,9 +113,19 @@ export function useDatabaseSession() {
   /** Open transactions keyed by connection id. */
   const [txnOpenById, setTxnOpenById] = useState<Record<string, boolean>>({});
 
-  const syncFromCache = useCallback((connectionId: string) => {
-    setSchemas(toSchemaNodes(getSchemaCache(connectionId)));
-  }, []);
+  const syncFromCache = useCallback(
+    (connectionId: string, database?: string) => {
+      const nodes = toSchemaNodes(getSchemaCache(connectionId));
+      setSchemas(nodes);
+      if (database) {
+        setSchemasByDatabase((current) => ({
+          ...current,
+          [database]: nodes,
+        }));
+      }
+    },
+    [],
+  );
 
   function clearSession() {
     setActiveId(null);
@@ -109,6 +134,8 @@ export function useDatabaseSession() {
     setConnectionInfo(null);
     setSchemas([]);
     setAvailableSchemas([]);
+    setAvailableDatabases([]);
+    setSchemasByDatabase({});
     setSchemaExpanded(new Set());
     setObjectSubgroups({});
     setResult(null);
@@ -119,15 +146,57 @@ export function useDatabaseSession() {
   function activate(profile: ConnectionProfile) {
     setActiveId(profile.id);
     setError("");
-    setSchemaExpanded(new Set());
     setObjectSubgroups({});
     const cache = getSchemaCache(profile.id);
+    const activeDb = profile.database || cache?.activeDatabase || "";
+
     if (cache) {
       setAvailableSchemas(cache.schemas);
-      setSchemas(toSchemaNodes(cache));
+      const nodes = toSchemaNodes(cache);
+      setSchemas(nodes);
+      if (profile.driver === "postgres") {
+        const databases =
+          cache.databases && cache.databases.length > 0
+            ? cache.databases
+            : activeDb
+              ? [{ name: activeDb, isSystem: false }]
+              : profile.databases.map((name) => ({
+                  name,
+                  isSystem: false,
+                }));
+        setAvailableDatabases(databases);
+        setSchemasByDatabase(activeDb ? { [activeDb]: nodes } : {});
+        setSchemaExpanded(
+          activeDb ? new Set([treeKeys.database(activeDb)]) : new Set(),
+        );
+      } else {
+        setAvailableDatabases([]);
+        setSchemasByDatabase({});
+        setSchemaExpanded(new Set());
+      }
     } else {
       setAvailableSchemas([]);
       setSchemas([]);
+      if (profile.driver === "postgres") {
+        const databases = profile.allDatabases
+          ? activeDb
+            ? [{ name: activeDb, isSystem: false }]
+            : []
+          : profile.databases.length > 0
+            ? profile.databases.map((name) => ({ name, isSystem: false }))
+            : activeDb
+              ? [{ name: activeDb, isSystem: false }]
+              : [];
+        setAvailableDatabases(databases);
+        setSchemasByDatabase({});
+        setSchemaExpanded(
+          activeDb ? new Set([treeKeys.database(activeDb)]) : new Set(),
+        );
+      } else {
+        setAvailableDatabases([]);
+        setSchemasByDatabase({});
+        setSchemaExpanded(new Set());
+      }
     }
     if (!liveIdsRef.current.has(profile.id)) {
       setConnectionInfo(null);
@@ -148,6 +217,21 @@ export function useDatabaseSession() {
       setConnectionInfo(info);
     }
     setTxnOpenById((current) => ({ ...current, [profile.id]: false }));
+  }
+
+  async function loadDatabaseList(profile: ConnectionProfile) {
+    if (profile.driver !== "postgres") {
+      setAvailableDatabases([]);
+      return;
+    }
+    try {
+      await ensureLive(profile);
+      const listed = await databaseApi.listDatabases(profile.id);
+      setAvailableDatabases(listed);
+      setDatabaseList(profile.id, listed, profile.database || undefined);
+    } catch {
+      // Database listing is optional for browsing; keep the last known list.
+    }
   }
 
   function isVaultAuthError(error: unknown) {
@@ -171,7 +255,26 @@ export function useDatabaseSession() {
     const cached = getSchemaCache(profile.id);
     if (!options.force && cached) {
       setAvailableSchemas(cached.schemas);
-      setSchemas(toSchemaNodes(cached));
+      const nodes = toSchemaNodes(cached);
+      setSchemas(nodes);
+      if (profile.database) {
+        setSchemasByDatabase((current) => ({
+          ...current,
+          [profile.database]: nodes,
+        }));
+      }
+      if (
+        profile.driver === "postgres" &&
+        cached.databases &&
+        cached.databases.length > 0
+      ) {
+        setAvailableDatabases(cached.databases);
+      }
+      if (profile.driver === "postgres" && profile.database) {
+        setSchemaExpanded((current) =>
+          new Set(current).add(treeKeys.database(profile.database)),
+        );
+      }
       return;
     }
 
@@ -184,11 +287,27 @@ export function useDatabaseSession() {
       if (options.force) {
         clearSchemaObjects(profile.id);
       }
-      setSchemaList(profile.id, filtered);
+      setSchemaList(profile.id, filtered, profile.database || undefined);
       setAvailableSchemas(listed);
-      setSchemas(toSchemaNodes(getSchemaCache(profile.id)));
+      const nodes = toSchemaNodes(getSchemaCache(profile.id));
+      setSchemas(nodes);
+      if (profile.database) {
+        setSchemasByDatabase((current) => ({
+          ...current,
+          [profile.database]: nodes,
+        }));
+      }
       if (options.force) {
-        setSchemaExpanded(new Set());
+        setSchemaExpanded((current) => {
+          const next = new Set<string>();
+          for (const key of current) {
+            if (key.startsWith("database:")) next.add(key);
+          }
+          if (profile.database) {
+            next.add(treeKeys.database(profile.database));
+          }
+          return next;
+        });
       }
     } catch (nextError) {
       if (isVaultAuthError(nextError)) throw nextError;
@@ -205,7 +324,7 @@ export function useDatabaseSession() {
     options: { force?: boolean } = {},
   ) {
     if (!options.force && hasSchemaObjects(profile.id, schema, group)) {
-      syncFromCache(profile.id);
+      syncFromCache(profile.id, profile.database || undefined);
       return;
     }
 
@@ -215,7 +334,7 @@ export function useDatabaseSession() {
       await ensureLive(profile);
       const objects = await databaseApi.listObjects(profile.id, schema, group);
       setSchemaObjects(profile.id, schema, group, objects);
-      syncFromCache(profile.id);
+      syncFromCache(profile.id, profile.database || undefined);
     } catch (nextError) {
       if (isVaultAuthError(nextError)) throw nextError;
       setError(errorMessage(nextError));
@@ -265,18 +384,75 @@ export function useDatabaseSession() {
         // Completion data is optional; a failed group just stays unlisted.
       }
     }
-    if (loaded) syncFromCache(profile.id);
+    if (loaded) syncFromCache(profile.id, profile.database || undefined);
   }
 
   async function refreshDatabase(profile: ConnectionProfile) {
     setObjectSubgroups({});
     await loadSchemaList(profile, { force: true });
+    await loadDatabaseList(profile);
+  }
+
+  async function switchDatabase(profile: ConnectionProfile, database: string) {
+    if (!database) return;
+    if (profile.database === database) {
+      await loadSchemaList(profile);
+      setSchemaExpanded((current) =>
+        new Set(current).add(treeKeys.database(database)),
+      );
+      return profile;
+    }
+    const next = { ...profile, database };
+    setBusy({ kind: "connect" });
+    setError("");
+    setObjectSubgroups({});
+    try {
+      if (liveIdsRef.current.has(profile.id)) {
+        await databaseApi.disconnect(profile.id);
+        setLiveIds((current) => {
+          const updated = new Set(current);
+          updated.delete(profile.id);
+          return updated;
+        });
+        if (liveIdRef.current === profile.id) {
+          setLiveId(null);
+        }
+        setTxnOpenById((current) => {
+          if (!(profile.id in current)) return current;
+          const updated = { ...current };
+          delete updated[profile.id];
+          return updated;
+        });
+      }
+      clearSchemaObjects(profile.id);
+      await ensureLive(next);
+      setBusy(null);
+      await loadSchemaList(next, { force: true });
+      await loadDatabaseList(next);
+      setSchemaExpanded((current) => {
+        const updated = new Set<string>();
+        for (const key of current) {
+          if (key.startsWith("database:")) updated.add(key);
+        }
+        updated.add(treeKeys.database(database));
+        return updated;
+      });
+      return next;
+    } catch (nextError) {
+      if (isVaultAuthError(nextError)) {
+        setBusy(null);
+        throw nextError;
+      }
+      setError(errorMessage(nextError));
+      setBusy(null);
+      return profile;
+    }
   }
 
   async function refreshSchema(profile: ConnectionProfile, schema: string) {
     setObjectSubgroups({});
     clearSchemaObjects(profile.id, schema);
-    syncFromCache(profile.id);
+    syncFromCache(profile.id, profile.database || undefined);
     const groups = objectGroupsFor(profile.driver);
     await Promise.all(
       groups.map((group) =>
@@ -292,7 +468,7 @@ export function useDatabaseSession() {
   ) {
     setObjectSubgroups({});
     clearSchemaObjects(profile.id, schema, group);
-    syncFromCache(profile.id);
+    syncFromCache(profile.id, profile.database || undefined);
     await loadSchemaObjects(profile, schema, group, { force: true });
   }
 
@@ -305,6 +481,12 @@ export function useDatabaseSession() {
       await ensureLive(profile);
       setBusy(null);
       await loadSchemaList(profile, { force: true });
+      await loadDatabaseList(profile);
+      if (profile.driver === "postgres" && profile.database) {
+        setSchemaExpanded((current) =>
+          new Set(current).add(treeKeys.database(profile.database)),
+        );
+      }
     } catch (nextError) {
       if (isVaultAuthError(nextError)) {
         setBusy(null);
@@ -404,6 +586,9 @@ export function useDatabaseSession() {
 
     if (!opening) return;
 
+    // Database nodes are expanded in the browser; switching is handled there.
+    if (parseDatabaseKey(key)) return;
+
     const subgroup = parseSubgroupKey(key);
     if (subgroup) {
       if (subgroup.subgroup === "columns" || objectSubgroups[key]) return;
@@ -502,6 +687,9 @@ export function useDatabaseSession() {
     schemas,
     availableSchemas,
     setAvailableSchemas,
+    availableDatabases,
+    setAvailableDatabases,
+    schemasByDatabase,
     schemaExpanded,
     objectSubgroups,
     toggleSchemaExpanded,
@@ -513,6 +701,7 @@ export function useDatabaseSession() {
     activate,
     connect,
     refreshDatabase,
+    switchDatabase,
     refreshSchema,
     refreshGroup,
     prefetchObjects,

@@ -30,6 +30,8 @@ export function toConfig(profile: ConnectionProfile) {
     sslMode: profile.sslMode,
     schemas: profile.schemas,
     allSchemas: profile.allSchemas,
+    databases: profile.databases,
+    allDatabases: profile.allDatabases,
     ssh:
       ssh && ssh.enabled
         ? {
@@ -65,6 +67,9 @@ export const databaseApi = {
   },
   listSchemas(connectionId: string) {
     return invoke<SchemaInfo[]>("list_schemas", { connectionId });
+  },
+  listDatabases(connectionId: string) {
+    return invoke<SchemaInfo[]>("list_databases", { connectionId });
   },
   listSchema(connectionId: string, profile: ConnectionProfile) {
     return invoke<SchemaNode[]>("list_schema", {
