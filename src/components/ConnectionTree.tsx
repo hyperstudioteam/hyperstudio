@@ -285,13 +285,9 @@ export function ConnectionTree({
             </strong>
             <small className="text-subtle text-[10px] font-mono truncate">
               {profile.host}:{profile.port}
-              {profile.driver === "postgres" &&
-              !profile.allDatabases &&
-              profile.databases.length
-                ? ` · ${profile.databases.length} database${profile.databases.length > 1 ? "s" : ""}`
-                : !profile.allSchemas && profile.schemas.length
-                  ? ` · ${profile.schemas.length} schema${profile.schemas.length > 1 ? "s" : ""}`
-                  : ""}
+              {!profile.allSchemas && profile.schemas.length
+                ? ` · ${profile.schemas.length} schema${profile.schemas.length > 1 ? "s" : ""}`
+                : ""}
             </small>
           </span>
           <span
