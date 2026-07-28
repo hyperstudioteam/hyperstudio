@@ -11,6 +11,8 @@ export interface ColumnNode {
   defaultValue?: string | null;
   comment?: string | null;
   autoIncrement?: boolean;
+  /** Postgres enum labels when the column is a user-defined enum. */
+  enumLabels?: string[];
 }
 
 export interface TableColumnChange {

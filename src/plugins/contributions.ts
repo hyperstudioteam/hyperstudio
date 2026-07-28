@@ -21,6 +21,8 @@ export interface CellContext {
   columnName?: string;
   /** Active driver id (e.g. "postgres", or a plugin id). */
   driver?: string;
+  /** Postgres enum labels when the column is a user-defined enum. */
+  enumLabels?: string[];
 }
 
 /**
@@ -37,6 +39,8 @@ export interface ColumnTypeContribution {
   matchPrefix?: boolean;
   /** Fallback predicate on the raw JS value when type name is unknown. */
   matchValue?: (value: unknown) => boolean;
+  /** Match on full cell context (e.g. enum labels present). */
+  match?: (ctx: CellContext) => boolean;
   /** Inline text rendering. Defaults to a JSON/string stringify. */
   format?: (ctx: CellContext) => string;
   /** Cell horizontal alignment. */
@@ -136,6 +140,9 @@ class ContributionRegistry {
           return 100;
         }
       }
+    }
+    if (contribution.match && contribution.match(ctx)) {
+      return 50;
     }
     if (contribution.matchValue && contribution.matchValue(ctx.value)) {
       return 10;

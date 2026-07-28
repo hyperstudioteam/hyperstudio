@@ -546,6 +546,17 @@ fn parse_columns(value: Value) -> Result<Vec<ColumnNode>, String> {
                 .or_else(|| obj.get("auto_increment"))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
+            enum_labels: obj
+                .get("enumLabels")
+                .or_else(|| obj.get("enum_labels"))
+                .and_then(|v| v.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default(),
         });
     }
     Ok(columns)

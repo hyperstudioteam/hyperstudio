@@ -18,6 +18,12 @@ interface SelectMenuProps {
   className?: string;
   /** Menu alignment relative to the trigger. */
   align?: "left" | "right";
+  /** Stretch the trigger to the parent width (e.g. grid cell edit). */
+  fullWidth?: boolean;
+  /** Open the menu on mount (e.g. cell edit). */
+  defaultOpen?: boolean;
+  /** Called when the menu closes without selecting (Escape / outside click). */
+  onDismiss?: () => void;
   "aria-label"?: string;
 }
 
@@ -34,12 +40,17 @@ export function SelectMenu({
   title,
   className,
   align = "right",
+  fullWidth = false,
+  defaultOpen = false,
+  onDismiss,
   "aria-label": ariaLabel,
 }: SelectMenuProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const rootRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const selected = options.find((option) => option.value === value);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   useEffect(() => {
     if (!open) return;
@@ -52,15 +63,21 @@ export function SelectMenu({
         return;
       }
       setOpen(false);
+      onDismissRef.current?.();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        onDismissRef.current?.();
+      }
     };
     window.addEventListener("mousedown", close);
-    window.addEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("mousedown", close);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
@@ -69,11 +86,12 @@ export function SelectMenu({
       <button
         type="button"
         className={cn(
-          "flex h-[22px] max-w-[220px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-surface-input px-1.5 text-[10px] text-[#c4cad4] outline-none",
+          "flex h-[22px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-surface-input px-1.5 text-[10px] text-[#c4cad4] outline-none",
           "hover:border-border-bright hover:text-text",
           "focus-visible:border-accent",
           open && "border-accent",
           disabled && "cursor-default opacity-50",
+          fullWidth ? "w-full max-w-none" : "max-w-[220px]",
         )}
         disabled={disabled}
         title={title}
@@ -81,6 +99,7 @@ export function SelectMenu({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        autoFocus={defaultOpen}
         onClick={() => setOpen((isOpen) => !isOpen)}
       >
         <span className="min-w-0 flex-1 truncate text-left">

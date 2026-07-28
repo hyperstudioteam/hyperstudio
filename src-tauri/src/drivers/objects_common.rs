@@ -57,6 +57,7 @@ where
             default_value: None,
             comment: None,
             auto_increment: false,
+            enum_labels: Vec::new(),
         });
     }
 

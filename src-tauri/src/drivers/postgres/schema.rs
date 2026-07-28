@@ -80,7 +80,10 @@ pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<Schema
     let column_sql_all = "SELECT c.table_schema,
                                  c.table_name,
                                  c.column_name,
-                                 c.data_type,
+                                 CASE
+                                   WHEN c.data_type = 'USER-DEFINED' THEN c.udt_name
+                                   ELSE c.data_type
+                                 END,
                                  c.is_nullable,
                                  CASE WHEN pk.column_name IS NULL THEN 'NO' ELSE 'YES' END,
                                  c.column_default,
@@ -96,7 +99,16 @@ pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<Schema
                                    WHEN c.is_identity = 'YES' THEN 'YES'
                                    WHEN c.column_default LIKE 'nextval(%' THEN 'YES'
                                    ELSE 'NO'
-                                 END
+                                 END,
+                                 (
+                                   SELECT jsonb_agg(e.enumlabel ORDER BY e.enumsortorder)::text
+                                   FROM pg_catalog.pg_type t
+                                   JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+                                   JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
+                                   WHERE c.data_type = 'USER-DEFINED'
+                                     AND t.typname = c.udt_name
+                                     AND n.nspname = c.udt_schema
+                                 )
                           FROM information_schema.columns c
                           LEFT JOIN (
                             SELECT kcu.table_schema, kcu.table_name, kcu.column_name
@@ -116,7 +128,10 @@ pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<Schema
     let column_sql_selected = "SELECT c.table_schema,
                                       c.table_name,
                                       c.column_name,
-                                      c.data_type,
+                                      CASE
+                                        WHEN c.data_type = 'USER-DEFINED' THEN c.udt_name
+                                        ELSE c.data_type
+                                      END,
                                       c.is_nullable,
                                       CASE WHEN pk.column_name IS NULL THEN 'NO' ELSE 'YES' END,
                                       c.column_default,
@@ -132,7 +147,16 @@ pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<Schema
                                         WHEN c.is_identity = 'YES' THEN 'YES'
                                         WHEN c.column_default LIKE 'nextval(%' THEN 'YES'
                                         ELSE 'NO'
-                                      END
+                                      END,
+                                      (
+                                        SELECT jsonb_agg(e.enumlabel ORDER BY e.enumsortorder)::text
+                                        FROM pg_catalog.pg_type t
+                                        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+                                        JOIN pg_catalog.pg_enum e ON e.enumtypid = t.oid
+                                        WHERE c.data_type = 'USER-DEFINED'
+                                          AND t.typname = c.udt_name
+                                          AND n.nspname = c.udt_schema
+                                      )
                                FROM information_schema.columns c
                                LEFT JOIN (
                                  SELECT kcu.table_schema, kcu.table_name, kcu.column_name

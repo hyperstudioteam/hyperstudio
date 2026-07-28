@@ -2,6 +2,7 @@ import { CellContext, contributions, defaultFormat } from "./contributions";
 import { JsonTree } from "../components/viewers/JsonTree";
 import { ImagePreview } from "../components/viewers/ImagePreview";
 import { TextPreview } from "../components/viewers/TextPreview";
+import { EnumPreview } from "../components/viewers/EnumPreview";
 
 const BUILT_IN = "built-in";
 
@@ -121,6 +122,15 @@ export function registerBuiltinContributions() {
     defaultViewer: "builtin.text",
   });
 
+  contributions.registerColumnType({
+    id: "builtin.enum",
+    source: BUILT_IN,
+    match: (ctx) => Boolean(ctx.enumLabels && ctx.enumLabels.length > 0),
+    className: "text-[#d4b87a]",
+    defaultViewer: "builtin.enum",
+    priority: 20,
+  });
+
   // ----- Data viewers (rich inspection) -----
 
   contributions.registerDataViewer({
@@ -139,6 +149,17 @@ export function registerBuiltinContributions() {
     priority: 30,
     canView: (ctx) => looksLikeImage(ctx.value),
     render: (ctx) => <ImagePreview src={String(ctx.value)} />,
+  });
+
+  contributions.registerDataViewer({
+    id: "builtin.enum",
+    label: "Enum",
+    source: BUILT_IN,
+    priority: 25,
+    canView: (ctx) => Boolean(ctx.enumLabels && ctx.enumLabels.length > 0),
+    render: (ctx) => (
+      <EnumPreview value={ctx.value} labels={ctx.enumLabels ?? []} />
+    ),
   });
 
   contributions.registerDataViewer({
