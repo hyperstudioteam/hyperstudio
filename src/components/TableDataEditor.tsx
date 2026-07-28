@@ -56,9 +56,12 @@ import {
   nextSort,
 } from "../lib/gridFilter";
 import { ColumnHeader } from "./grid/ColumnHeader";
+import { SelectMenu } from "./SelectMenu";
 import { ConnectionProfile } from "../types/connection";
 import { QueryResult } from "../types/query";
 import { ColumnNode, TableNode } from "../types/schema";
+
+const ENUM_NULL_VALUE = "<null>";
 
 type RowStatus = "clean" | "modified" | "inserted" | "deleted";
 
@@ -1177,11 +1180,14 @@ export function TableDataEditor({
                       colIndex,
                       cellRange,
                     );
+                    const meta = columnMeta[colIndex];
+                    const enumLabels = meta?.enumLabels;
                     const cell = presentCell({
                       value,
-                      typeName: columnMeta[colIndex]?.dataType,
+                      typeName: meta?.dataType,
                       columnName: columns[colIndex],
                       driver: profile.driver,
+                      enumLabels,
                     });
                     return (
                       <td
@@ -1226,7 +1232,51 @@ export function TableDataEditor({
                           setCopyAsOpen(false);
                         }}
                       >
-                        {isEditing ? (
+                        {isEditing && enumLabels && enumLabels.length > 0 ? (
+                          <div
+                            className="-mx-2.5"
+                            onMouseDown={(event) => event.stopPropagation()}
+                          >
+                            <SelectMenu
+                              key={`${editing.rowId}-${editing.col}`}
+                              className="w-full"
+                              align="left"
+                              fullWidth
+                              defaultOpen
+                              value={
+                                value === null
+                                  ? ENUM_NULL_VALUE
+                                  : String(value)
+                              }
+                              options={[
+                                ...(meta?.nullable
+                                  ? [
+                                      {
+                                        value: ENUM_NULL_VALUE,
+                                        label: "<null>",
+                                      },
+                                    ]
+                                  : []),
+                                ...enumLabels.map((label) => ({
+                                  value: label,
+                                  label,
+                                })),
+                                ...(value != null &&
+                                !enumLabels.includes(String(value))
+                                  ? [
+                                      {
+                                        value: String(value),
+                                        label: `${String(value)} (unknown)`,
+                                      },
+                                    ]
+                                  : []),
+                              ]}
+                              aria-label={`Edit ${columns[colIndex]}`}
+                              onChange={(next) => commitEdit(next)}
+                              onDismiss={() => setEditing(null)}
+                            />
+                          </div>
+                        ) : isEditing ? (
                           <input
                             key={`${editing.rowId}-${editing.col}-${editing.seed ?? "edit"}`}
                             className="-mx-2.5 h-full min-h-[27px] w-full border border-accent bg-[#0f1218] px-2.5 text-[#e8ecf3] outline-0"
@@ -1397,6 +1447,7 @@ export function TableDataEditor({
             typeName: columnMeta[viewerCell.col]?.dataType,
             columnName: columns[viewerCell.col],
             driver: profile.driver,
+            enumLabels: columnMeta[viewerCell.col]?.enumLabels,
           };
           return (
             <CellViewer

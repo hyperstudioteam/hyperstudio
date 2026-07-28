@@ -83,6 +83,9 @@ pub struct ColumnNode {
     pub comment: Option<String>,
     #[serde(default)]
     pub auto_increment: bool,
+    /// Postgres enum labels when `data_type` is a user-defined enum.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enum_labels: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

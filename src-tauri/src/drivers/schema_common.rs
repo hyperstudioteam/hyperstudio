@@ -36,6 +36,12 @@ where
         if let Some(node) = tables.get_mut(&(schema, table)) {
             let nullable: String = row.try_get(4).map_err(|error| error.to_string())?;
             let primary: String = row.try_get(5).unwrap_or_else(|_| "NO".into());
+            let enum_labels = row
+                .try_get::<Option<String>, _>(9)
+                .ok()
+                .flatten()
+                .and_then(|raw| serde_json::from_str::<Vec<String>>(&raw).ok())
+                .unwrap_or_default();
             node.columns.push(ColumnNode {
                 name: row.try_get(2).map_err(|error| error.to_string())?,
                 data_type: row.try_get(3).map_err(|error| error.to_string())?,
@@ -60,6 +66,7 @@ where
                             || value.to_ascii_lowercase().contains("auto_increment")
                     })
                     .unwrap_or(false),
+                enum_labels,
             });
         }
     }

@@ -40,7 +40,26 @@ pub fn decode(row: &PgRow, index: usize) -> Value {
         "BYTEA" => row
             .try_get::<Vec<u8>, _>(index)
             .map(|value| Value::String(format!("<{} bytes>", value.len()))),
-        _ => row.try_get::<String, _>(index).map(Value::String),
+        // Text, varchar, enums, and other UDTs whose wire value is UTF-8 text.
+        _ => decode_textish(row, index),
     }
     .unwrap_or_else(|_| Value::String(format!("<unsupported {kind}>")))
+}
+
+/// Decode values sqlx won't map to `String` (notably Postgres enums) via the raw wire bytes.
+fn decode_textish(row: &PgRow, index: usize) -> Result<Value, sqlx::Error> {
+    if let Ok(value) = row.try_get::<String, _>(index) {
+        return Ok(Value::String(value));
+    }
+    let raw = row.try_get_raw(index)?;
+    if let Ok(text) = raw.as_str() {
+        return Ok(Value::String(text.to_owned()));
+    }
+    let bytes = raw
+        .as_bytes()
+        .map_err(|error| sqlx::Error::Decode(error))?;
+    match std::str::from_utf8(bytes) {
+        Ok(text) => Ok(Value::String(text.to_owned())),
+        Err(_) => Ok(Value::String(format!("<{} bytes>", bytes.len()))),
+    }
 }
