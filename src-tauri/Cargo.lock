@@ -2330,7 +2330,7 @@ dependencies = [
 
 [[package]]
 name = "hyperstudio"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-ssh2-tokio",
  "async-trait",

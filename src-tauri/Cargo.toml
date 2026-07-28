@@ -1,6 +1,6 @@
 [package]
 name = "hyperstudio"
-version = "0.1.4"
+version = "0.1.5"
 description = "An open-source database client for MySQL and PostgreSQL"
 authors = ["HyperStudio contributors"]
 license = "MIT"
