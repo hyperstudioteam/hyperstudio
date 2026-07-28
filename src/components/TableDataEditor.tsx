@@ -55,11 +55,16 @@ import {
   buildWhereClause,
   nextSort,
 } from "../lib/gridFilter";
+import {
+  buildCompletionSchema,
+  defaultSchemaFor,
+} from "../lib/completionSchema";
+import { ClauseInput } from "./grid/ClauseInput";
 import { ColumnHeader } from "./grid/ColumnHeader";
 import { SelectMenu } from "./SelectMenu";
 import { ConnectionProfile } from "../types/connection";
 import { QueryResult } from "../types/query";
-import { ColumnNode, TableNode } from "../types/schema";
+import { ColumnNode, SchemaNode, TableNode } from "../types/schema";
 
 const ENUM_NULL_VALUE = "<null>";
 
@@ -77,6 +82,8 @@ interface TableDataEditorProps {
   schema: string;
   table: string;
   tableMeta: TableNode | null;
+  /** Cached schema tree for subquery / qualified autocomplete. */
+  schemas?: SchemaNode[];
   /** Rows per page; defaults to driver max (500). */
   pageSize?: number;
   execute: (sql: string, confirmedWrite?: boolean) => Promise<QueryResult>;
@@ -121,6 +128,7 @@ export function TableDataEditor({
   schema,
   table,
   tableMeta,
+  schemas = [],
   pageSize = 500,
   execute,
   executeBatch,
@@ -167,6 +175,16 @@ export function TableDataEditor({
   const rowSelectAnchor = useRef<number | null>(null);
   const suppressEditCommit = useRef(false);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  const completionSchema = useMemo(
+    () => buildCompletionSchema(schemas),
+    [schemas],
+  );
+  const defaultSchema = useMemo(
+    () => defaultSchemaFor(profile, schemas),
+    [profile, schemas],
+  );
+  const clauseColumns = tableMeta?.columns ?? columnMeta;
 
   const pkNames = useMemo(
     () => primaryKeyColumns(columnMeta).map((column) => column.name),
@@ -876,7 +894,7 @@ export function TableDataEditor({
   }
 
   return (
-    <section className="grid min-h-0 grid-rows-[34px_32px_auto_1fr_22px] overflow-hidden">
+    <section className="grid h-full min-h-0 grid-rows-[34px_32px_auto_1fr_22px] overflow-hidden">
       <div className="flex items-center gap-1.5 border-b border-border bg-[#14171b] px-2">
         <div className="flex items-center gap-0.5">
           <span className="min-w-[72px] px-1 font-mono text-[10px] text-[#9aa3b0] tabular-nums">
@@ -1043,15 +1061,18 @@ export function TableDataEditor({
         <label className="flex min-w-0 items-center gap-[7px] border-r border-border px-2.5 text-[10px] text-[#7d8694]">
           <Filter size={13} />
           <span className="shrink-0 font-semibold tracking-[0.02em]">WHERE</span>
-          <input
-            className="h-[30px] min-w-0 flex-1 border-0 bg-transparent font-mono text-[11px] leading-[1.3] text-[#d2d7df] outline-0 placeholder:text-[#4a5260]"
+          <ClauseInput
+            className="min-w-0 flex-1"
             value={where}
+            columns={clauseColumns}
+            driver={profile.driver}
+            mode="where"
+            completionSchema={completionSchema}
+            schemas={schemas}
+            defaultSchema={defaultSchema}
             placeholder="condition"
-            spellCheck={false}
-            onChange={(event) => setWhere(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void load(0);
-            }}
+            onChange={setWhere}
+            onSubmit={() => void load(0)}
           />
           {headerFilters.length > 0 && (
             <button
@@ -1073,18 +1094,21 @@ export function TableDataEditor({
           <span className="shrink-0 font-semibold tracking-[0.02em]">
             ORDER BY
           </span>
-          <input
-            className="h-[30px] min-w-0 flex-1 border-0 bg-transparent font-mono text-[11px] leading-[1.3] text-[#d2d7df] outline-0 placeholder:text-[#4a5260]"
+          <ClauseInput
+            className="min-w-0 flex-1"
             value={orderBy}
+            columns={clauseColumns}
+            driver={profile.driver}
+            mode="orderBy"
+            completionSchema={completionSchema}
+            schemas={schemas}
+            defaultSchema={defaultSchema}
             placeholder="column"
-            spellCheck={false}
-            onChange={(event) => {
-              setOrderBy(event.target.value);
+            onChange={(next) => {
+              setOrderBy(next);
               setHeaderSort(null);
             }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void load(0);
-            }}
+            onSubmit={() => void load(0)}
           />
         </label>
       </div>

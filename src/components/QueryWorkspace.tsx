@@ -250,6 +250,14 @@ export function QueryWorkspace({
 }: QueryWorkspaceProps) {
   const [tabs, setTabs] = useState<WorkspaceTab[]>(() => bootSession.tabs);
   const [activeId, setActiveId] = useState(() => bootSession.activeId);
+  /** Edit tabs keep their DataEditor mounted after first visit so switching back does not reload. */
+  const [mountedEditIds, setMountedEditIds] = useState<Set<string>>(() => {
+    const bootActive =
+      bootSession.tabs.find((tab) => tab.id === bootSession.activeId) ?? null;
+    return bootActive?.kind === "edit"
+      ? new Set([bootActive.id])
+      : new Set();
+  });
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
   const [erDiagram, setErDiagram] = useState<ErDiagram | null>(null);
@@ -332,6 +340,21 @@ export function QueryWorkspace({
     }
     return schemas;
   }, [active, schemas]);
+  /** Per-connection schema snapshots for edit-tab subquery completion. */
+  const editSchemasByConnection = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof toSchemaNodes>>();
+    for (const tab of tabs) {
+      if (tab.kind !== "edit" || map.has(tab.connectionId)) continue;
+      map.set(
+        tab.connectionId,
+        tab.connectionId === active?.connectionId
+          ? querySchemas
+          : toSchemaNodes(getSchemaCache(tab.connectionId)),
+      );
+    }
+    return map;
+    // `schemas` refreshes the map when the sidebar connection's cache updates.
+  }, [tabs, active?.connectionId, querySchemas, schemas]);
   const queryCaps = drivers.find(
     (driver) => driver.id === activeConnection?.driver,
   )?.capabilities;
@@ -404,6 +427,33 @@ export function QueryWorkspace({
     if (tabs.some((tab) => tab.id === activeId)) return;
     setActiveId(tabs[0]?.id ?? "query-1");
   }, [tabs, activeId]);
+
+  // Mount each Data Editor the first time its tab becomes active; keep it thereafter.
+  useEffect(() => {
+    if (active?.kind !== "edit") return;
+    setMountedEditIds((current) => {
+      if (current.has(active.id)) return current;
+      const next = new Set(current);
+      next.add(active.id);
+      return next;
+    });
+  }, [active?.id, active?.kind]);
+
+  // Drop mounted editors when their tab is closed or pruned.
+  useEffect(() => {
+    const editIds = new Set(
+      tabs.filter((tab) => tab.kind === "edit").map((tab) => tab.id),
+    );
+    setMountedEditIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (editIds.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [tabs]);
 
   // Persist open panels so a restart restores the same workspace.
   useEffect(() => {
@@ -1068,52 +1118,77 @@ export function QueryWorkspace({
         </div>
       </div>
 
-      {active?.kind === "edit" && activeConnection ? (
-        <TableDataEditor
-          key={active.id}
-          profile={activeConnection}
-          schema={active.schema}
-          table={active.table}
-          tableMeta={findTableMeta(
-            active.connectionId,
-            active.schema,
-            active.table,
-          )}
-          pageSize={pageSize}
-          execute={(sql, confirmedWrite) =>
-            onExecute(sql, active.connectionId, confirmedWrite)
-          }
-          executeBatch={
-            onExecuteBatch &&
-            drivers.find((driver) => driver.id === activeConnection.driver)
-              ?.capabilities.transactions
-              ? (statements) => onExecuteBatch(active.connectionId, statements)
-              : undefined
-          }
-          confirmWrites={
-            onConfirmWrites
-              ? (preview) => onConfirmWrites(active.connectionId, preview)
-              : undefined
-          }
-        />
-      ) : active?.kind === "er" ? (
-        <ErDiagramView
-          key={active.id}
-          diagram={erDiagram?.schema === active.schema ? erDiagram : null}
-          busy={erBusy}
-          error={erError}
-          onRefresh={() =>
-            void loadErDiagram(active.schema, active.connectionId)
-          }
-        />
-      ) : (
-        <Group
-          id="editor-results"
-          orientation="vertical"
-          className="min-h-0"
-          defaultLayout={editorResultsLayout.defaultLayout}
-          onLayoutChanged={editorResultsLayout.onLayoutChanged}
-        >
+      <div className="min-h-0 overflow-hidden">
+        {tabs.map((tab) => {
+          if (tab.kind !== "edit") return null;
+          const isActive = tab.id === activeId;
+          if (!mountedEditIds.has(tab.id) && !isActive) return null;
+          const connection =
+            connections.find((item) => item.id === tab.connectionId) ??
+            (selected?.id === tab.connectionId ? selected : null);
+          if (!connection) return null;
+          const tabPageSize = defaultMaxRows(
+            drivers.find((driver) => driver.id === connection.driver)
+              ?.capabilities.maxRows,
+          );
+          return (
+            <div
+              key={tab.id}
+              className={cn("h-full min-h-0", !isActive && "hidden")}
+              aria-hidden={!isActive}
+            >
+              <TableDataEditor
+                profile={connection}
+                schema={tab.schema}
+                table={tab.table}
+                tableMeta={findTableMeta(
+                  tab.connectionId,
+                  tab.schema,
+                  tab.table,
+                )}
+                schemas={
+                  editSchemasByConnection.get(tab.connectionId) ?? []
+                }
+                pageSize={tabPageSize}
+                execute={(sql, confirmedWrite) =>
+                  onExecute(sql, tab.connectionId, confirmedWrite)
+                }
+                executeBatch={
+                  onExecuteBatch &&
+                  drivers.find((driver) => driver.id === connection.driver)
+                    ?.capabilities.transactions
+                    ? (statements) =>
+                        onExecuteBatch(tab.connectionId, statements)
+                    : undefined
+                }
+                confirmWrites={
+                  onConfirmWrites
+                    ? (preview) => onConfirmWrites(tab.connectionId, preview)
+                    : undefined
+                }
+              />
+            </div>
+          );
+        })}
+
+        {active?.kind === "er" ? (
+          <ErDiagramView
+            key={active.id}
+            diagram={erDiagram?.schema === active.schema ? erDiagram : null}
+            busy={erBusy}
+            error={erError}
+            onRefresh={() =>
+              void loadErDiagram(active.schema, active.connectionId)
+            }
+          />
+        ) : active?.kind !== "edit" ? (
+          <Group
+            id="editor-results"
+            orientation="vertical"
+            className="h-full min-h-0"
+            defaultLayout={editorResultsLayout.defaultLayout}
+            onLayoutChanged={editorResultsLayout.onLayoutChanged}
+          >
           <Panel id="sql-editor" defaultSize="42%" minSize={120}>
           <section className="flex h-full min-h-0 flex-col">
             <div className="flex h-9 shrink-0 items-center gap-[9px] border-b border-border bg-[#14171b] px-[9px]">
@@ -1496,7 +1571,8 @@ export function QueryWorkspace({
           </section>
           </Panel>
         </Group>
-      )}
+        ) : null}
+      </div>
 
       {exportOpen && result && (
         <ExportModal
