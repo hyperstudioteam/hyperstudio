@@ -2,7 +2,6 @@ import { DragEvent, MouseEvent, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Database,
   Folder,
   Lock,
   ShieldAlert,
@@ -15,6 +14,7 @@ import {
   Selection,
   TreeNode,
 } from "../types/connection";
+import { DriverIcon, driverIconShellClass } from "./DriverIcon";
 
 interface ConnectionTreeProps {
   nodes: TreeNode[];
@@ -78,14 +78,6 @@ function connectionRowClass({
     drop === "into" &&
       "outline outline-1 outline-[rgba(76,141,255,0.85)] bg-[rgba(76,141,255,0.14)]",
     "[&[draggable=true]]:cursor-grab [&[draggable=true]:active]:cursor-grabbing",
-  );
-}
-
-function dbIconClass(driver: string) {
-  return cn(
-    "size-[27px] shrink-0 rounded-md grid place-items-center",
-    driver === "postgres" && "text-[#8fb9e8] bg-[rgba(72,128,186,0.16)]",
-    driver === "mysql" && "text-[#e0a367] bg-[rgba(216,132,55,0.14)]",
   );
 }
 
@@ -264,8 +256,13 @@ export function ConnectionTree({
             onMove(payload.id, profile.id, position);
           }}
         >
-          <span className={dbIconClass(profile.driver)}>
-            <Database size={15} />
+          <span
+            className={cn(
+              "size-[27px]",
+              driverIconShellClass(profile.driver),
+            )}
+          >
+            <DriverIcon driver={profile.driver} size={15} />
           </span>
           <span className="flex flex-1 min-w-0 flex-col gap-0.5">
             <strong className="flex items-center gap-1.5 text-[#cdd3de] text-xs font-[560]">
@@ -288,9 +285,13 @@ export function ConnectionTree({
             </strong>
             <small className="text-subtle text-[10px] font-mono truncate">
               {profile.host}:{profile.port}
-              {!profile.allSchemas && profile.schemas.length
-                ? ` · ${profile.schemas.length} schema${profile.schemas.length > 1 ? "s" : ""}`
-                : ""}
+              {profile.driver === "postgres" &&
+              !profile.allDatabases &&
+              profile.databases.length
+                ? ` · ${profile.databases.length} database${profile.databases.length > 1 ? "s" : ""}`
+                : !profile.allSchemas && profile.schemas.length
+                  ? ` · ${profile.schemas.length} schema${profile.schemas.length > 1 ? "s" : ""}`
+                  : ""}
             </small>
           </span>
           <span

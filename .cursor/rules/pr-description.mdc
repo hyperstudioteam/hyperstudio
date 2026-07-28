@@ -1,0 +1,12 @@
+---
+description: PR description conventions for GitHub pull requests
+alwaysApply: true
+---
+
+# Pull request descriptions
+
+When creating or editing GitHub pull request descriptions:
+
+- Do **not** include `Made with Cursor`, `Made with [Cursor](...)`, or any equivalent Cursor attribution / footer.
+- Do **not** add marketing footers, AI-generated-by lines, or similar trailing attribution.
+- Keep the body focused on Summary, Test plan, and any stack/dependency notes the user requested.
