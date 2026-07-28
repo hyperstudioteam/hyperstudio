@@ -148,6 +148,25 @@ function App() {
       stop();
     };
   }, []);
+
+  // Suppress the native context menu except on editable fields (and opt-ins).
+  useEffect(() => {
+    const allowsNativeContextMenu = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return false;
+      return Boolean(
+        target.closest(
+          'input, textarea, select, [contenteditable="true"], [contenteditable=""], [data-allow-context-menu]',
+        ),
+      );
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      if (!allowsNativeContextMenu(event.target)) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("contextmenu", onContextMenu);
+    return () => window.removeEventListener("contextmenu", onContextMenu);
+  }, []);
   const vaultRetry = useRef<(() => void) | null>(null);
   const completionPrefetched = useRef<string | null>(null);
 
