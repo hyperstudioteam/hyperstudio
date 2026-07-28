@@ -10,7 +10,12 @@ import {
 } from "@codemirror/lang-sql";
 import { compact } from "es-toolkit";
 import { ConnectionProfile } from "../types/connection";
-import { ObjectNode, SchemaNode, TABLES_GROUP } from "../types/schema";
+import {
+  ColumnNode,
+  ObjectNode,
+  SchemaNode,
+  TABLES_GROUP,
+} from "../types/schema";
 import { objectGroupsFor } from "./driverGroups";
 
 /** Object groups whose members can appear in a FROM clause. */
@@ -57,7 +62,7 @@ export function dialectFor(driver: string): SQLDialect {
   }
 }
 
-function columnCompletion(column: ObjectNode["children"][number]): Completion {
+function columnCompletion(column: ColumnNode): Completion {
   const parts = [column.dataType];
   if (column.primaryKey) {
     parts.push("PK");
@@ -68,6 +73,92 @@ function columnCompletion(column: ObjectNode["children"][number]): Completion {
     label: column.name,
     type: column.primaryKey ? "constant" : "property",
     detail: compact(parts).join(" · "),
+  };
+}
+
+const WHERE_KEYWORDS: Completion[] = [
+  { label: "AND", type: "keyword" },
+  { label: "OR", type: "keyword" },
+  { label: "NOT", type: "keyword" },
+  { label: "LIKE", type: "keyword" },
+  { label: "ILIKE", type: "keyword" },
+  { label: "IN", type: "keyword" },
+  { label: "IS", type: "keyword" },
+  { label: "NULL", type: "keyword" },
+  { label: "TRUE", type: "keyword" },
+  { label: "FALSE", type: "keyword" },
+  { label: "BETWEEN", type: "keyword" },
+  { label: "EXISTS", type: "keyword" },
+  { label: "SELECT", type: "keyword" },
+  { label: "FROM", type: "keyword" },
+  { label: "WHERE", type: "keyword" },
+  { label: "JOIN", type: "keyword" },
+  { label: "LEFT JOIN", type: "keyword" },
+  { label: "INNER JOIN", type: "keyword" },
+  { label: "ON", type: "keyword" },
+  { label: "AS", type: "keyword" },
+];
+
+const ORDER_BY_KEYWORDS: Completion[] = [
+  { label: "ASC", type: "keyword" },
+  { label: "DESC", type: "keyword" },
+  { label: "NULLS FIRST", type: "keyword" },
+  { label: "NULLS LAST", type: "keyword" },
+];
+
+/**
+ * Column (+ clause keyword) completions for the data-editor WHERE / ORDER BY
+ * bars. Bare identifiers use the open table's columns; schema/table completion
+ * for subqueries comes from `@codemirror/lang-sql` when a schema namespace is
+ * configured. Skip when the cursor is in a FROM/JOIN table position so those
+ * suggestions are not drowned out by column names.
+ */
+export function tableClauseCompletionSource(
+  columns: ColumnNode[],
+  mode: "where" | "orderBy",
+) {
+  return (context: CompletionContext): CompletionResult | null => {
+    if (context.matchBefore(/(\.|`|"|\[)\w*$/)) return null;
+    const typed = context.matchBefore(/[A-Za-z_][\w$]*$/);
+    if (!typed && !context.explicit) return null;
+
+    const beforeWord = context.state.doc.sliceString(
+      0,
+      typed?.from ?? context.pos,
+    );
+    if (/\b(?:from|join|into|update|table)\s+$/i.test(beforeWord)) {
+      return null;
+    }
+
+    const prefix = (typed?.text ?? "").toLowerCase();
+    const options: Completion[] = [];
+    const seen = new Set<string>();
+
+    for (const column of columns) {
+      const key = column.name.toLowerCase();
+      if (seen.has(key)) continue;
+      if (prefix && !key.startsWith(prefix)) continue;
+      seen.add(key);
+      options.push({ ...columnCompletion(column), boost: 3 });
+    }
+
+    const keywords = mode === "where" ? WHERE_KEYWORDS : ORDER_BY_KEYWORDS;
+    for (const keyword of keywords) {
+      const key = keyword.label.toLowerCase();
+      if (seen.has(key)) continue;
+      if (prefix && !key.startsWith(prefix) && !key.includes(` ${prefix}`)) {
+        continue;
+      }
+      seen.add(key);
+      options.push({ ...keyword, boost: 1 });
+    }
+
+    if (options.length === 0) return null;
+    return {
+      from: typed?.from ?? context.pos,
+      options,
+      validFor: /^[\w$]*$/,
+    };
   };
 }
 
