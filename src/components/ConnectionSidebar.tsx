@@ -40,7 +40,9 @@ interface ConnectionSidebarProps {
   busy: "connect" | "query" | "schema" | null;
   busyDetail: Parameters<typeof SchemaBrowser>[0]["busyDetail"];
   schemas: Parameters<typeof SchemaBrowser>[0]["schemas"];
+  schemasByDatabase: Parameters<typeof SchemaBrowser>[0]["schemasByDatabase"];
   objectSubgroups: Parameters<typeof SchemaBrowser>[0]["objectSubgroups"];
+  availableDatabases: Parameters<typeof SchemaBrowser>[0]["availableDatabases"];
   schemaExpanded: Set<string>;
   hasSchemaCache: boolean;
   syncBusy?: boolean;
@@ -49,6 +51,7 @@ interface ConnectionSidebarProps {
   onToggleSchema: (key: string) => void;
   onConnect: (profile: ConnectionProfile) => void;
   onRefreshDatabase: (profile: ConnectionProfile) => void;
+  onSwitchDatabase: (profile: ConnectionProfile, database: string) => void;
   onRefreshSchema: (profile: ConnectionProfile, schema: string) => void;
   onRefreshGroup: (
     profile: ConnectionProfile,
@@ -297,11 +300,16 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
                   busy={props.busy}
                   busyDetail={props.busyDetail}
                   schemas={props.schemas}
+                  schemasByDatabase={props.schemasByDatabase}
                   objectSubgroups={props.objectSubgroups}
+                  availableDatabases={props.availableDatabases}
                   expanded={props.schemaExpanded}
                   onConnect={() => props.onConnect(props.selected!)}
                   onRefreshDatabase={() =>
                     props.onRefreshDatabase(props.selected!)
+                  }
+                  onSwitchDatabase={(database) =>
+                    props.onSwitchDatabase(props.selected!, database)
                   }
                   onRefreshSchema={(schema) =>
                     props.onRefreshSchema(props.selected!, schema)

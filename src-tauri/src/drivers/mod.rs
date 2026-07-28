@@ -67,6 +67,15 @@ pub trait DatabaseDriver: Send + Sync {
     async fn connect(&self, cfg: &ConnectionConfig) -> Result<ConnectionInfo, String>;
     async fn disconnect(&self, connection_id: &str) -> Result<(), String>;
     async fn list_schemas(&self, connection_id: &str) -> Result<Vec<SchemaInfo>, String>;
+
+    /// List databases on the server. Default: unsupported.
+    async fn list_databases(&self, _connection_id: &str) -> Result<Vec<SchemaInfo>, String> {
+        Err(format!(
+            "Driver '{}' does not support listing databases.",
+            self.id()
+        ))
+    }
+
     async fn list_schema(
         &self,
         connection_id: &str,

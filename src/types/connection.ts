@@ -13,6 +13,8 @@ export type ConnectionSafety = "none" | "confirm" | "readOnly";
 
 export interface DriverCapabilities {
   schemas: boolean;
+  /** Driver can list and switch among multiple databases on one server. */
+  databases?: boolean;
   views: boolean;
   fileBased: boolean;
   folderBased: boolean;
@@ -108,6 +110,13 @@ export interface ConnectionProfile {
   allSchemas: boolean;
   /** Used when allSchemas is false. */
   schemas: string[];
+  /**
+   * When true (Postgres), every accessible database is available to switch to.
+   * When false, only `databases` are offered.
+   */
+  allDatabases: boolean;
+  /** Used when allDatabases is false (Postgres multi-database connections). */
+  databases: string[];
   /** Optional SSH hop in front of the database host. */
   ssh?: SshTunnelSettings;
   /** Swatch id used to tint the connection in the tree. */
@@ -159,6 +168,8 @@ export function blankProfile(driver: Driver = "postgres"): ConnectionProfile {
     sslMode: "prefer",
     allSchemas: true,
     schemas: [],
+    allDatabases: true,
+    databases: [],
     ssh: blankSsh(),
     color: "none",
     safety: "none",

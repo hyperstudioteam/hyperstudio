@@ -61,6 +61,7 @@ impl DatabaseDriver for NativePostgres {
     fn capabilities(&self) -> DriverCapabilities {
         DriverCapabilities {
             schemas: true,
+            databases: true,
             views: true,
             file_based: false,
             folder_based: false,
@@ -104,6 +105,11 @@ impl DatabaseDriver for NativePostgres {
     async fn list_schemas(&self, connection_id: &str) -> Result<Vec<SchemaInfo>, String> {
         let pool = get_pool(&self.pools, connection_id).await?;
         schema::list_available(&pool).await
+    }
+
+    async fn list_databases(&self, connection_id: &str) -> Result<Vec<SchemaInfo>, String> {
+        let pool = get_pool(&self.pools, connection_id).await?;
+        schema::list_databases(&pool).await
     }
 
     async fn list_schema(

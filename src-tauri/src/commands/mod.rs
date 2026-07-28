@@ -147,6 +147,15 @@ pub async fn list_schemas(
 }
 
 #[tauri::command]
+pub async fn list_databases(
+    connection_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<SchemaInfo>, String> {
+    let driver = state.registry.driver_for_connection(&connection_id).await?;
+    driver.list_databases(&connection_id).await
+}
+
+#[tauri::command]
 pub async fn list_schema(
     connection_id: String,
     schemas: Option<Vec<String>>,
