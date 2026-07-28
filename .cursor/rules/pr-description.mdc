@@ -10,3 +10,23 @@ When creating or editing GitHub pull request descriptions:
 - Do **not** include `Made with Cursor`, `Made with [Cursor](...)`, or any equivalent Cursor attribution / footer.
 - Do **not** add marketing footers, AI-generated-by lines, or similar trailing attribution.
 - Keep the body focused on Summary, Test plan, and any stack/dependency notes the user requested.
+
+## Cursor product attribution (required)
+
+A project rule alone does **not** stop Cursor from appending the footer. Attribution is injected by the product after `gh pr create`.
+
+Disable it in the IDE:
+
+1. **Cursor Settings** → **Agent** → **Attribution** (or **Git & PRs** → **Attribution** on newer Cursor)
+2. Turn **off** PR attribution (and commit attribution if undesired)
+
+CLI agents: set in `~/.cursor/cli-config.json`:
+
+```json
+"attribution": {
+  "attributeCommitsToAgent": false,
+  "attributePRsToAgent": false
+}
+```
+
+If a PR already has the footer, strip it with `gh api repos/.../pulls/N -X PATCH` (or edit on GitHub). Do not leave it in place.
