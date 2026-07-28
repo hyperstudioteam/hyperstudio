@@ -8,17 +8,33 @@ import {
   SQLite,
   StandardSQL,
 } from "@codemirror/lang-sql";
+import { compact } from "es-toolkit";
 import { ConnectionProfile } from "../types/connection";
 import { ObjectNode, SchemaNode, TABLES_GROUP } from "../types/schema";
 import { objectGroupsFor } from "./driverGroups";
 
 /** Object groups whose members can appear in a FROM clause. */
-const QUERYABLE_GROUPS = [TABLES_GROUP, "views", "materialized_views"];
+const QUERYABLE_GROUPS = [TABLES_GROUP, "views", "materialized_views", "aliases", "synonyms"];
 
-/** The queryable groups this driver actually exposes. */
+/** All object groups we want to support in autocomplete and prefetch. */
+const COMPLETION_GROUPS = [
+  TABLES_GROUP,
+  "views",
+  "materialized_views",
+  "routines",
+  "functions",
+  "aliases",
+  "synonyms",
+];
+
+/** The object groups this driver exposes that we want to prefetch for autocomplete. */
 export function completionGroupsFor(driver: string): string[] {
-  const available = new Set(objectGroupsFor(driver).map((group) => group.id));
-  return QUERYABLE_GROUPS.filter((group) => available.has(group));
+  const availableGroups = new Set(objectGroupsFor(driver).map((group) => {
+    return group.id;
+  }));
+  return COMPLETION_GROUPS.filter((group) => {
+    return availableGroups.has(group);
+  });
 }
 
 export function dialectFor(driver: string): SQLDialect {
@@ -43,32 +59,77 @@ export function dialectFor(driver: string): SQLDialect {
 
 function columnCompletion(column: ObjectNode["children"][number]): Completion {
   const parts = [column.dataType];
-  if (column.primaryKey) parts.push("PK");
-  else if (!column.nullable) parts.push("not null");
+  if (column.primaryKey) {
+    parts.push("PK");
+  } else if (!column.nullable) {
+    parts.push("not null");
+  }
   return {
     label: column.name,
     type: column.primaryKey ? "constant" : "property",
-    detail: parts.filter(Boolean).join(" · "),
+    detail: compact(parts).join(" · "),
   };
 }
 
 function objectCompletion(object: ObjectNode, kindLabel: string): Completion {
+  let completionType = "type";
+  if (kindLabel === "view" || kindLabel === "alias" || kindLabel === "synonym") {
+    completionType = "class";
+  } else if (kindLabel === "function") {
+    completionType = "function";
+  }
+
   return {
     label: object.name,
-    type: kindLabel === "view" ? "class" : "type",
+    type: completionType,
     detail: object.detail || object.kind || kindLabel,
   };
 }
 
 function queryableObjects(schema: SchemaNode): Array<[ObjectNode, string]> {
-  const found: Array<[ObjectNode, string]> = [];
+  const foundObjects: Array<[ObjectNode, string]> = [];
   for (const group of QUERYABLE_GROUPS) {
     const objects = schema.objects[group];
-    if (!objects) continue;
-    const kindLabel = group === TABLES_GROUP ? "table" : "view";
-    for (const object of objects) found.push([object, kindLabel]);
+    if (!objects) {
+      continue;
+    }
+    let kindLabel = "table";
+    if (group === "views" || group === "materialized_views") {
+      kindLabel = "view";
+    } else if (group === "aliases") {
+      kindLabel = "alias";
+    } else if (group === "synonyms") {
+      kindLabel = "synonym";
+    }
+    for (const object of objects) {
+      foundObjects.push([object, kindLabel]);
+    }
   }
-  return found;
+  return foundObjects;
+}
+
+function autocompleteObjects(schema: SchemaNode): Array<[ObjectNode, string]> {
+  const foundObjects: Array<[ObjectNode, string]> = [];
+  for (const group of COMPLETION_GROUPS) {
+    const objects = schema.objects[group];
+    if (!objects) {
+      continue;
+    }
+    let kindLabel = "table";
+    if (group === "views" || group === "materialized_views") {
+      kindLabel = "view";
+    } else if (group === "routines" || group === "functions") {
+      kindLabel = "function";
+    } else if (group === "aliases") {
+      kindLabel = "alias";
+    } else if (group === "synonyms") {
+      kindLabel = "synonym";
+    }
+    for (const object of objects) {
+      foundObjects.push([object, kindLabel]);
+    }
+  }
+  return foundObjects;
 }
 
 /**
@@ -98,43 +159,47 @@ export function defaultSchemaFor(
  * case-insensitive matching still resolves `OfferLetter` / `offerletter`.
  */
 export function buildCompletionSchema(schemas: SchemaNode[]): SQLNamespace {
-  const namespace: Record<string, SQLNamespace> = {};
+  const schemaNamespace: Record<string, SQLNamespace> = {};
 
   for (const schema of schemas) {
-    const tables: Record<string, SQLNamespace> = {};
+    const tableNamespace: Record<string, SQLNamespace> = {};
 
-    for (const [object, kindLabel] of queryableObjects(schema)) {
+    for (const [object, kindLabel] of autocompleteObjects(schema)) {
       const entry = {
         self: objectCompletion(object, kindLabel),
-        children: object.children.map(columnCompletion),
+        children: object.children.map((column) => {
+          return columnCompletion(column);
+        }),
       };
-      tables[object.name] = entry;
-      const lower = object.name.toLowerCase();
-      if (lower !== object.name && !tables[lower]) {
-        tables[lower] = entry;
+      tableNamespace[object.name] = entry;
+      const lowerName = object.name.toLowerCase();
+      if (lowerName !== object.name && !tableNamespace[lowerName]) {
+        tableNamespace[lowerName] = entry;
       }
     }
 
-    namespace[schema.name] = {
+    schemaNamespace[schema.name] = {
       self: {
         label: schema.name,
         type: "namespace",
         detail: schema.isSystem ? "system schema" : "schema",
       },
-      children: tables,
+      children: tableNamespace,
     };
-    const lowerSchema = schema.name.toLowerCase();
-    if (lowerSchema !== schema.name && !namespace[lowerSchema]) {
-      namespace[lowerSchema] = namespace[schema.name];
+    const lowerSchemaName = schema.name.toLowerCase();
+    if (lowerSchemaName !== schema.name && !schemaNamespace[lowerSchemaName]) {
+      schemaNamespace[lowerSchemaName] = schemaNamespace[schema.name];
     }
   }
 
-  return namespace;
+  return schemaNamespace;
 }
 
 /** True when at least one table with columns is available to complete. */
 export function hasCompletionData(schemas: SchemaNode[]): boolean {
-  return schemas.some((schema) => queryableObjects(schema).length > 0);
+  return schemas.some((schema) => {
+    return autocompleteObjects(schema).length > 0;
+  });
 }
 
 function findTable(
