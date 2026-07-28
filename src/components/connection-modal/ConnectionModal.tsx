@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Database, LoaderCircle, X } from "lucide-react";
+import { LoaderCircle, X } from "lucide-react";
+import { DriverIcon, driverIconShellClass } from "../DriverIcon";
 import { databaseApi } from "../../api/database";
 import { errorMessage } from "../../lib/format";
 import {
@@ -344,15 +345,9 @@ export function ConnectionModal({
         <div className="flex items-center justify-between mb-[17px]">
           <div className="flex items-center gap-2.5">
             <span
-              className={cn(
-                "w-[27px] h-[27px] shrink-0 rounded-md grid place-items-center",
-                profile.driver === "postgres" &&
-                  "text-[#8fb9e8] bg-[rgba(72,128,186,.16)]",
-                profile.driver === "mysql" &&
-                  "text-[#e0a367] bg-[rgba(216,132,55,.14)]",
-              )}
+              className={cn("size-[27px]", driverIconShellClass(profile.driver))}
             >
-              <Database size={17} />
+              <DriverIcon driver={profile.driver} size={17} />
             </span>
             <h2 className="m-0 text-text-bright text-sm font-[630]">
               Database connection
