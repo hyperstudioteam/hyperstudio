@@ -138,25 +138,23 @@ export function GeneralTab({
 
   return (
     <>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-2 mb-[17px]">
-        {drivers.map((driver) => (
-          <button
-            type="button"
-            key={driver.id}
-            className={cn(
-              "h-[38px] border border-border rounded-md flex items-center justify-center gap-[7px] text-muted bg-surface-deep text-[11px] cursor-pointer hover:border-border-bright hover:text-text",
-              profile.driver === driver.id &&
-                "text-[#d5d0ff] border-[rgba(139,124,246,.6)] bg-accent-soft",
-            )}
-            onClick={() => onDriverChange(driver.id)}
-            title={driver.description}
-          >
-            {driver.name}
-          </button>
-        ))}
-      </div>
-
       <div className="grid grid-cols-[1fr_120px] gap-3">
+        <label className={`${formLabelClass} col-span-full`}>
+          Connection type
+          <select
+            className={formInputClass}
+            value={profile.driver}
+            title={active?.description}
+            onChange={(event) => onDriverChange(event.target.value)}
+          >
+            {drivers.map((driver) => (
+              <option key={driver.id} value={driver.id}>
+                {driver.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <label className={`${formLabelClass} col-span-full`}>
           Connection name
           <input
