@@ -29,6 +29,11 @@ function applyParsed(parsed: Record<string, ConnectionSchemaCache>) {
         cache.objectsBySchema && typeof cache.objectsBySchema === "object"
           ? cache.objectsBySchema
           : {},
+      databases: Array.isArray(cache.databases) ? cache.databases : undefined,
+      activeDatabase:
+        typeof cache.activeDatabase === "string"
+          ? cache.activeDatabase
+          : undefined,
     });
   }
 }
@@ -157,7 +162,11 @@ export function hasSchemaCache(connectionId: string): boolean {
   return Boolean(cache && cache.schemas.length > 0);
 }
 
-export function setSchemaList(connectionId: string, schemas: SchemaInfo[]) {
+export function setSchemaList(
+  connectionId: string,
+  schemas: SchemaInfo[],
+  activeDatabase?: string,
+) {
   const existing = cacheByConnection.get(connectionId);
   const kept: Record<string, ObjectsByGroup> = {};
   const names = new Set(schemas.map((schema) => schema.name));
@@ -166,7 +175,29 @@ export function setSchemaList(connectionId: string, schemas: SchemaInfo[]) {
       if (names.has(name)) kept[name] = groups;
     }
   }
-  cacheByConnection.set(connectionId, { schemas, objectsBySchema: kept });
+  cacheByConnection.set(connectionId, {
+    schemas,
+    objectsBySchema: kept,
+    databases: existing?.databases,
+    activeDatabase: activeDatabase ?? existing?.activeDatabase,
+  });
+  persist();
+}
+
+export function setDatabaseList(
+  connectionId: string,
+  databases: SchemaInfo[],
+  activeDatabase?: string,
+) {
+  const existing = cacheByConnection.get(connectionId) ?? {
+    schemas: [],
+    objectsBySchema: {},
+  };
+  cacheByConnection.set(connectionId, {
+    ...existing,
+    databases,
+    activeDatabase: activeDatabase ?? existing.activeDatabase,
+  });
   persist();
 }
 
@@ -217,6 +248,8 @@ export function clearSchemaObjects(
     cacheByConnection.set(connectionId, {
       schemas: existing.schemas,
       objectsBySchema: {},
+      databases: existing.databases,
+      activeDatabase: existing.activeDatabase,
     });
     persist();
     return;
@@ -232,6 +265,8 @@ export function clearSchemaObjects(
   cacheByConnection.set(connectionId, {
     schemas: existing.schemas,
     objectsBySchema: next,
+    databases: existing.databases,
+    activeDatabase: existing.activeDatabase,
   });
   persist();
 }

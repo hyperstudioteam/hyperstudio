@@ -385,6 +385,9 @@ pub struct ErDiagram {
 #[serde(rename_all = "camelCase")]
 pub struct DriverCapabilities {
     pub schemas: bool,
+    /// Driver can list and switch among multiple databases on one server.
+    #[serde(default)]
+    pub databases: bool,
     pub views: bool,
     pub file_based: bool,
     pub folder_based: bool,
@@ -415,6 +418,7 @@ impl Default for DriverCapabilities {
     fn default() -> Self {
         Self {
             schemas: true,
+            databases: false,
             views: true,
             file_based: false,
             folder_based: false,

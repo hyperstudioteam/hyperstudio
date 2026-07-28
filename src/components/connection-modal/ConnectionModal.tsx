@@ -29,20 +29,23 @@ import { SchemaInfo } from "../../types/schema";
 import { cacheDriverGroups } from "../../lib/driverGroups";
 import { syncPluginColumnTypes } from "../../plugins/init";
 import { GeneralTab } from "./GeneralTab";
+import { DatabasesTab } from "./DatabasesTab";
 import { SchemasTab } from "./SchemasTab";
 import { SshTab } from "./SshTab";
 import { VaultCreateModal } from "./VaultCreateModal";
 import { VaultUnlockModal } from "./VaultUnlockModal";
 
-type ModalTab = "general" | "ssh" | "schemas";
+type ModalTab = "general" | "ssh" | "databases" | "schemas";
 
 interface ConnectionModalProps {
   profile: ConnectionProfile;
   folderId: string | null;
   folderOptions: { id: string | null; label: string }[];
   availableSchemas: SchemaInfo[];
+  availableDatabases: SchemaInfo[];
   onFolderChange: (folderId: string | null) => void;
   onAvailableSchemas: (schemas: SchemaInfo[]) => void;
+  onAvailableDatabases: (databases: SchemaInfo[]) => void;
   onSave: (profile: ConnectionProfile, folderId: string | null) => void;
   onClose: () => void;
   isAlreadyConnected: boolean;
@@ -53,8 +56,10 @@ export function ConnectionModal({
   folderId,
   folderOptions,
   availableSchemas,
+  availableDatabases,
   onFolderChange,
   onAvailableSchemas,
+  onAvailableDatabases,
   onSave,
   onClose,
   isAlreadyConnected,
@@ -64,6 +69,7 @@ export function ConnectionModal({
   const [tab, setTab] = useState<ModalTab>("general");
   const [testing, setTesting] = useState(false);
   const [loadingSchemas, setLoadingSchemas] = useState(false);
+  const [loadingDatabases, setLoadingDatabases] = useState(false);
   const [testStatus, setTestStatus] = useState("");
   const [saving, setSaving] = useState(false);
   const [vaultGate, setVaultGate] = useState<"create" | "unlock" | null>(null);
@@ -135,6 +141,7 @@ export function ConnectionModal({
 
   const activeDriver = drivers.find((driver) => driver.id === profile.driver);
   const supportsSchemas = activeDriver?.capabilities.schemas ?? true;
+  const supportsDatabases = activeDriver?.capabilities.databases ?? false;
 
   function update(patch: Partial<ConnectionProfile>) {
     setProfile((current) => ({ ...current, ...patch }));
@@ -183,7 +190,12 @@ export function ConnectionModal({
           ? driver.id
           : profile.database,
       password: usesCustom && !keys.has("password") ? "" : profile.password,
+      allDatabases: true,
+      databases: [],
     });
+    if (tab === "databases" && !caps.databases) {
+      setTab("general");
+    }
   }
 
   async function profileForConnect(): Promise<ConnectionProfile> {
@@ -201,13 +213,24 @@ export function ConnectionModal({
       const ready = await profileForConnect();
       const info = await databaseApi.testConnection(ready);
       setTestStatus(`Connected to ${info.database}`);
-      if (!supportsSchemas) return;
-      setLoadingSchemas(true);
+      if (!supportsSchemas && !supportsDatabases) return;
+      setLoadingSchemas(supportsSchemas);
+      setLoadingDatabases(supportsDatabases);
       await databaseApi.connect(ready);
       try {
-        const listed = await databaseApi.listSchemas(profile.id);
-        onAvailableSchemas(listed);
-        setTab("schemas");
+        if (supportsDatabases) {
+          const listed = await databaseApi.listDatabases(profile.id);
+          onAvailableDatabases(listed);
+        }
+        if (supportsSchemas) {
+          const listed = await databaseApi.listSchemas(profile.id);
+          onAvailableSchemas(listed);
+        }
+        if (supportsDatabases) {
+          setTab("databases");
+        } else if (supportsSchemas) {
+          setTab("schemas");
+        }
       } finally {
         if (!isAlreadyConnected) {
           await databaseApi.disconnect(profile.id);
@@ -218,6 +241,7 @@ export function ConnectionModal({
     } finally {
       setTesting(false);
       setLoadingSchemas(false);
+      setLoadingDatabases(false);
     }
   }
 
@@ -239,6 +263,27 @@ export function ConnectionModal({
       setTestStatus(errorMessage(nextError));
     } finally {
       setLoadingSchemas(false);
+    }
+  }
+
+  async function refreshDatabases() {
+    setLoadingDatabases(true);
+    setTestStatus("");
+    try {
+      const ready = await profileForConnect();
+      await databaseApi.connect(ready);
+      try {
+        const listed = await databaseApi.listDatabases(profile.id);
+        onAvailableDatabases(listed);
+      } finally {
+        if (!isAlreadyConnected) {
+          await databaseApi.disconnect(profile.id);
+        }
+      }
+    } catch (nextError) {
+      setTestStatus(errorMessage(nextError));
+    } finally {
+      setLoadingDatabases(false);
     }
   }
 
@@ -387,6 +432,18 @@ export function ConnectionModal({
               <span className="ml-1.5 text-[9px] text-green">on</span>
             ) : null}
           </button>
+          {supportsDatabases && (
+            <button
+              type="button"
+              className={cn(
+                "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
+                tab === "databases" && "text-[#d8dde6] border-b-blue",
+              )}
+              onClick={() => setTab("databases")}
+            >
+              Databases
+            </button>
+          )}
           {supportsSchemas && (
             <button
               type="button"
@@ -403,6 +460,14 @@ export function ConnectionModal({
 
         {tab === "ssh" ? (
           <SshTab profile={profile} onChange={update} />
+        ) : tab === "databases" && supportsDatabases ? (
+          <DatabasesTab
+            profile={profile}
+            availableDatabases={availableDatabases}
+            loading={loadingDatabases}
+            onChange={update}
+            onRefresh={() => void refreshDatabases()}
+          />
         ) : tab === "schemas" && supportsSchemas ? (
           <SchemasTab
             profile={profile}
@@ -439,7 +504,7 @@ export function ConnectionModal({
           <button
             type="button"
             className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer flex items-center gap-1.5 border border-border-bright text-[#b8bfca] bg-[#20242b] hover:text-white hover:border-[#4c5360] disabled:opacity-40 disabled:cursor-default"
-            disabled={testing || loadingSchemas || saving}
+            disabled={testing || loadingSchemas || loadingDatabases || saving}
             onClick={() => void testAndLoadSchemas()}
           >
             {(testing || loadingSchemas) && (

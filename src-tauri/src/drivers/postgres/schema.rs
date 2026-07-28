@@ -29,6 +29,30 @@ pub async fn list_available(pool: &PgPool) -> Result<Vec<SchemaInfo>, String> {
         .collect())
 }
 
+pub async fn list_databases(pool: &PgPool) -> Result<Vec<SchemaInfo>, String> {
+    let rows = sqlx::query(
+        "SELECT datname
+         FROM pg_catalog.pg_database
+         WHERE datallowconn
+         ORDER BY datname",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|error| error.to_string())?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(|row| {
+            let name: String = row.try_get(0).ok()?;
+            if name.is_empty() {
+                return None;
+            }
+            let is_system = matches!(name.as_str(), "template0" | "template1");
+            Some(SchemaInfo { name, is_system })
+        })
+        .collect())
+}
+
 pub async fn introspect(pool: &PgPool, selected: &[String]) -> Result<Vec<SchemaNode>, String> {
     let table_rows = if selected.is_empty() {
         sqlx::query(

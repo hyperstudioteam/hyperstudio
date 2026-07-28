@@ -129,6 +129,10 @@ export interface ConnectionSchemaCache {
   schemas: SchemaInfo[];
   /** schema name -> group id -> objects */
   objectsBySchema: Record<string, ObjectsByGroup>;
+  /** Postgres: databases known for this connection (for offline/cached tree). */
+  databases?: SchemaInfo[];
+  /** Database that `schemas` / objects currently describe. */
+  activeDatabase?: string;
 }
 
 export const TABLES_GROUP = "tables";
