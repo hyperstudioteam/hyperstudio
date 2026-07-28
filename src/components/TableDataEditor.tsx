@@ -26,6 +26,7 @@ import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu, ContextMenuSeparator } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
 import { errorMessage } from "../lib/format";
+import { isPrimaryModifier, shortcutLabel } from "../lib/platform";
 import { presentCell } from "../plugins/contributions";
 import { useExtensionMenu } from "../extensions/hooks";
 import { extensionRegistry } from "../extensions/registry";
@@ -409,10 +410,22 @@ export function TableDataEditor({
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      if (editing || isEditingField(event.target)) return;
-
       const key = event.key.toLowerCase();
-      const mod = event.metaKey || event.ctrlKey;
+      const mod = isPrimaryModifier(event);
+      // Either primary mod counts as "modified" for type-to-edit suppression.
+      const anyMod = event.metaKey || event.ctrlKey;
+
+      // Skip shortcuts for inactive (kept-alive but hidden) edit tabs.
+      if (gridRef.current?.closest('[aria-hidden="true"]')) return;
+
+      if (mod && key === "r") {
+        if (event.altKey || event.shiftKey || busy) return;
+        event.preventDefault();
+        void load(page);
+        return;
+      }
+
+      if (editing || isEditingField(event.target)) return;
 
       if (mod && key === "d") {
         if (!hasSelection) return;
@@ -423,7 +436,7 @@ export function TableDataEditor({
 
       // Type-to-edit: printable key fills every cell in the selection.
       if (
-        !mod &&
+        !anyMod &&
         !event.altKey &&
         event.key.length === 1 &&
         !event.repeat
@@ -477,6 +490,8 @@ export function TableDataEditor({
     pkNames,
     visibleRows,
     hasSelection,
+    page,
+    busy,
   ]);
 
   function focusGrid() {
@@ -945,7 +960,7 @@ export function TableDataEditor({
           <button
             type="button"
             className={iconButtonClass}
-            title="Refresh"
+            title={`Refresh (${shortcutLabel("R")})`}
             disabled={busy}
             onClick={() => void load(page)}
           >
@@ -1363,7 +1378,10 @@ export function TableDataEditor({
             <span>{stats.coord}</span>
           </>
         ) : (
-          <span>Select cells · ⌘C copy · ⌘V paste · ⌘D duplicate</span>
+          <span>
+            Select cells · ⌘C copy · ⌘V paste · ⌘D duplicate ·{" "}
+            {shortcutLabel("R")} refresh
+          </span>
         )}
       </div>
 
