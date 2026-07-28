@@ -62,6 +62,7 @@ import {
   tableFromObject,
 } from "../types/schema";
 import { cn } from "../lib/cn";
+import { ContextMenu } from "./ContextMenu";
 import { ErDiagramView } from "./ErDiagramView";
 import { StatementRun, toStatementRuns } from "../lib/scriptRun";
 import { splitStatements } from "../lib/splitStatements";
@@ -258,6 +259,11 @@ export function QueryWorkspace({
       ? new Set([bootActive.id])
       : new Set();
   });
+  const [tabMenu, setTabMenu] = useState<{
+    x: number;
+    y: number;
+    tabId: string;
+  } | null>(null);
   const [resultPage, setResultPage] = useState(0);
   const [pagePlan, setPagePlan] = useState<PagedQueryPlan | null>(null);
   const [erDiagram, setErDiagram] = useState<ErDiagram | null>(null);
@@ -1012,6 +1018,82 @@ export function QueryWorkspace({
     });
   }
 
+  function closeOtherTabs(id: string) {
+    setTabs((current) => {
+      const next = current.filter((tab) => tab.id === id);
+      return next.length > 0 ? next : current;
+    });
+    setActiveId(id);
+  }
+
+  function closeAllTabs() {
+    queryCounter.current += 1;
+    const id = `query-${queryCounter.current}`;
+    setTabs([
+      {
+        id,
+        kind: "query",
+        title: `Query ${queryCounter.current}`,
+        sql: STARTER_QUERY,
+        connectionId: selected?.id ?? activeConnectionId ?? "",
+      },
+    ]);
+    setActiveId(id);
+  }
+
+  function closeTabsToLeft(id: string) {
+    setTabs((current) => {
+      const index = current.findIndex((tab) => tab.id === id);
+      if (index <= 0) return current;
+      const next = current.slice(index);
+      if (!next.some((tab) => tab.id === activeId)) setActiveId(id);
+      return next;
+    });
+  }
+
+  function closeTabsToRight(id: string) {
+    setTabs((current) => {
+      const index = current.findIndex((tab) => tab.id === id);
+      if (index < 0 || index >= current.length - 1) return current;
+      const next = current.slice(0, index + 1);
+      if (!next.some((tab) => tab.id === activeId)) setActiveId(id);
+      return next;
+    });
+  }
+
+  useEffect(() => {
+    if (!tabMenu) return;
+    const close = () => setTabMenu(null);
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [tabMenu]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "w") {
+        return;
+      }
+      if (event.altKey || event.shiftKey) return;
+      event.preventDefault();
+      closeTab(activeId);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [activeId, tabs.length]);
+
+  const tabMenuIndex = tabMenu
+    ? tabs.findIndex((tab) => tab.id === tabMenu.tabId)
+    : -1;
+  const canCloseTab = tabs.length > 1;
+  const canCloseOthers = canCloseTab && tabMenuIndex >= 0;
+  const canCloseLeft = tabMenuIndex > 0;
+  const canCloseRight =
+    tabMenuIndex >= 0 && tabMenuIndex < tabs.length - 1;
+
   return (
     <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
       <Group
@@ -1023,53 +1105,65 @@ export function QueryWorkspace({
       >
         <Panel id="workspace-main" minSize={320} className="min-w-0">
           <main className="grid h-full min-h-0 grid-rows-[36px_1fr_23px] overflow-hidden bg-bg">
-      <div className="flex items-stretch overflow-x-auto border-b border-border bg-titlebar">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={cn(
-              "flex max-w-[200px] min-w-[120px] cursor-pointer items-center gap-[7px] border-0 border-r border-border bg-transparent px-2.5 pl-2.5 text-[11px] text-muted",
-              tab.id === activeId &&
-                "border-t border-accent bg-bg text-[#d8dde6]",
-            )}
-            onClick={() => setActiveId(tab.id)}
-          >
-            {tab.kind === "query" ? (
-              <span className="text-[8px] font-extrabold tracking-[0.02em] text-accent-bright">
-                SQL
-              </span>
-            ) : tab.kind === "er" ? (
-              <Network size={12} className="shrink-0 text-[#9d90ff]" />
-            ) : (
-              <Table2 size={12} className="shrink-0 text-[#7db7ff]" />
-            )}
-            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
-              {tab.title}
-            </span>
-            <span
-              className="ml-auto grid place-items-center rounded-[3px] text-subtle hover:bg-panel-soft hover:text-text"
-              role="button"
-              tabIndex={-1}
-              aria-label={`Close ${tab.title}`}
-              onClick={(event) => {
+      <div className="flex min-w-0 items-stretch border-b border-border bg-titlebar">
+        <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={cn(
+                "flex max-w-[200px] min-w-[120px] shrink-0 cursor-pointer items-center gap-[7px] border-0 border-r border-border bg-transparent px-2.5 pl-2.5 text-[11px] text-muted",
+                tab.id === activeId &&
+                  "border-t border-accent bg-bg text-[#d8dde6]",
+              )}
+              onClick={() => setActiveId(tab.id)}
+              onContextMenu={(event) => {
+                event.preventDefault();
                 event.stopPropagation();
-                closeTab(tab.id);
+                setActiveId(tab.id);
+                setTabMenu({
+                  x: event.clientX,
+                  y: event.clientY,
+                  tabId: tab.id,
+                });
               }}
             >
-              <X size={13} />
-            </span>
+              {tab.kind === "query" ? (
+                <span className="text-[8px] font-extrabold tracking-[0.02em] text-accent-bright">
+                  SQL
+                </span>
+              ) : tab.kind === "er" ? (
+                <Network size={12} className="shrink-0 text-[#9d90ff]" />
+              ) : (
+                <Table2 size={12} className="shrink-0 text-[#7db7ff]" />
+              )}
+              <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+                {tab.title}
+              </span>
+              <span
+                className="ml-auto grid place-items-center rounded-[3px] text-subtle hover:bg-panel-soft hover:text-text"
+                role="button"
+                tabIndex={-1}
+                aria-label={`Close ${tab.title}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeTab(tab.id);
+                }}
+              >
+                <X size={13} />
+              </span>
+            </button>
+          ))}
+          <button
+            className="grid w-[35px] shrink-0 cursor-pointer place-items-center border-0 bg-transparent text-subtle hover:bg-panel-soft hover:text-text"
+            aria-label="New query"
+            type="button"
+            onClick={addQueryTab}
+          >
+            <CirclePlus size={15} />
           </button>
-        ))}
-        <button
-          className="grid w-[35px] cursor-pointer place-items-center border-0 bg-transparent text-subtle hover:bg-panel-soft hover:text-text"
-          aria-label="New query"
-          type="button"
-          onClick={addQueryTab}
-        >
-          <CirclePlus size={15} />
-        </button>
-        <div className="ml-auto flex shrink-0 items-center gap-[7px] px-[11px] text-[10px] text-muted">
+        </div>
+        <div className="relative z-10 flex shrink-0 items-center gap-[7px] border-l border-border bg-titlebar px-[11px] text-[10px] text-muted">
           {active?.kind === "query" ? (
             <>
               <span
@@ -1117,6 +1211,63 @@ export function QueryWorkspace({
           )}
         </div>
       </div>
+
+      {tabMenu && tabMenuIndex >= 0 && (
+        <ContextMenu x={tabMenu.x} y={tabMenu.y}>
+          <button
+            type="button"
+            disabled={!canCloseTab}
+            onClick={() => {
+              closeTab(tabMenu.tabId);
+              setTabMenu(null);
+            }}
+          >
+            Close
+            <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+              ⌘W
+            </kbd>
+          </button>
+          <button
+            type="button"
+            disabled={!canCloseOthers}
+            onClick={() => {
+              closeOtherTabs(tabMenu.tabId);
+              setTabMenu(null);
+            }}
+          >
+            Close Other Tabs
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              closeAllTabs();
+              setTabMenu(null);
+            }}
+          >
+            Close All Tabs
+          </button>
+          <button
+            type="button"
+            disabled={!canCloseLeft}
+            onClick={() => {
+              closeTabsToLeft(tabMenu.tabId);
+              setTabMenu(null);
+            }}
+          >
+            Close Tabs to the Left
+          </button>
+          <button
+            type="button"
+            disabled={!canCloseRight}
+            onClick={() => {
+              closeTabsToRight(tabMenu.tabId);
+              setTabMenu(null);
+            }}
+          >
+            Close Tabs to the Right
+          </button>
+        </ContextMenu>
+      )}
 
       <div className="min-h-0 overflow-hidden">
         {tabs.map((tab) => {
