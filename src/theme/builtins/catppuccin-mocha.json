@@ -1,0 +1,30 @@
+{
+  "id": "catppuccin-mocha",
+  "name": "Catppuccin Mocha",
+  "family": "catppuccin",
+  "colorScheme": "dark",
+  "description": "Soothing pastel dark theme (Catppuccin Mocha).",
+  "background": "#1e1e2e",
+  "foreground": "#cdd6f4",
+  "cursor": "#f5e0dc",
+  "selectionBackground": "#585b70",
+  "selectionForeground": "#cdd6f4",
+  "palette": [
+    "#45475a",
+    "#f38ba8",
+    "#a6e3a1",
+    "#f9e2af",
+    "#89b4fa",
+    "#cba6f7",
+    "#94e2d5",
+    "#bac2de",
+    "#585b70",
+    "#f38ba8",
+    "#a6e3a1",
+    "#f9e2af",
+    "#89b4fa",
+    "#cba6f7",
+    "#94e2d5",
+    "#a6adc8"
+  ]
+}

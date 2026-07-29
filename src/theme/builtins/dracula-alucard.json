@@ -1,0 +1,30 @@
+{
+  "id": "dracula-alucard",
+  "name": "Dracula Alucard",
+  "family": "dracula",
+  "colorScheme": "light",
+  "description": "Light companion to the Dracula palette.",
+  "background": "#fffbeb",
+  "foreground": "#1e1f29",
+  "cursor": "#1e1f29",
+  "selectionBackground": "#cfcfde",
+  "selectionForeground": "#1e1f29",
+  "palette": [
+    "#1e1f29",
+    "#cb3a2a",
+    "#147a3e",
+    "#846e15",
+    "#644ac9",
+    "#a3144d",
+    "#036a96",
+    "#9f9faf",
+    "#4c4f69",
+    "#cb3a2a",
+    "#147a3e",
+    "#846e15",
+    "#644ac9",
+    "#a3144d",
+    "#036a96",
+    "#1e1f29"
+  ]
+}

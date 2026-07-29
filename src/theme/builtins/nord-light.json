@@ -1,0 +1,30 @@
+{
+  "id": "nord-light",
+  "name": "Nord Light",
+  "family": "nord",
+  "colorScheme": "light",
+  "description": "Snow Storm light palette from Nord.",
+  "background": "#eceff4",
+  "foreground": "#2e3440",
+  "cursor": "#2e3440",
+  "selectionBackground": "#d8dee9",
+  "selectionForeground": "#2e3440",
+  "palette": [
+    "#3b4252",
+    "#bf616a",
+    "#a3be8c",
+    "#ebcb8b",
+    "#5e81ac",
+    "#b48ead",
+    "#398e93",
+    "#4c566a",
+    "#4c566a",
+    "#bf616a",
+    "#a3be8c",
+    "#ebcb8b",
+    "#5e81ac",
+    "#b48ead",
+    "#398e93",
+    "#2e3440"
+  ]
+}

@@ -1114,7 +1114,7 @@ export function QueryWorkspace({
               className={cn(
                 "flex max-w-[200px] min-w-[120px] shrink-0 cursor-pointer items-center gap-[7px] border-0 border-r border-border bg-transparent px-2.5 pl-2.5 text-[11px] text-muted",
                 tab.id === activeId &&
-                  "border-t border-accent bg-bg text-[#d8dde6]",
+                  "border-t border-accent bg-bg text-text",
               )}
               onClick={() => setActiveId(tab.id)}
               onContextMenu={(event) => {
@@ -1133,9 +1133,9 @@ export function QueryWorkspace({
                   SQL
                 </span>
               ) : tab.kind === "er" ? (
-                <Network size={12} className="shrink-0 text-[#9d90ff]" />
+                <Network size={12} className="shrink-0 text-accent-bright" />
               ) : (
-                <Table2 size={12} className="shrink-0 text-[#7db7ff]" />
+                <Table2 size={12} className="shrink-0 text-blue" />
               )}
               <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                 {tab.title}
@@ -1168,8 +1168,8 @@ export function QueryWorkspace({
             <>
               <span
                 className={cn(
-                  "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
-                  queryLive && "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
+                  "size-1.5 shrink-0 rounded-full bg-subtle",
+                  queryLive && "bg-green shadow-[0_0_7px] shadow-green/40",
                 )}
               />
               <label className="flex items-center gap-1.5 text-[10px] text-muted">
@@ -1194,10 +1194,10 @@ export function QueryWorkspace({
             <>
               <span
                 className={cn(
-                  "size-1.5 shrink-0 rounded-full bg-[#4e5664]",
+                  "size-1.5 shrink-0 rounded-full bg-subtle",
                   activeConnectionId &&
                     liveConnectionIds.has(activeConnectionId) &&
-                    "bg-green shadow-[0_0_7px_rgba(73,201,137,.4)]",
+                    "bg-green shadow-[0_0_7px] shadow-green/40",
                 )}
               />
               {activeConnection
@@ -1223,7 +1223,7 @@ export function QueryWorkspace({
             }}
           >
             Close
-            <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+            <kbd className="ml-auto rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
               ⌘W
             </kbd>
           </button>
@@ -1342,9 +1342,9 @@ export function QueryWorkspace({
           >
           <Panel id="sql-editor" defaultSize="42%" minSize={120}>
           <section className="flex h-full min-h-0 flex-col">
-            <div className="flex h-9 shrink-0 items-center gap-[9px] border-b border-border bg-[#14171b] px-[9px]">
+            <div className="flex h-9 shrink-0 items-center gap-[9px] border-b border-border bg-surface-deep px-[9px]">
               <button
-                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-2 text-[10px] font-semibold text-[#c9c2ff] hover:border-accent hover:bg-[rgba(139,124,246,.22)] hover:text-white disabled:opacity-60"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-accent/45 bg-accent-soft px-2 text-[10px] font-semibold text-accent-bright hover:border-accent hover:bg-accent-soft hover:text-white disabled:opacity-60"
                 disabled={busy === "query"}
                 onClick={run}
               >
@@ -1354,13 +1354,13 @@ export function QueryWorkspace({
                   <Play size={14} fill="currentColor" />
                 )}
                 Run
-                <kbd className="rounded-[3px] border border-[#403a67] bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-[#857cad]">
+                <kbd className="rounded-[3px] border border-accent/40 bg-black/15 px-1 py-px font-mono text-[8px] text-accent-bright">
                   ⌘↵
                 </kbd>
               </button>
               {busy === "query" && sessions && queryConnectionId && (
                 <button
-                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-red/45 bg-transparent px-2 text-[10px] text-red hover:bg-red/10"
                   onClick={() => onCancel?.(queryConnectionId)}
                   title="Ask the server to stop this statement"
                 >
@@ -1374,13 +1374,13 @@ export function QueryWorkspace({
                   {txnOpen ? (
                     <div className="flex items-center gap-1">
                       <span
-                        className="rounded-[3px] border border-warn bg-[rgba(201,162,39,.12)] px-[7px] py-0.5 text-[10px] text-warn"
+                        className="rounded-[3px] border border-warn bg-pk/15 px-[7px] py-0.5 text-[10px] text-warn"
                         title="Statements run inside an open transaction"
                       >
                         Tx: Open
                       </span>
                       <button
-                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-green hover:text-white disabled:opacity-60"
+                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-text hover:border-green hover:text-white disabled:opacity-60"
                         disabled={busy === "query"}
                         onClick={() =>
                           onEndTransaction?.(queryConnectionId, true)
@@ -1390,7 +1390,7 @@ export function QueryWorkspace({
                         Commit
                       </button>
                       <button
-                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-red hover:text-white disabled:opacity-60"
+                        className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-text hover:border-red hover:text-white disabled:opacity-60"
                         disabled={busy === "query"}
                         onClick={() =>
                           onEndTransaction?.(queryConnectionId, false)
@@ -1402,7 +1402,7 @@ export function QueryWorkspace({
                     </div>
                   ) : (
                     <button
-                      className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
+                      className="flex h-[25px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-text hover:border-accent hover:text-white disabled:opacity-60"
                       disabled={busy === "query" || !queryConnection}
                       onClick={() => onBeginTransaction?.(queryConnectionId)}
                       title="Run the next statements inside a transaction"
@@ -1414,7 +1414,7 @@ export function QueryWorkspace({
               )}
               {statementCount > 1 && (
                 <button
-                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c4cad4] hover:border-accent hover:text-white disabled:opacity-60"
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-text hover:border-accent hover:text-white disabled:opacity-60"
                   disabled={busy === "query" || scriptBusy}
                   onClick={() => void runScript()}
                   title="Run every statement in order"
@@ -1426,7 +1426,7 @@ export function QueryWorkspace({
               )}
               {scriptBusy && (
                 <button
-                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(239,107,115,.45)] bg-transparent px-2 text-[10px] text-red hover:bg-[rgba(239,107,115,.12)]"
+                  className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-red/45 bg-transparent px-2 text-[10px] text-red hover:bg-red/10"
                   onClick={() => {
                     cancelScript.current = true;
                   }}
@@ -1438,19 +1438,19 @@ export function QueryWorkspace({
               )}
               <button
                 type="button"
-                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-text hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
                 disabled={busy === "query"}
                 title="Format selection, or the whole query"
                 onClick={formatQuery}
               >
                 <WandSparkles size={14} />
                 Format
-                <kbd className="rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+                <kbd className="rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
                   ⇧⌥F
                 </kbd>
               </button>
               <button
-                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] font-semibold text-text hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
                 disabled={explainDisabled}
                 title={
                   explainCapable
@@ -1485,7 +1485,7 @@ export function QueryWorkspace({
               )}
               <button
                 type="button"
-                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
+                className="flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-text hover:border-border-bright hover:bg-panel-soft hover:text-white disabled:opacity-60"
                 title="Save this query"
                 disabled={busy === "query"}
                 onClick={saveCurrentQuery}
@@ -1496,8 +1496,8 @@ export function QueryWorkspace({
               <button
                 type="button"
                 className={cn(
-                  "flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-[#c9d0db] hover:border-border-bright hover:bg-panel-soft hover:text-white",
-                  historyOpen && "border-accent bg-accent-soft text-[#c9c2ff]",
+                  "flex h-[25px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-border bg-transparent px-2 text-[10px] text-text hover:border-border-bright hover:bg-panel-soft hover:text-white",
+                  historyOpen && "border-accent bg-accent-soft text-accent-bright",
                 )}
                 title="Query history and saved queries"
                 onClick={() => setHistoryOpen((value) => !value)}
@@ -1558,13 +1558,13 @@ export function QueryWorkspace({
 
           <Panel id="query-results" minSize={100}>
           <section className="flex h-full min-h-0 flex-col overflow-hidden">
-            <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-border bg-[#14171b]">
+            <div className="flex h-9 shrink-0 items-stretch justify-between border-b border-border bg-surface-deep">
               <div className="flex">
                 <button
                   type="button"
                   className={cn(
                     "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
-                    resultPanel === "results" && "border-accent text-[#d5dae3]",
+                    resultPanel === "results" && "border-accent text-text-bright",
                   )}
                   onClick={() => setResultPanel("results")}
                 >
@@ -1575,7 +1575,7 @@ export function QueryWorkspace({
                     type="button"
                     className={cn(
                       "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
-                      resultPanel === "plan" && "border-accent text-[#d5dae3]",
+                      resultPanel === "plan" && "border-accent text-text-bright",
                     )}
                     onClick={() => setResultPanel("plan")}
                   >
@@ -1586,7 +1586,7 @@ export function QueryWorkspace({
                   type="button"
                   className={cn(
                     "cursor-pointer border-0 border-b border-transparent bg-transparent px-3.5 text-[10px] text-muted",
-                    resultPanel === "messages" && "border-accent text-[#d5dae3]",
+                    resultPanel === "messages" && "border-accent text-text-bright",
                   )}
                   onClick={() => setResultPanel("messages")}
                 >
@@ -1619,7 +1619,7 @@ export function QueryWorkspace({
                 <div className="flex items-center gap-[13px] px-[11px] text-[9px] text-subtle [&>span]:flex [&>span]:items-center [&>span]:gap-1">
                   {pageable && result.columns.length > 0 ? (
                     <div className="flex items-center gap-0.5">
-                      <span className="min-w-[72px] px-1 font-mono text-[10px] text-[#9aa3b0] tabular-nums">
+                      <span className="min-w-[72px] px-1 font-mono text-[10px] text-muted tabular-nums">
                         {rangeStart === 0
                           ? "0 of 0"
                           : `${rangeStart}-${rangeEnd}${hasMore ? "+" : ""}`}
@@ -1653,7 +1653,7 @@ export function QueryWorkspace({
                       </button>
                     </div>
                   ) : (
-                    <span className="!text-[#74cda0]">
+                    <span className="!text-green">
                       <Check size={13} />{" "}
                       {result.rows.length || result.affectedRows}{" "}
                       {result.columns.length ? "rows" : "affected"}
@@ -1692,7 +1692,7 @@ export function QueryWorkspace({
             ) : resultPanel === "plan" && explainPlan ? (
               <ExplainPlanView plan={explainPlan} />
             ) : resultPanel === "messages" ? (
-              <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] text-[#c9d0db]">
+              <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-[11px] text-text">
                 {error ? (
                   <pre className="m-0 whitespace-pre-wrap text-danger">
                     {error}
@@ -1748,7 +1748,7 @@ export function QueryWorkspace({
         />
       )}
 
-      <footer className="flex h-[23px] items-center overflow-hidden border-t border-border bg-[#171a20] px-[9px] text-[9px] whitespace-nowrap text-[#687181]">
+      <footer className="flex h-[23px] items-center overflow-hidden border-t border-border bg-panel-soft px-[9px] text-[9px] whitespace-nowrap text-subtle">
         <span>
           {active?.kind === "edit"
             ? `Edit Data · ${active.schema}.${active.table}`

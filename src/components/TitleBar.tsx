@@ -7,14 +7,18 @@ const iconButtonClass = cn(
   "disabled:cursor-default disabled:opacity-40",
 );
 
-export function TitleBar() {
+interface TitleBarProps {
+  onOpenSettings?: () => void;
+}
+
+export function TitleBar({ onOpenSettings }: TitleBarProps) {
   return (
     <header
       className="flex h-[38px] select-none items-center justify-between border-b border-border bg-titlebar py-0 pl-[76px] pr-2.5 max-[760px]:pl-[66px]"
       data-tauri-drag-region
     >
       <div className="flex items-center gap-2 text-xs font-[650] tracking-[0.01em]">
-        <span className="grid h-6 w-6 place-items-center rounded-md bg-[linear-gradient(145deg,#9e91ff,#6655db)] text-white">
+        <span className="grid h-6 w-6 place-items-center rounded-md bg-[linear-gradient(145deg,var(--color-accent-bright),var(--color-accent))] text-white">
           <Braces size={17} />
         </span>
         <span>HyperStudio</span>
@@ -23,7 +27,13 @@ export function TitleBar() {
         </span>
       </div>
       <div className="flex">
-        <button className={iconButtonClass} aria-label="Settings">
+        <button
+          type="button"
+          className={iconButtonClass}
+          aria-label="Settings"
+          title="Settings"
+          onClick={onOpenSettings}
+        >
           <Settings size={16} />
         </button>
       </div>

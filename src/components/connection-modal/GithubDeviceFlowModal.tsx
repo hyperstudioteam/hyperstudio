@@ -68,7 +68,7 @@ export function GithubDeviceFlowModal({
 
   return (
     <div
-      className="fixed inset-0 z-40 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-40 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && handleClose()
       }
@@ -93,7 +93,7 @@ export function GithubDeviceFlowModal({
           </button>
         </div>
 
-        <p className="m-0 mb-3.5 text-[12px] leading-[1.45] text-[#aab1be]">
+        <p className="m-0 mb-3.5 text-[12px] leading-[1.45] text-muted">
           Enter this code on GitHub, then approve access for HyperStudio.
         </p>
 
@@ -103,7 +103,7 @@ export function GithubDeviceFlowModal({
           </code>
           <button
             type="button"
-            className="h-[28px] px-2.5 border-0 rounded-[5px] text-[10px] font-semibold cursor-pointer text-[#c4cad4] bg-transparent hover:text-text hover:bg-surface flex items-center gap-1"
+            className="h-[28px] px-2.5 border-0 rounded-[5px] text-[10px] font-semibold cursor-pointer text-text bg-transparent hover:text-text hover:bg-surface flex items-center gap-1"
             onClick={() => void copyCode()}
           >
             <Copy size={13} />
@@ -122,10 +122,10 @@ export function GithubDeviceFlowModal({
           </button>
         </div>
 
-        <p className="m-0 text-[11px] text-[#8b93a1]">{status}</p>
+        <p className="m-0 text-[11px] text-muted">{status}</p>
 
         {error && (
-          <div className="mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-[#d18b91] bg-[rgba(239,107,115,.08)]">
+          <div className="mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-danger bg-red/10">
             {error}
           </div>
         )}
@@ -133,7 +133,7 @@ export function GithubDeviceFlowModal({
         <div className="mt-[18px] pt-3.5 border-t border-border flex justify-end">
           <button
             type="button"
-            className="h-[32px] px-3 border border-border-bright rounded-[5px] text-[#c4cad4] bg-transparent text-[11px] cursor-pointer hover:text-text hover:bg-panel-soft"
+            className="h-[32px] px-3 border border-border-bright rounded-[5px] text-text bg-transparent text-[11px] cursor-pointer hover:text-text hover:bg-panel-soft"
             onClick={handleClose}
           >
             Cancel

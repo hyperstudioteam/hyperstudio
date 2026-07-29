@@ -5,6 +5,27 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + React + Typescript</title>
+    <script>
+      try {
+        var cached = localStorage.getItem("hyperstudio.theme.vars.v1");
+        var theme = localStorage.getItem("hyperstudio.theme.v1");
+        if (theme) document.documentElement.dataset.theme = theme;
+        if (cached) {
+          var parsed = JSON.parse(cached);
+          if (parsed && parsed.vars) {
+            var root = document.documentElement.style;
+            if (parsed.colorScheme) {
+              root.colorScheme = parsed.colorScheme;
+            }
+            for (var key in parsed.vars) {
+              if (Object.prototype.hasOwnProperty.call(parsed.vars, key)) {
+                root.setProperty(key, parsed.vars[key]);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    </script>
   </head>
 
   <body>

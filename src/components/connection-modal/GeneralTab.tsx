@@ -31,11 +31,11 @@ const PROFILE_KEYS = new Set([
 ]);
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const formInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 const checkboxRowClass =
-  "flex flex-row items-center gap-2 text-[#b4bbc6] text-[11px] font-normal cursor-pointer";
+  "flex flex-row items-center gap-2 text-muted text-[11px] font-normal cursor-pointer";
 const checkboxInputClass =
   "w-3.5 h-3.5 m-0 p-0 border-0 rounded-none bg-transparent shrink-0 accent-accent cursor-pointer";
 
@@ -197,14 +197,14 @@ export function GeneralTab({
         <div className={`${formLabelClass} col-span-full`}>
           Safety
           <div
-            className="flex flex-col gap-2 rounded-md border border-border bg-[#14171d] p-2.5 px-[11px]"
+            className="flex flex-col gap-2 rounded-md border border-border bg-surface-deep p-2.5 px-[11px]"
             role="radiogroup"
             aria-label="Safety"
           >
             {SAFETY_OPTIONS.map((option) => (
               <label
                 key={option.id}
-                className="flex cursor-pointer items-center gap-2 text-[11px] text-[#b4bbc6]"
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-muted"
               >
                 <input
                   type="radio"
@@ -214,10 +214,10 @@ export function GeneralTab({
                   onChange={() => onChange({ safety: option.id })}
                 />
                 <span className="flex flex-col gap-0.5">
-                  <strong className="text-[11px] font-semibold text-[#d5dae3]">
+                  <strong className="text-[11px] font-semibold text-text-bright">
                     {option.label}
                   </strong>
-                  <em className="text-[10px] not-italic text-[#6f7785]">
+                  <em className="text-[10px] not-italic text-subtle">
                     {option.description}
                   </em>
                 </span>
@@ -491,11 +491,11 @@ function PasswordStorageBlock({
 
       {savePassword && (
         <div
-          className="flex flex-col gap-2 p-2.5 px-[11px] border border-border rounded-md bg-[#14171d]"
+          className="flex flex-col gap-2 p-2.5 px-[11px] border border-border rounded-md bg-surface-deep"
           role="radiogroup"
           aria-label="Secret storage"
         >
-          <label className="flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer">
+          <label className="flex items-center gap-2 text-muted text-[11px] cursor-pointer">
             <input
               type="radio"
               name="password-storage"
@@ -504,10 +504,10 @@ function PasswordStorageBlock({
               onChange={() => onStorage("vault")}
             />
             <span className="flex flex-col gap-0.5">
-              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+              <strong className="text-text-bright text-[11px] font-semibold">
                 Into vault
               </strong>
-              <em className="text-[#6f7785] text-[10px] not-italic">
+              <em className="text-subtle text-[10px] not-italic">
                 {vaultReady
                   ? vaultOpen
                     ? "Encrypted · vault unlocked"
@@ -518,7 +518,7 @@ function PasswordStorageBlock({
           </label>
           <label
             className={cn(
-              "flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer",
+              "flex items-center gap-2 text-muted text-[11px] cursor-pointer",
               !keychainReady && "opacity-50 cursor-default",
             )}
           >
@@ -531,17 +531,17 @@ function PasswordStorageBlock({
               onChange={() => onStorage("keychain")}
             />
             <span className="flex flex-col gap-0.5">
-              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+              <strong className="text-text-bright text-[11px] font-semibold">
                 OS credential store
               </strong>
-              <em className="text-[#6f7785] text-[10px] not-italic">
+              <em className="text-subtle text-[10px] not-italic">
                 {keychainReady
                   ? "Managed by the system keychain · no master password"
                   : "Not available on this system"}
               </em>
             </span>
           </label>
-          <label className="flex items-center gap-2 text-[#b4bbc6] text-[11px] cursor-pointer">
+          <label className="flex items-center gap-2 text-muted text-[11px] cursor-pointer">
             <input
               type="radio"
               name="password-storage"
@@ -550,10 +550,10 @@ function PasswordStorageBlock({
               onChange={() => onStorage("raw")}
             />
             <span className="flex flex-col gap-0.5">
-              <strong className="text-[#d5dae3] text-[11px] font-semibold">
+              <strong className="text-text-bright text-[11px] font-semibold">
                 Raw
               </strong>
-              <em className="text-[#6f7785] text-[10px] not-italic">
+              <em className="text-subtle text-[10px] not-italic">
                 Stored as plain text on this device
               </em>
             </span>

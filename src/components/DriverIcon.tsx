@@ -11,11 +11,11 @@ interface DriverIconProps {
 export function driverIconShellClass(driver: string) {
   return cn(
     "shrink-0 rounded-md grid place-items-center",
-    driver === "postgres" && "text-[#8fb9e8] bg-[rgba(72,128,186,0.16)]",
-    driver === "mysql" && "text-[#e0a367] bg-[rgba(216,132,55,0.14)]",
+    driver === "postgres" && "text-blue bg-blue/15",
+    driver === "mysql" && "text-warn bg-warn/15",
     driver !== "postgres" &&
       driver !== "mysql" &&
-      "text-muted bg-[rgba(255,255,255,0.06)]",
+      "text-muted bg-panel-soft",
   );
 }
 

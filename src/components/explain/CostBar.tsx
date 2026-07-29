@@ -15,7 +15,7 @@ export function CostBar({ ratio, analyzed, className }: CostBarProps) {
   return (
     <div
       className={cn(
-        "h-1.5 w-full overflow-hidden rounded-sm bg-[#1a1e26]",
+        "h-1.5 w-full overflow-hidden rounded-sm bg-panel-soft",
         className,
       )}
       title={`${pct.toFixed(1)}%`}

@@ -22,9 +22,9 @@ interface ImportCsvModalProps {
 const PREVIEW_ROWS = 8;
 const BATCH_SIZE = 200;
 
-const labelClass = "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+const labelClass = "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const inputClass =
-  "w-full h-[30px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[30px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 
 export function ImportCsvModal({
   profile,
@@ -122,7 +122,7 @@ export function ImportCsvModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center bg-[rgba(5,7,10,.72)] p-5 backdrop-blur-[4px]"
+      className="fixed inset-0 z-20 grid place-items-center bg-black/70 p-5 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && !busy && onClose()
       }
@@ -130,7 +130,7 @@ export function ImportCsvModal({
       <div className="flex max-h-full w-[min(780px,100%)] flex-col overflow-hidden rounded-[10px] border border-border-bright bg-surface shadow-[0_24px_70px_rgba(0,0,0,.48)]">
         <div className="flex items-center justify-between border-b border-border px-[18px] py-3.5">
           <div className="flex items-center gap-2.5">
-            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-[rgba(116,201,157,.12)] text-green">
+            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-green/15 text-green">
               <FileSpreadsheet size={17} />
             </span>
             <div>
@@ -160,7 +160,7 @@ export function ImportCsvModal({
               <input
                 type="file"
                 accept=".csv,.tsv,.txt,text/csv,text/plain"
-                className="text-[10px] text-muted file:mr-2 file:cursor-pointer file:rounded-[5px] file:border file:border-border-bright file:bg-surface-input file:px-2 file:py-1 file:text-[10px] file:text-[#d2d7df]"
+                className="text-[10px] text-muted file:mr-2 file:cursor-pointer file:rounded-[5px] file:border file:border-border-bright file:bg-surface-input file:px-2 file:py-1 file:text-[10px] file:text-text"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void readFile(file);
@@ -231,7 +231,7 @@ export function ImportCsvModal({
                       {headers.map((header, index) => (
                         <th
                           key={index}
-                          className="sticky top-0 border-r border-b border-grid-line bg-grid-head px-2 py-1 text-left font-semibold whitespace-nowrap text-[#aeb5c1]"
+                          className="sticky top-0 border-r border-b border-grid-line bg-grid-head px-2 py-1 text-left font-semibold whitespace-nowrap text-muted"
                         >
                           {header}
                         </th>
@@ -244,7 +244,7 @@ export function ImportCsvModal({
                         {headers.map((_, colIndex) => (
                           <td
                             key={colIndex}
-                            className="max-w-[220px] overflow-hidden border-r border-b border-grid-line bg-grid-row px-2 py-1 text-ellipsis whitespace-nowrap text-[#b9c0cb]"
+                            className="max-w-[220px] overflow-hidden border-r border-b border-grid-line bg-grid-row px-2 py-1 text-ellipsis whitespace-nowrap text-text"
                           >
                             {row[colIndex] ?? ""}
                           </td>
@@ -264,7 +264,7 @@ export function ImportCsvModal({
                     key={item.column.name}
                     className="flex items-center gap-2 text-[10px] text-muted"
                   >
-                    <span className="w-[42%] shrink-0 truncate font-mono text-[10px] text-[#c4cad4]">
+                    <span className="w-[42%] shrink-0 truncate font-mono text-[10px] text-text">
                       {item.column.name}
                       <span className="ml-1 text-subtle">
                         {item.column.dataType}
@@ -291,7 +291,7 @@ export function ImportCsvModal({
           )}
 
           {error && (
-            <p className="mt-3 mb-0 rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-2.5 font-mono text-[10px] whitespace-pre-wrap text-[#c79599]">
+            <p className="mt-3 mb-0 rounded-md border border-red/20 bg-red/5 p-2.5 font-mono text-[10px] whitespace-pre-wrap text-danger">
               {error}
             </p>
           )}
@@ -320,7 +320,7 @@ export function ImportCsvModal({
             </button>
             <button
               type="button"
-              className="flex h-[31px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[#7667e7] bg-[#6959da] px-[11px] text-[10px] font-semibold text-white hover:bg-[#7767e7] disabled:cursor-default disabled:opacity-50"
+              className="flex h-[31px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-accent bg-accent px-[11px] text-[10px] font-semibold text-white hover:bg-accent-bright disabled:cursor-default disabled:opacity-50"
               disabled={busy || mapped.length === 0 || dataRows.length === 0}
               onClick={() => void runImport()}
             >

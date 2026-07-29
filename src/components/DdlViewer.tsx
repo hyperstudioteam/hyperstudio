@@ -61,7 +61,7 @@ export function DdlViewer({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[rgba(0,0,0,.5)]"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50"
       onClick={onClose}
     >
       <div
@@ -79,7 +79,7 @@ export function DdlViewer({
             onClick={() => void copy()}
           >
             {copied ? (
-              <Check size={12} className="text-[#72c99d]" />
+              <Check size={12} className="text-green" />
             ) : (
               <Copy size={12} />
             )}
@@ -102,14 +102,14 @@ export function DdlViewer({
               Reading DDL…
             </div>
           ) : error ? (
-            <div className="rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-3 text-[11px] text-red">
+            <div className="rounded-md border border-red/20 bg-red/5 p-3 text-[11px] text-red">
               <strong className="text-[11px]">Could not read DDL</strong>
-              <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-[#c79599]">
+              <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-danger">
                 {error}
               </p>
             </div>
           ) : (
-            <pre className="m-0 font-mono text-[11px] leading-[1.55] whitespace-pre text-[#c4cbd6]">
+            <pre className="m-0 font-mono text-[11px] leading-[1.55] whitespace-pre text-text">
               {ddl}
             </pre>
           )}

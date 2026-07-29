@@ -16,9 +16,9 @@ interface QueryParamsPanelProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const formInputClass =
-  "w-full h-[30px] px-[9px] border border-border rounded-[4px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663] disabled:opacity-40";
+  "w-full h-[30px] px-[9px] border border-border rounded-[4px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle disabled:opacity-40";
 
 function entriesSignature(params: QueryParam[]): string {
   return params.map((param) => `${param.index}:${param.label}`).join("|");
@@ -66,8 +66,8 @@ export function QueryParamsPanel({
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-panel">
-      <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-[#14171b] px-3">
-        <div className="flex items-center gap-1.5 text-[10px] text-[#d5dae3]">
+      <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-surface-deep px-3">
+        <div className="flex items-center gap-1.5 text-[10px] text-text-bright">
           <Braces size={12} className="text-accent" />
           Parameters
         </div>
@@ -102,7 +102,7 @@ export function QueryParamsPanel({
                     update(index, { text: event.target.value })
                   }
                 />
-                <label className="flex shrink-0 cursor-pointer select-none items-center gap-1 text-[10px] text-[#9199a7]">
+                <label className="flex shrink-0 cursor-pointer select-none items-center gap-1 text-[10px] text-muted">
                   <input
                     type="checkbox"
                     disabled={busy}
@@ -133,7 +133,7 @@ export function QueryParamsPanel({
           <button
             type="submit"
             disabled={busy}
-            className="flex h-7 cursor-pointer items-center gap-1 rounded-[4px] border border-[#7667e7] bg-[#6959da] px-2.5 text-[10px] font-semibold text-white hover:bg-[#7767e7] disabled:opacity-50"
+            className="flex h-7 cursor-pointer items-center gap-1 rounded-[4px] border border-accent bg-accent px-2.5 text-[10px] font-semibold text-white hover:bg-accent-bright disabled:opacity-50"
           >
             <Play size={11} />
             Run

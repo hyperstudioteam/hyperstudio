@@ -48,7 +48,7 @@ export function ColumnHeader({
       <span className="flex items-center gap-[5px]">
         <button
           type="button"
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-[5px] border-0 bg-transparent p-0 text-left text-inherit [&>svg]:text-[#6e7787]"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-[5px] border-0 bg-transparent p-0 text-left text-inherit [&>svg]:text-subtle"
           title={`Sort by ${column}`}
           onClick={onSortToggle}
         >
@@ -177,7 +177,7 @@ function FilterPopover({
         </button>
         <button
           type="button"
-          className="flex-1 cursor-pointer rounded-[4px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-2 py-1 text-[10px] font-semibold text-[#c9c2ff] hover:border-accent hover:text-white"
+          className="flex-1 cursor-pointer rounded-[4px] border border-accent/45 bg-accent-soft px-2 py-1 text-[10px] font-semibold text-accent-bright hover:border-accent hover:text-white"
           onClick={apply}
         >
           Apply

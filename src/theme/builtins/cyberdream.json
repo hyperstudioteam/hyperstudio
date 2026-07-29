@@ -1,0 +1,30 @@
+{
+  "id": "cyberdream",
+  "name": "Cyberdream Dark",
+  "family": "cyberdream",
+  "colorScheme": "dark",
+  "description": "High-contrast neon dark theme.",
+  "background": "#16181a",
+  "foreground": "#ffffff",
+  "cursor": "#ffffff",
+  "selectionBackground": "#3c4048",
+  "selectionForeground": "#ffffff",
+  "palette": [
+    "#16181a",
+    "#ff6e5e",
+    "#5eff6c",
+    "#f1ff5e",
+    "#5ea1ff",
+    "#bd5eff",
+    "#5ef1ff",
+    "#ffffff",
+    "#3c4048",
+    "#ff6e5e",
+    "#5eff6c",
+    "#f1ff5e",
+    "#5ea1ff",
+    "#bd5eff",
+    "#5ef1ff",
+    "#ffffff"
+  ]
+}

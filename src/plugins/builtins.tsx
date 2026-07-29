@@ -61,7 +61,7 @@ export function registerBuiltinContributions() {
     typeNames: ["json", "jsonb"],
     matchValue: (value) => value !== null && typeof value === "object",
     format: (ctx) => defaultFormat(ctx.value),
-    className: "text-[#9fd0c2]",
+    className: "text-green",
     defaultViewer: "builtin.json",
     priority: 5,
   });
@@ -87,7 +87,7 @@ export function registerBuiltinContributions() {
     matchPrefix: true,
     matchValue: (value) => typeof value === "number",
     align: "right",
-    className: "tabular-nums text-[#d7c9a8]",
+    className: "tabular-nums text-warn",
   });
 
   contributions.registerColumnType({
@@ -126,7 +126,7 @@ export function registerBuiltinContributions() {
     id: "builtin.enum",
     source: BUILT_IN,
     match: (ctx) => Boolean(ctx.enumLabels && ctx.enumLabels.length > 0),
-    className: "text-[#d4b87a]",
+    className: "text-warn",
     defaultViewer: "builtin.enum",
     priority: 20,
   });

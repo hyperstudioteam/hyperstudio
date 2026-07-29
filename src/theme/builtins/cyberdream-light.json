@@ -1,0 +1,30 @@
+{
+  "id": "cyberdream-light",
+  "name": "Cyberdream Light",
+  "family": "cyberdream",
+  "colorScheme": "light",
+  "description": "Light variant of the cyberdream palette.",
+  "background": "#ffffff",
+  "foreground": "#16181a",
+  "cursor": "#16181a",
+  "selectionBackground": "#acacac",
+  "selectionForeground": "#16181a",
+  "palette": [
+    "#ffffff",
+    "#d11500",
+    "#008b0c",
+    "#997b00",
+    "#0057d1",
+    "#a018ff",
+    "#008c99",
+    "#16181a",
+    "#acacac",
+    "#d11500",
+    "#008b0c",
+    "#997b00",
+    "#0057d1",
+    "#a018ff",
+    "#008c99",
+    "#16181a"
+  ]
+}

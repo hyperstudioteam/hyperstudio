@@ -120,9 +120,9 @@ function TypeIcon({ dataType }: { dataType: string }) {
 const iconButtonClass =
   "grid size-7 cursor-pointer place-items-center rounded-[5px] border-0 bg-transparent text-muted hover:bg-panel-soft hover:text-text disabled:cursor-default disabled:opacity-40";
 const thClass =
-  "sticky top-0 z-[1] h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-[#aeb5c1] bg-grid-head";
+  "sticky top-0 z-[1] h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-muted bg-grid-head";
 const tdClass =
-  "h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left whitespace-nowrap overflow-hidden text-ellipsis text-[#b9c0cb] select-none cursor-cell";
+  "h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left whitespace-nowrap overflow-hidden text-ellipsis text-text select-none cursor-cell";
 
 export function TableDataEditor({
   profile,
@@ -910,9 +910,9 @@ export function TableDataEditor({
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[34px_32px_auto_1fr_22px] overflow-hidden">
-      <div className="flex items-center gap-1.5 border-b border-border bg-[#14171b] px-2">
+      <div className="flex items-center gap-1.5 border-b border-border bg-surface-deep px-2">
         <div className="flex items-center gap-0.5">
-          <span className="min-w-[72px] px-1 font-mono text-[10px] text-[#9aa3b0] tabular-nums">
+          <span className="min-w-[72px] px-1 font-mono text-[10px] text-muted tabular-nums">
             {loadedCount === 0 && dirtyCount === 0
               ? "0 of 0"
               : `${rangeStart}-${Math.max(rangeStart, displayEnd)}${hasMore ? "+" : ""}`}
@@ -1012,8 +1012,8 @@ export function TableDataEditor({
         <button
           type="button"
           className={cn(
-            "cursor-pointer rounded-[3px] border border-border-bright bg-[#1a1e25] px-[7px] py-0.5 text-[10px] text-[#aeb6c3] disabled:cursor-default disabled:opacity-60",
-            transactional && "border-accent text-[#c9c2ff]",
+            "cursor-pointer rounded-[3px] border border-border-bright bg-panel-soft px-[7px] py-0.5 text-[10px] text-muted disabled:cursor-default disabled:opacity-60",
+            transactional && "border-accent text-accent-bright",
           )}
           disabled={!executeBatch || busy}
           title={
@@ -1073,7 +1073,7 @@ export function TableDataEditor({
       </div>
 
       <div className="grid grid-cols-[1.4fr_1fr] border-b border-border bg-grid-row">
-        <label className="flex min-w-0 items-center gap-[7px] border-r border-border px-2.5 text-[10px] text-[#7d8694]">
+        <label className="flex min-w-0 items-center gap-[7px] border-r border-border px-2.5 text-[10px] text-subtle">
           <Filter size={13} />
           <span className="shrink-0 font-semibold tracking-[0.02em]">WHERE</span>
           <ClauseInput
@@ -1092,7 +1092,7 @@ export function TableDataEditor({
           {headerFilters.length > 0 && (
             <button
               type="button"
-              className="shrink-0 cursor-pointer rounded-[3px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-1.5 py-0.5 text-[9px] text-[#c9c2ff] hover:border-accent hover:text-white"
+              className="shrink-0 cursor-pointer rounded-[3px] border border-accent/45 bg-accent-soft px-1.5 py-0.5 text-[9px] text-accent-bright hover:border-accent hover:text-white"
               title="Clear column filters"
               onClick={() => {
                 setHeaderFilters([]);
@@ -1104,7 +1104,7 @@ export function TableDataEditor({
             </button>
           )}
         </label>
-        <label className="flex min-w-0 items-center gap-[7px] px-2.5 text-[10px] text-[#7d8694]">
+        <label className="flex min-w-0 items-center gap-[7px] px-2.5 text-[10px] text-subtle">
           <ArrowDownUp size={13} />
           <span className="shrink-0 font-semibold tracking-[0.02em]">
             ORDER BY
@@ -1129,10 +1129,10 @@ export function TableDataEditor({
       </div>
 
       {error && (
-        <div className="m-2 flex gap-[9px] rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-3 text-[11px] text-red">
+        <div className="m-2 flex gap-[9px] rounded-md border border-red/20 bg-red/5 p-3 text-[11px] text-red">
           <div>
             <strong className="text-[11px]">Edit Data failed</strong>
-            <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-[#c79599]">
+            <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-danger">
               {error}
             </p>
           </div>
@@ -1194,14 +1194,14 @@ export function TableDataEditor({
                   key={row.id}
                   className={cn(
                     "group",
-                    selected.has(row.id) && "[&>td]:!bg-[#1d2430]",
-                    row.status === "inserted" && "[&>td]:!bg-[#15241c]",
+                    selected.has(row.id) && "[&>td]:!bg-panel-soft",
+                    row.status === "inserted" && "[&>td]:!bg-green/10",
                   )}
                 >
                   <td
                     className={cn(
                       tdClass,
-                      "w-[42px] min-w-[42px] bg-row-num! text-right text-[#596272]",
+                      "w-[42px] min-w-[42px] bg-row-num! text-right text-subtle",
                       row.status === "modified" && "text-pk",
                     )}
                     onClick={(event) => selectRows(rowIndex, event)}
@@ -1235,14 +1235,14 @@ export function TableDataEditor({
                           tdClass,
                           rowIndex % 2 === 1 ? "bg-grid-alt" : "bg-grid-row",
                           "group-hover:bg-grid-hover",
-                          value === null && "text-[#686f7c] italic",
+                          value === null && "text-subtle italic",
                           cell.className,
                           cell.align === "right" && "text-right",
                           cell.align === "center" && "text-center",
                           dirty &&
-                            "shadow-[inset_2px_0_0_#c9a227]",
+                            "shadow-[inset_2px_0_0] shadow-pk",
                           inSelection &&
-                            "bg-cell-select! text-[#e8eef8] shadow-[inset_0_0_0_1px_rgba(96,150,230,.55)]",
+                            "bg-cell-select! text-text-bright ring-1 ring-inset ring-blue/50",
                         )}
                         title={cell.text}
                         onMouseDown={(event) => {
@@ -1318,7 +1318,7 @@ export function TableDataEditor({
                         ) : isEditing ? (
                           <input
                             key={`${editing.rowId}-${editing.col}-${editing.seed ?? "edit"}`}
-                            className="-mx-2.5 h-full min-h-[27px] w-full border border-accent bg-[#0f1218] px-2.5 text-[#e8ecf3] outline-0"
+                            className="-mx-2.5 h-full min-h-[27px] w-full border border-accent bg-surface-input px-2.5 text-text-bright outline-0"
                             autoFocus
                             defaultValue={
                               editing.seed != null
@@ -1365,8 +1365,8 @@ export function TableDataEditor({
         )}
       </div>
 
-      <div className="flex h-[22px] items-center justify-end gap-3.5 border-t border-border bg-surface-deep px-2.5 text-[10px] text-[#8b93a1]">
-        {copyFlash && <span className="text-[#72c99d]">{copyFlash}</span>}
+      <div className="flex h-[22px] items-center justify-end gap-3.5 border-t border-border bg-surface-deep px-2.5 text-[10px] text-muted">
+        {copyFlash && <span className="text-green">{copyFlash}</span>}
         {stats.cells > 0 ? (
           <>
             {stats.sum != null && <span>SUM: {stats.sum}</span>}

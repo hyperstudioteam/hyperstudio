@@ -77,7 +77,7 @@ export function SchemasTab({
         <div className="flex-1 h-[30px] flex items-center gap-[7px] px-[9px] border border-border-bright rounded-[5px] text-subtle bg-surface-input">
           <Search size={13} />
           <input
-            className="flex-1 min-w-0 border-0 outline-0 text-[#d2d7df] bg-transparent text-[11px]"
+            className="flex-1 min-w-0 border-0 outline-0 text-text bg-transparent text-[11px]"
             value={filter}
             placeholder="Filter schemas"
             onChange={(event) => setFilter(event.target.value)}
@@ -96,8 +96,8 @@ export function SchemasTab({
           enabled to fetch the default set.
         </div>
       ) : (
-        <div className="flex-1 max-h-80 overflow-auto border border-border rounded-md bg-[#14171c] scrollbar-thin-app">
-          <label className="min-h-[30px] px-2.5 flex items-center gap-2 text-[#d8dde6] text-[11px] font-[560] cursor-pointer hover:bg-[rgba(255,255,255,.03)]">
+        <div className="flex-1 max-h-80 overflow-auto border border-border rounded-md bg-surface-deep scrollbar-thin-app">
+          <label className="min-h-[30px] px-2.5 flex items-center gap-2 text-text text-[11px] font-[560] cursor-pointer hover:bg-panel-soft">
             <input
               type="checkbox"
               className="w-3.5 h-3.5 accent-blue cursor-pointer"
@@ -110,7 +110,7 @@ export function SchemasTab({
           {filtered.map((schema) => (
             <label
               key={schema.name}
-              className="min-h-[30px] px-2.5 flex items-center gap-2 text-[#c5cad3] text-[11px] cursor-pointer hover:bg-[rgba(255,255,255,.03)]"
+              className="min-h-[30px] px-2.5 flex items-center gap-2 text-text text-[11px] cursor-pointer hover:bg-panel-soft"
             >
               <input
                 type="checkbox"
@@ -127,7 +127,7 @@ export function SchemasTab({
               {schema.isSystem && (
                 <Zap
                   size={12}
-                  className="text-[#8ea0b8] shrink-0"
+                  className="text-muted shrink-0"
                   aria-label="System schema"
                 />
               )}

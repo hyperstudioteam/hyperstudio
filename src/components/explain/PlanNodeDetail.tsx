@@ -17,7 +17,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[110px_1fr] gap-2 border-b border-grid-line py-1.5 last:border-0">
       <dt className="text-[10px] text-subtle">{label}</dt>
-      <dd className="min-w-0 break-words font-mono text-[11px] text-[#c9d0db]">
+      <dd className="min-w-0 break-words font-mono text-[11px] text-text">
         {value}
       </dd>
     </div>
@@ -41,7 +41,7 @@ export function PlanNodeDetail({ node, analyzed }: PlanNodeDetailProps) {
 
   return (
     <div className="min-h-0 flex-1 overflow-auto px-3 py-2">
-      <h3 className="mb-2 text-[12px] font-semibold text-[#e0e4eb]">
+      <h3 className="mb-2 text-[12px] font-semibold text-text-bright">
         {node.nodeType}
       </h3>
       <dl>
@@ -85,7 +85,7 @@ export function PlanNodeDetail({ node, analyzed }: PlanNodeDetailProps) {
             {node.filters.map((filter) => (
               <li
                 key={filter}
-                className="rounded-[4px] bg-[#15181e] px-2 py-1.5 font-mono text-[10px] leading-relaxed text-[#b8c0cc]"
+                className="rounded-[4px] bg-surface-deep px-2 py-1.5 font-mono text-[10px] leading-relaxed text-muted"
               >
                 {filter}
               </li>

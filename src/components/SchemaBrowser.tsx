@@ -201,7 +201,7 @@ const treeRowEmClass =
   "ml-auto text-subtle text-[9px] not-italic whitespace-nowrap";
 
 const treeRowBaseClass =
-  "w-full h-[26px] border-0 rounded flex items-center gap-[5px] px-1.5 bg-transparent text-[#aeb5c1] text-[11px] text-left cursor-default [&>span]:truncate";
+  "w-full h-[26px] border-0 rounded flex items-center gap-[5px] px-1.5 bg-transparent text-muted text-[11px] text-left cursor-default [&>span]:truncate";
 
 const treeRowMainClass =
   "min-w-0 flex-1 h-[26px] border-0 rounded flex items-center gap-[5px] pr-1 pl-0 bg-transparent text-inherit text-[11px] text-left cursor-default hover:text-text [&>span]:truncate";
@@ -210,7 +210,7 @@ const treeRowActionClass =
   "size-[22px] shrink-0 opacity-0 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer hover:enabled:text-text hover:enabled:bg-panel-soft disabled:cursor-default disabled:opacity-40";
 
 const treeBadgeClass =
-  "ml-auto shrink-0 rounded-[4px] bg-[#2a303a] px-1.5 py-px text-[9px] font-medium text-[#9aa3b2]";
+  "ml-auto shrink-0 rounded-[4px] bg-panel-raised px-1.5 py-px text-[9px] font-medium text-muted";
 
 export function SchemaBrowser({
   profile,
@@ -343,13 +343,13 @@ export function SchemaBrowser({
               <ChevronRight size={13} />
             )}
             {indent ? (
-              <Network size={14} className="text-[#8b93a3]" />
+              <Network size={14} className="text-muted" />
             ) : (
               <Server size={14} />
             )}
             <span>{schema.name}</span>
             {schema.isSystem && (
-              <Zap size={11} className="text-[#8ea0b8] shrink-0" />
+              <Zap size={11} className="text-muted shrink-0" />
             )}
           </button>
           <button
@@ -449,7 +449,7 @@ export function SchemaBrowser({
           <small className="text-subtle text-[9px] uppercase tracking-[0.06em]">
             Connection
           </small>
-          <strong className="text-[#c8ced8] text-[11px] font-[590] overflow-hidden text-ellipsis">
+          <strong className="text-muted text-[11px] font-[590] overflow-hidden text-ellipsis">
             {connectionLabel}
           </strong>
           {showDatabaseGroups ? (
@@ -543,7 +543,7 @@ export function SchemaBrowser({
       >
         {showConnect ? (
           <button
-            className="mx-[7px] my-[7px] py-[7px] px-2.5 w-[calc(100%-14px)] flex justify-center items-center gap-1.5 border border-border-bright rounded-md bg-panel-soft text-[#bac1cc] text-[11px] cursor-pointer hover:border-accent hover:text-white"
+            className="mx-[7px] my-[7px] py-[7px] px-2.5 w-[calc(100%-14px)] flex justify-center items-center gap-1.5 border border-border-bright rounded-md bg-panel-soft text-muted text-[11px] cursor-pointer hover:border-accent hover:text-white"
             onClick={onConnect}
           >
             {busy === "connect" ? (
@@ -573,7 +573,7 @@ export function SchemaBrowser({
                       treeRowBaseClass,
                       "pr-0.5 gap-0 group/db-node",
                       dbOpen && "open",
-                      isActive && "bg-[rgba(76,141,255,0.12)]",
+                      isActive && "bg-blue/15",
                     )}
                   >
                     <button
@@ -596,10 +596,10 @@ export function SchemaBrowser({
                       ) : (
                         <ChevronRight size={13} />
                       )}
-                      <Database size={14} className="text-[#8fb9e8]" />
+                      <Database size={14} className="text-blue" />
                       <span>{database.name}</span>
                       {database.isSystem && (
-                        <Zap size={11} className="text-[#8ea0b8] shrink-0" />
+                        <Zap size={11} className="text-muted shrink-0" />
                       )}
                       {loadingThis ? (
                         <LoaderCircle
@@ -1260,7 +1260,7 @@ function ObjectGroupBranch({
       >
         <button
           type="button"
-          className={cn(treeRowMainClass, "pl-1 [&>span]:text-[#9aa3b2] [&>span]:font-medium")}
+          className={cn(treeRowMainClass, "pl-1 [&>span]:text-muted [&>span]:font-medium")}
           onClick={() => onToggle(groupKey)}
           onContextMenu={(event) =>
             onOpenMenu(event, {
@@ -1322,7 +1322,7 @@ function ObjectGroupBranch({
               <button
                 className={cn(
                   treeRowBaseClass,
-                  "pl-9 hover:bg-panel-soft hover:text-text [&>svg:nth-child(2)]:text-[#b2a7f9]",
+                  "pl-9 hover:bg-panel-soft hover:text-text [&>svg:nth-child(2)]:text-accent-bright",
                 )}
                 onClick={() => {
                   if (hasChildren) onToggle(objectKey);
@@ -1394,7 +1394,7 @@ function ObjectGroupBranch({
                             type="button"
                             className={cn(
                               treeRowBaseClass,
-                              "pl-[54px] text-[#9aa3b2] [&>svg:nth-child(2)]:text-blue [&>em]:text-[#6f7784]",
+                              "pl-[54px] text-muted [&>svg:nth-child(2)]:text-blue [&>em]:text-subtle",
                             )}
                             onClick={() => onToggle(subgroupKey)}
                             onContextMenu={(event) => {
@@ -1463,7 +1463,7 @@ function ObjectGroupBranch({
                                 <div
                                   className={cn(
                                     treeRowBaseClass,
-                                    "pl-20 text-[#818a99] [&>span]:min-w-0 [&>em]:max-w-[110px] [&>em]:truncate",
+                                    "pl-20 text-subtle [&>span]:min-w-0 [&>em]:max-w-[110px] [&>em]:truncate",
                                   )}
                                   key={`${subgroupKey}.${child.name}`}
                                   onContextMenu={(event) => {
@@ -1493,7 +1493,7 @@ function ObjectGroupBranch({
                                 <div
                                   className={cn(
                                     treeRowBaseClass,
-                                    "pl-20 text-[#818a99] [&>span]:min-w-0 [&>em]:max-w-[110px] [&>em]:truncate",
+                                    "pl-20 text-subtle [&>span]:min-w-0 [&>em]:max-w-[110px] [&>em]:truncate",
                                   )}
                                   key={`${subgroupKey}.${item.name}`}
                                   title={item.detail ?? undefined}
@@ -1541,7 +1541,7 @@ function ObjectGroupBranch({
                       <div
                         className={cn(
                           treeRowBaseClass,
-                          "pl-16 text-[#818a99] [&>em]:max-w-[74px] [&>em]:truncate",
+                          "pl-16 text-subtle [&>em]:max-w-[74px] [&>em]:truncate",
                         )}
                         key={`${objectKey}.${child.name}`}
                         onContextMenu={(event) => {

@@ -11,11 +11,11 @@ interface SshTabProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const formInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 const checkboxRowClass =
-  "flex flex-row items-center gap-2 text-[#b4bbc6] text-[11px] font-normal cursor-pointer";
+  "flex flex-row items-center gap-2 text-muted text-[11px] font-normal cursor-pointer";
 const checkboxInputClass =
   "w-3.5 h-3.5 m-0 p-0 border-0 rounded-none bg-transparent shrink-0 accent-accent cursor-pointer";
 
@@ -79,8 +79,8 @@ export function SshTab({ profile, onChange }: SshTabProps) {
             />
           </label>
 
-          <fieldset className="col-span-full m-0 flex flex-col gap-2 rounded-md border border-border bg-[#14171d] p-2.5 px-[11px]">
-            <legend className="px-1 text-[10px] text-[#9199a7]">
+          <fieldset className="col-span-full m-0 flex flex-col gap-2 rounded-md border border-border bg-surface-deep p-2.5 px-[11px]">
+            <legend className="px-1 text-[10px] text-muted">
               Authentication
             </legend>
             {(
@@ -92,7 +92,7 @@ export function SshTab({ profile, onChange }: SshTabProps) {
             ).map(([value, label]) => (
               <label
                 key={value}
-                className="flex cursor-pointer items-center gap-2 text-[11px] text-[#b4bbc6]"
+                className="flex cursor-pointer items-center gap-2 text-[11px] text-muted"
               >
                 <input
                   type="radio"
@@ -152,14 +152,14 @@ export function SshTab({ profile, onChange }: SshTabProps) {
           {ssh.auth === "agent" && (
             <p className="col-span-full m-0 text-[10px] leading-relaxed text-subtle">
               Uses the local SSH agent (Unix/macOS). Make sure your key is
-              loaded with <code className="text-[#c4cad4]">ssh-add</code>.
+              loaded with <code className="text-text">ssh-add</code>.
             </p>
           )}
 
           <p className="col-span-full m-0 text-[10px] leading-relaxed text-subtle">
             Database host and port on the General tab are the address as seen
             from the SSH server (often a private IP or{" "}
-            <code className="text-[#c4cad4]">localhost</code>).
+            <code className="text-text">localhost</code>).
           </p>
         </>
       )}

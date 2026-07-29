@@ -50,8 +50,8 @@ export function ErDiagramView({
 
   return (
     <section className="flex min-h-0 flex-col overflow-hidden bg-bg">
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-[#14171b] px-2.5">
-        <span className="text-[11px] text-[#d5dae3]">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-surface-deep px-2.5">
+        <span className="text-[11px] text-text-bright">
           {diagram ? `${diagram.schema} · ER diagram` : "ER diagram"}
         </span>
         {diagram && (
@@ -71,7 +71,7 @@ export function ErDiagramView({
       </div>
 
       {error && (
-        <div className="m-2 rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-3 font-mono text-[10px] text-[#c79599]">
+        <div className="m-2 rounded-md border border-red/20 bg-red/5 p-3 font-mono text-[10px] text-danger">
           {error}
         </div>
       )}
@@ -85,7 +85,7 @@ export function ErDiagramView({
           No tables in this schema
         </div>
       ) : (
-        <div className="scrollbar-thin-app min-h-0 flex-1 overflow-auto bg-[#0f1217]">
+        <div className="scrollbar-thin-app min-h-0 flex-1 overflow-auto bg-surface-input">
           <svg
             width={size.width}
             height={size.height}
@@ -103,7 +103,7 @@ export function ErDiagramView({
                 markerHeight="7"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill="#6e7787" />
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--hs-subtle)" />
               </marker>
             </defs>
 
@@ -118,7 +118,9 @@ export function ErDiagramView({
                   <path
                     d={edgePath(from, to)}
                     fill="none"
-                    stroke={active ? "#9d90ff" : "#3a4250"}
+                    stroke={
+                      active ? "var(--hs-accent-bright)" : "var(--hs-border-bright)"
+                    }
                     strokeWidth={active ? 1.6 : 1.2}
                     markerEnd="url(#er-arrow)"
                   />
@@ -147,26 +149,34 @@ export function ErDiagramView({
                     width={node.width}
                     height={node.height}
                     rx={6}
-                    fill={active ? "#1a2030" : "#161a22"}
-                    stroke={active ? "#8b7cf6" : "#2c3340"}
+                    fill={
+                      active ? "var(--hs-panel-soft)" : "var(--hs-surface-deep)"
+                    }
+                    stroke={
+                      active ? "var(--hs-accent)" : "var(--hs-border)"
+                    }
                     strokeWidth={1}
                   />
                   <rect
                     width={node.width}
                     height={HEADER_HEIGHT}
                     rx={6}
-                    fill={active ? "#242b3c" : "#1c212b"}
+                    fill={
+                      active ? "var(--hs-panel-raised)" : "var(--hs-surface)"
+                    }
                   />
                   <rect
                     y={HEADER_HEIGHT - 6}
                     width={node.width}
                     height={6}
-                    fill={active ? "#242b3c" : "#1c212b"}
+                    fill={
+                      active ? "var(--hs-panel-raised)" : "var(--hs-surface)"
+                    }
                   />
                   <text
                     x={10}
                     y={18}
-                    fill="#d8dde6"
+                    fill="var(--hs-text)"
                     fontSize={11}
                     fontFamily="SFMono-Regular, Consolas, monospace"
                     fontWeight={600}
@@ -178,7 +188,11 @@ export function ErDiagramView({
                       <text
                         x={10}
                         y={HEADER_HEIGHT + 14 + index * ROW_HEIGHT}
-                        fill={column.primaryKey ? "#c9a227" : "#aeb5c1"}
+                        fill={
+                          column.primaryKey
+                            ? "var(--hs-pk)"
+                            : "var(--hs-muted)"
+                        }
                         fontSize={10}
                         fontFamily="SFMono-Regular, Consolas, monospace"
                       >
@@ -188,7 +202,7 @@ export function ErDiagramView({
                       <text
                         x={node.width - 10}
                         y={HEADER_HEIGHT + 14 + index * ROW_HEIGHT}
-                        fill="#606979"
+                        fill="var(--hs-subtle)"
                         fontSize={9}
                         fontFamily="SFMono-Regular, Consolas, monospace"
                         textAnchor="end"
@@ -207,9 +221,9 @@ export function ErDiagramView({
       )}
 
       {selected && diagram && (
-        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-[#171a20] px-2.5 py-1.5 text-[9px] text-[#8b93a1]">
+        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-panel-soft px-2.5 py-1.5 text-[9px] text-muted">
           <KeyRound size={12} className="text-pk" />
-          <span className={cn("font-mono text-[#c4cad4]")}>{selected}</span>
+          <span className={cn("font-mono text-text")}>{selected}</span>
           <span>
             {
               edges.filter(
