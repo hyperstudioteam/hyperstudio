@@ -120,7 +120,7 @@ function PlanTreeNode({
           <div className="flex items-baseline gap-2">
             <span
               className={cn(
-                "min-w-0 truncate font-semibold text-[#d5dae3]",
+                "min-w-0 truncate font-semibold text-text-bright",
                 selected && "text-white",
               )}
             >
@@ -132,7 +132,7 @@ function PlanTreeNode({
                   {formatNum(node.actualTotalMs)} ms · rows{" "}
                   {formatNum(node.actualRows, 0)}
                   {node.planRows != null && (
-                    <span className="text-[#4a5568]">
+                    <span className="text-subtle">
                       {" "}
                       / est {formatNum(node.planRows, 0)}
                     </span>

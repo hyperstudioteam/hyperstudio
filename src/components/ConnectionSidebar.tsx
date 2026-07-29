@@ -86,7 +86,7 @@ const iconButtonClass =
   "size-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer hover:enabled:text-text hover:enabled:bg-panel-soft disabled:cursor-default disabled:opacity-40";
 
 const contextDangerClass =
-  "text-danger hover:bg-[rgba(239,107,115,0.1)]";
+  "text-danger hover:bg-red/10";
 
 export function ConnectionSidebar(props: ConnectionSidebarProps) {
   const extensionMenu = useExtensionMenu("connection/context");
@@ -137,14 +137,14 @@ export function ConnectionSidebar(props: ConnectionSidebarProps) {
   }
 
   const menuItemClass =
-    "flex h-[30px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-[9px] text-left text-[11px] text-[#c5cad3] hover:bg-panel-soft hover:text-white disabled:cursor-default disabled:opacity-40";
+    "flex h-[30px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-[9px] text-left text-[11px] text-text hover:bg-panel-soft hover:text-white disabled:cursor-default disabled:opacity-40";
 
   const selectedFolderId =
     props.selection?.kind === "folder" ? props.selection.id : null;
 
   return (
     <aside className="flex h-full min-w-0 flex-col overflow-hidden bg-panel">
-      <div className="flex h-11 shrink-0 items-center justify-between px-[11px] pl-3.5 text-[10px] font-bold tracking-[0.08em] text-[#aab1be] uppercase">
+      <div className="flex h-11 shrink-0 items-center justify-between px-[11px] pl-3.5 text-[10px] font-bold tracking-[0.08em] text-muted uppercase">
         <span>Connections</span>
         <div className="flex gap-0.5">
           <div className="relative" ref={actionsMenuRef}>

@@ -14,6 +14,7 @@ import { FolderModal } from "./components/connection-modal/FolderModal";
 import { VaultCreateModal } from "./components/connection-modal/VaultCreateModal";
 import { VaultUnlockModal } from "./components/connection-modal/VaultUnlockModal";
 import { PluginsPanel } from "./components/PluginsPanel";
+import { SettingsModal } from "./components/SettingsModal";
 import { WriteConfirmModal } from "./components/WriteConfirmModal";
 import { useConnectionTree } from "./hooks/useConnectionTree";
 import { useDatabaseSession } from "./hooks/useDatabaseSession";
@@ -98,6 +99,7 @@ function App() {
     null,
   );
   const [pluginsOpen, setPluginsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [importTarget, setImportTarget] = useState<{
     schema: string;
     table: string;
@@ -596,7 +598,7 @@ function App() {
 
   return (
     <div className="h-full w-full bg-bg">
-      <TitleBar />
+      <TitleBar onOpenSettings={() => setSettingsOpen(true)} />
       <div className="flex h-[calc(100%-38px)] min-h-0 overflow-hidden">
         <ActivityBar
           active="databases"
@@ -885,7 +887,7 @@ function App() {
 
       {transferNotice && (
         <div
-          className="fixed bottom-4 left-1/2 z-30 max-w-[min(520px,calc(100%-2rem))] -translate-x-1/2 px-3.5 py-2.5 border border-border-bright rounded-[8px] bg-surface text-[12px] leading-[1.4] text-[#d2d7df] shadow-[0_16px_40px_rgba(0,0,0,.45)]"
+          className="fixed bottom-4 left-1/2 z-30 max-w-[min(520px,calc(100%-2rem))] -translate-x-1/2 px-3.5 py-2.5 border border-border-bright rounded-[8px] bg-surface text-[12px] leading-[1.4] text-text shadow-[0_16px_40px_rgba(0,0,0,.45)]"
           role="status"
         >
           <div className="flex items-start gap-3">
@@ -967,6 +969,10 @@ function App() {
           onClose={() => setPluginsOpen(false)}
           onDriversChanged={refreshDrivers}
         />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );

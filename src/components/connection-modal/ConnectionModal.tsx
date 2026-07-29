@@ -378,7 +378,7 @@ export function ConnectionModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -413,7 +413,7 @@ export function ConnectionModal({
             type="button"
             className={cn(
               "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
-              tab === "general" && "text-[#d8dde6] border-b-blue",
+              tab === "general" && "text-text border-b-blue",
             )}
             onClick={() => setTab("general")}
           >
@@ -423,7 +423,7 @@ export function ConnectionModal({
             type="button"
             className={cn(
               "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
-              tab === "ssh" && "text-[#d8dde6] border-b-blue",
+              tab === "ssh" && "text-text border-b-blue",
             )}
             onClick={() => setTab("ssh")}
           >
@@ -437,7 +437,7 @@ export function ConnectionModal({
               type="button"
               className={cn(
                 "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
-                tab === "databases" && "text-[#d8dde6] border-b-blue",
+                tab === "databases" && "text-text border-b-blue",
               )}
               onClick={() => setTab("databases")}
             >
@@ -449,7 +449,7 @@ export function ConnectionModal({
               type="button"
               className={cn(
                 "h-8 px-3.5 border-0 border-b-2 border-transparent text-muted bg-transparent text-[11px] cursor-pointer hover:text-text",
-                tab === "schemas" && "text-[#d8dde6] border-b-blue",
+                tab === "schemas" && "text-text border-b-blue",
               )}
               onClick={() => setTab("schemas")}
             >
@@ -491,9 +491,9 @@ export function ConnectionModal({
         {testStatus && (
           <div
             className={cn(
-              "mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-[#d18b91] bg-[rgba(239,107,115,.08)]",
+              "mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-danger bg-red/10",
               testStatus.startsWith("Connected") &&
-                "text-[#72c99d] bg-[rgba(73,201,137,.08)]",
+                "text-green bg-green/10",
             )}
           >
             {testStatus}
@@ -503,7 +503,7 @@ export function ConnectionModal({
         <div className="mt-[18px] pt-3.5 border-t border-border flex items-center justify-between gap-2">
           <button
             type="button"
-            className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer flex items-center gap-1.5 border border-border-bright text-[#b8bfca] bg-[#20242b] hover:text-white hover:border-[#4c5360] disabled:opacity-40 disabled:cursor-default"
+            className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer flex items-center gap-1.5 border border-border-bright text-muted bg-panel hover:text-white hover:border-border-bright disabled:opacity-40 disabled:cursor-default"
             disabled={testing || loadingSchemas || loadingDatabases || saving}
             onClick={() => void testAndLoadSchemas()}
           >
@@ -522,7 +522,7 @@ export function ConnectionModal({
             </button>
             <button
               type="submit"
-              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40 disabled:cursor-default"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-accent text-white bg-accent hover:bg-accent-bright disabled:opacity-40 disabled:cursor-default"
               disabled={saving}
             >
               {saving ? "Saving…" : "Save connection"}

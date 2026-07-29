@@ -13,9 +13,9 @@ interface FolderModalProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const formInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 
 export function FolderModal({
   initial,
@@ -36,7 +36,7 @@ export function FolderModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -47,7 +47,7 @@ export function FolderModal({
       >
         <div className="flex items-center justify-between mb-[17px]">
           <div className="flex items-center gap-2.5">
-            <span className="w-7 h-7 shrink-0 rounded-md grid place-items-center text-folder bg-[rgba(201,178,122,.12)]">
+            <span className="w-7 h-7 shrink-0 rounded-md grid place-items-center text-folder bg-folder/15">
               <Folder size={17} />
             </span>
             <h2 className="m-0 text-text-bright text-sm font-[630]">
@@ -106,7 +106,7 @@ export function FolderModal({
             </button>
             <button
               type="submit"
-              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7]"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-accent text-white bg-accent hover:bg-accent-bright"
             >
               Save folder
             </button>

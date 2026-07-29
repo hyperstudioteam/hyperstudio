@@ -18,7 +18,7 @@ interface ExtractorMenuBodyProps {
 }
 
 const menuButtonClass =
-  "flex h-7 w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 text-left text-[11px] text-[#c4cad4] hover:bg-[#2a3344] hover:text-white";
+  "flex h-7 w-full cursor-pointer items-center gap-2 border-0 bg-transparent px-3 text-left text-[11px] text-text hover:bg-panel-soft hover:text-white";
 
 function ExtractorMenuBody({
   activeExtractor,
@@ -28,7 +28,7 @@ function ExtractorMenuBody({
 }: ExtractorMenuBodyProps) {
   return (
     <>
-      <div className="px-3 pt-1 pb-2 text-[11px] font-semibold text-[#d5dae3]">
+      <div className="px-3 pt-1 pb-2 text-[11px] font-semibold text-text-bright">
         Data Extractors
       </div>
       {(["built-in", "csv", "scripted"] as const).map((groupId) => {
@@ -43,7 +43,7 @@ function ExtractorMenuBody({
               : "Scripted";
         return (
           <div key={groupId}>
-            <div className="px-3 pt-2 pb-1 text-[9px] font-semibold tracking-[0.04em] text-[#6f7785] uppercase">
+            <div className="px-3 pt-2 pb-1 text-[9px] font-semibold tracking-[0.04em] text-subtle uppercase">
               {labelText}
             </div>
             {options.map((option) => (
@@ -52,11 +52,11 @@ function ExtractorMenuBody({
                 type="button"
                 className={cn(
                   menuButtonClass,
-                  option.id === activeExtractor && "bg-[#2a3344] text-white",
+                  option.id === activeExtractor && "bg-panel-soft text-white",
                 )}
                 onClick={() => onSelect(option.id)}
               >
-                <span className="grid w-3.5 place-items-center text-[#72c99d]">
+                <span className="grid w-3.5 place-items-center text-green">
                   {option.id === activeExtractor ? <Check size={12} /> : null}
                 </span>
                 {option.label}
@@ -65,13 +65,13 @@ function ExtractorMenuBody({
             {groupId === "csv" && (
               <button
                 type="button"
-                className={cn(menuButtonClass, "text-[#9aa3b0]")}
+                className={cn(menuButtonClass, "text-muted")}
                 onClick={(event) => {
                   event.stopPropagation();
                   onIncludeHeaderChange(!includeHeader);
                 }}
               >
-                <span className="grid w-3.5 place-items-center text-[#72c99d]">
+                <span className="grid w-3.5 place-items-center text-green">
                   {includeHeader ? <Check size={12} /> : null}
                 </span>
                 Include header
@@ -96,7 +96,7 @@ interface CopyAsMenuProps {
 }
 
 const menuPanelClass =
-  "z-40 max-h-[min(420px,70vh)] min-w-[220px] overflow-auto rounded-md border border-border-bright bg-[#1c2028] py-1.5 shadow-[0_12px_40px_rgba(0,0,0,.45)]";
+  "z-40 max-h-[min(420px,70vh)] min-w-[220px] overflow-auto rounded-md border border-border-bright bg-panel py-1.5 shadow-[0_12px_40px_rgba(0,0,0,.45)]";
 
 export function CopyAsMenu({
   open,
@@ -172,7 +172,7 @@ export function ExtractorToolbar({
     <div className="relative flex items-center gap-0.5" ref={rootRef}>
       <button
         type="button"
-        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded border border-border-bright bg-[#1a1e25] px-[7px] text-[10px] text-[#b8bfca] hover:text-white disabled:cursor-default disabled:opacity-50"
+        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded border border-border-bright bg-panel-soft px-[7px] text-[10px] text-muted hover:text-white disabled:cursor-default disabled:opacity-50"
         disabled={disabled}
         title={includeHeader ? "Include header: on" : "Include header: off"}
         onClick={() => setOpen((value) => !value)}

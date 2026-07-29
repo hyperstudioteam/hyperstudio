@@ -53,7 +53,7 @@ export function ScriptResults({
       onLayoutChanged={layout.onLayoutChanged}
     >
       <Panel id="script-list" defaultSize={240} minSize={160} maxSize={420}>
-        <ol className="m-0 h-full min-h-0 list-none overflow-y-auto bg-[#12151a] p-0">
+        <ol className="m-0 h-full min-h-0 list-none overflow-y-auto bg-grid-row p-0">
           {runs.map((run, index) => (
             <li key={`${index}-${run.line}`}>
               <button
@@ -68,7 +68,7 @@ export function ScriptResults({
                   <StatusIcon status={run.status} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-mono text-[10px] text-[#c4cad4]">
+                  <span className="block truncate font-mono text-[10px] text-text">
                     {statementLabel(run.sql)}
                   </span>
                   <span

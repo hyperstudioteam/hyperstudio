@@ -73,10 +73,10 @@ function connectionRowClass({
     "w-full border-0 rounded-md py-1 px-[7px] flex items-center gap-2 bg-transparent text-left cursor-default select-none hover:bg-white/[0.025]",
     folder ? "min-h-9" : "min-h-[42px]",
     selected && "bg-panel-soft",
-    drop === "before" && "shadow-[inset_0_2px_0_#4c8dff]",
-    drop === "after" && "shadow-[inset_0_-2px_0_#4c8dff]",
+    drop === "before" && "shadow-[inset_0_2px_0] shadow-blue",
+    drop === "after" && "shadow-[inset_0_-2px_0] shadow-blue",
     drop === "into" &&
-      "outline outline-1 outline-[rgba(76,141,255,0.85)] bg-[rgba(76,141,255,0.14)]",
+      "outline outline-1 outline-blue/85 bg-blue/15",
     "[&[draggable=true]]:cursor-grab [&[draggable=true]:active]:cursor-grabbing",
   );
 }
@@ -179,11 +179,11 @@ export function ConnectionTree({
               }}
             >
               {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-              <span className="size-[27px] shrink-0 rounded-md grid place-items-center text-folder bg-[rgba(201,178,122,0.12)]">
+              <span className="size-[27px] shrink-0 rounded-md grid place-items-center text-folder bg-folder/15">
                 <Folder size={15} />
               </span>
               <span className="flex flex-1 min-w-0 flex-col gap-0.5">
-                <strong className="text-[#cdd3de] text-xs font-[560] truncate">
+                <strong className="text-text text-xs font-[560] truncate">
                   {node.name}
                 </strong>
                 <small className="text-subtle text-[10px] font-mono truncate">
@@ -265,7 +265,7 @@ export function ConnectionTree({
             <DriverIcon driver={profile.driver} size={15} />
           </span>
           <span className="flex flex-1 min-w-0 flex-col gap-0.5">
-            <strong className="flex items-center gap-1.5 text-[#cdd3de] text-xs font-[560]">
+            <strong className="flex items-center gap-1.5 text-text text-xs font-[560]">
               {colorDot(profile.color) && (
                 <span
                   className="size-[7px] shrink-0 rounded-full"
@@ -298,8 +298,8 @@ export function ConnectionTree({
             className={cn(
               "size-1.5 shrink-0 rounded-full",
               liveConnectionIds.has(profile.id)
-                ? "bg-green shadow-[0_0_7px_rgba(73,201,137,0.4)]"
-                : "bg-[#4e5664]",
+                ? "bg-green shadow-[0_0_7px_var(--hs-green)]"
+                : "bg-subtle",
             )}
           />
         </div>

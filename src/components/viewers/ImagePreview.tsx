@@ -21,7 +21,7 @@ export function ImagePreview({ src }: ImagePreviewProps) {
   return (
     <div className="flex flex-col items-start gap-2">
       <img
-        className="max-h-[360px] max-w-full rounded-md border border-border bg-[#0c0e12]"
+        className="max-h-[360px] max-w-full rounded-md border border-border bg-surface-input"
         src={src}
         alt="cell value"
         onError={() => setErrored(true)}

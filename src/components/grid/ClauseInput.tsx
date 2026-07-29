@@ -46,15 +46,15 @@ export interface ClauseInputProps {
 }
 
 const highlight = HighlightStyle.define([
-  { tag: tags.keyword, color: "#c792ea" },
-  { tag: tags.operator, color: "#89ddff" },
-  { tag: [tags.string, tags.special(tags.string)], color: "#c3e88d" },
-  { tag: [tags.number, tags.bool, tags.null], color: "#f78c6c" },
-  { tag: tags.comment, color: "#5c6470", fontStyle: "italic" },
-  { tag: tags.typeName, color: "#ffcb6b" },
-  { tag: tags.propertyName, color: "#d8dce5" },
-  { tag: [tags.variableName, tags.name], color: "#d8dce5" },
-  { tag: tags.punctuation, color: "#8b93a1" },
+  { tag: tags.keyword, color: "var(--hs-syntax-keyword)" },
+  { tag: tags.operator, color: "var(--hs-syntax-operator)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--hs-syntax-string)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--hs-syntax-number)" },
+  { tag: tags.comment, color: "var(--hs-syntax-comment)", fontStyle: "italic" },
+  { tag: tags.typeName, color: "var(--hs-syntax-type)" },
+  { tag: tags.propertyName, color: "var(--hs-syntax-property)" },
+  { tag: [tags.variableName, tags.name], color: "var(--hs-syntax-fg)" },
+  { tag: tags.punctuation, color: "var(--hs-syntax-punctuation)" },
 ]);
 
 const theme = EditorView.theme(
@@ -63,7 +63,7 @@ const theme = EditorView.theme(
       height: "30px",
       flex: "1 1 0%",
       minWidth: "0",
-      color: "#d2d7df",
+      color: "var(--hs-syntax-fg)",
       backgroundColor: "transparent",
       fontSize: "11px",
     },
@@ -74,23 +74,26 @@ const theme = EditorView.theme(
     },
     ".cm-content": {
       padding: "0",
-      caretColor: "#9d90ff",
+      caretColor: "var(--hs-editor-caret)",
     },
     ".cm-line": {
       padding: "0",
     },
     "&.cm-focused": { outline: "none" },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#9d90ff" },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--hs-editor-caret)" },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-      { backgroundColor: "#2b3a55" },
+      {
+        backgroundColor: "var(--hs-editor-selection)",
+        color: "var(--hs-editor-selection-fg)",
+      },
     ".cm-placeholder": {
-      color: "#4a5260",
+      color: "var(--hs-editor-placeholder)",
       fontStyle: "normal",
     },
     ".cm-tooltip": {
-      border: "1px solid #363c48",
+      border: "1px solid var(--hs-editor-tooltip-border)",
       borderRadius: "6px",
-      backgroundColor: "#1c2028",
+      backgroundColor: "var(--hs-editor-tooltip-bg)",
       boxShadow: "0 12px 40px rgba(0,0,0,.45)",
       zIndex: "50",
     },
@@ -108,22 +111,22 @@ const theme = EditorView.theme(
       gap: "7px",
       padding: "0 10px",
       height: "24px",
-      color: "#c4cad4",
+      color: "var(--hs-editor-tooltip-fg)",
     },
     ".cm-tooltip-autocomplete ul li[aria-selected]": {
-      backgroundColor: "#2a3344",
-      color: "#fff",
+      backgroundColor: "var(--hs-editor-tooltip-selected)",
+      color: "var(--hs-text-bright)",
     },
     ".cm-completionLabel": { flex: "0 0 auto" },
     ".cm-completionMatchedText": {
       textDecoration: "none",
-      color: "#9d90ff",
+      color: "var(--hs-editor-caret)",
       fontWeight: "600",
     },
     ".cm-completionDetail": {
       marginLeft: "auto",
       paddingLeft: "14px",
-      color: "#606979",
+      color: "var(--hs-subtle)",
       fontStyle: "normal",
       fontSize: "10px",
     },

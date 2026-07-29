@@ -177,7 +177,7 @@ export function ExtensionView({
           "fixed left-1/2 top-1/2 z-30 h-[min(680px,calc(100vh-48px))] w-[min(520px,calc(100vw-48px))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border shadow-2xl",
       )}
     >
-      <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-[#14171b] px-3">
+      <header className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-surface-deep px-3">
         <strong className="truncate text-[11px] font-semibold text-text-bright">
           {view.name}
         </strong>

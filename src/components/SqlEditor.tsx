@@ -86,24 +86,24 @@ interface SqlEditorProps {
 }
 
 const highlight = HighlightStyle.define([
-  { tag: tags.keyword, color: "#c792ea" },
-  { tag: tags.operator, color: "#89ddff" },
-  { tag: [tags.string, tags.special(tags.string)], color: "#c3e88d" },
-  { tag: [tags.number, tags.bool, tags.null], color: "#f78c6c" },
-  { tag: tags.comment, color: "#5c6470", fontStyle: "italic" },
-  { tag: tags.typeName, color: "#ffcb6b" },
-  { tag: tags.function(tags.variableName), color: "#82aaff" },
-  { tag: tags.propertyName, color: "#d8dce5" },
-  { tag: [tags.variableName, tags.name], color: "#d8dce5" },
-  { tag: tags.punctuation, color: "#8b93a1" },
-  { tag: tags.invalid, color: "#ef6b73" },
+  { tag: tags.keyword, color: "var(--hs-syntax-keyword)" },
+  { tag: tags.operator, color: "var(--hs-syntax-operator)" },
+  { tag: [tags.string, tags.special(tags.string)], color: "var(--hs-syntax-string)" },
+  { tag: [tags.number, tags.bool, tags.null], color: "var(--hs-syntax-number)" },
+  { tag: tags.comment, color: "var(--hs-syntax-comment)", fontStyle: "italic" },
+  { tag: tags.typeName, color: "var(--hs-syntax-type)" },
+  { tag: tags.function(tags.variableName), color: "var(--hs-syntax-function)" },
+  { tag: tags.propertyName, color: "var(--hs-syntax-property)" },
+  { tag: [tags.variableName, tags.name], color: "var(--hs-syntax-fg)" },
+  { tag: tags.punctuation, color: "var(--hs-syntax-punctuation)" },
+  { tag: tags.invalid, color: "var(--hs-syntax-invalid)" },
 ]);
 
 const theme = EditorView.theme(
   {
     "&": {
       height: "100%",
-      color: "#d8dce5",
+      color: "var(--hs-syntax-fg)",
       backgroundColor: "transparent",
       fontSize: "12px",
     },
@@ -114,33 +114,36 @@ const theme = EditorView.theme(
     },
     ".cm-content": {
       padding: "11px 0",
-      caretColor: "#9d90ff",
+      caretColor: "var(--hs-editor-caret)",
     },
     "&.cm-focused": { outline: "none" },
-    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#9d90ff" },
+    ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--hs-editor-caret)" },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-      { backgroundColor: "#2b3a55" },
+      {
+        backgroundColor: "var(--hs-editor-selection)",
+        color: "var(--hs-editor-selection-fg)",
+      },
     ".cm-gutters": {
       minWidth: "41px",
       padding: "11px 0",
-      color: "#454d5a",
+      color: "var(--hs-editor-gutter)",
       backgroundColor: "transparent",
-      borderRight: "1px solid #1d2129",
+      borderRight: "1px solid var(--hs-editor-gutter-border)",
     },
     ".cm-lineNumbers .cm-gutterElement": { padding: "0 10px 0 8px" },
-    ".cm-activeLine": { backgroundColor: "rgba(139,124,246,.05)" },
+    ".cm-activeLine": { backgroundColor: "var(--hs-editor-active-line)" },
     ".cm-activeLineGutter": {
       backgroundColor: "transparent",
-      color: "#7d8694",
+      color: "var(--hs-editor-gutter-active)",
     },
     ".cm-matchingBracket, &.cm-focused .cm-matchingBracket": {
-      backgroundColor: "rgba(139,124,246,.22)",
+      backgroundColor: "var(--hs-editor-match)",
       outline: "none",
     },
     ".cm-tooltip": {
-      border: "1px solid #363c48",
+      border: "1px solid var(--hs-editor-tooltip-border)",
       borderRadius: "6px",
-      backgroundColor: "#1c2028",
+      backgroundColor: "var(--hs-editor-tooltip-bg)",
       boxShadow: "0 12px 40px rgba(0,0,0,.45)",
     },
     ".cm-tooltip.cm-tooltip-autocomplete": {
@@ -157,22 +160,22 @@ const theme = EditorView.theme(
       gap: "7px",
       padding: "0 10px",
       height: "24px",
-      color: "#c4cad4",
+      color: "var(--hs-editor-tooltip-fg)",
     },
     ".cm-tooltip-autocomplete ul li[aria-selected]": {
-      backgroundColor: "#2a3344",
-      color: "#fff",
+      backgroundColor: "var(--hs-editor-tooltip-selected)",
+      color: "var(--hs-text-bright)",
     },
     ".cm-completionLabel": { flex: "0 0 auto" },
     ".cm-completionMatchedText": {
       textDecoration: "none",
-      color: "#9d90ff",
+      color: "var(--hs-editor-caret)",
       fontWeight: "600",
     },
     ".cm-completionDetail": {
       marginLeft: "auto",
       paddingLeft: "14px",
-      color: "#606979",
+      color: "var(--hs-subtle)",
       fontStyle: "normal",
       fontSize: "10px",
     },
@@ -484,7 +487,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
             >
               <Scissors size={14} />
               Cut
-              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+              <kbd className="ml-auto rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
                 ⌘X
               </kbd>
             </button>
@@ -498,7 +501,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
             >
               <Copy size={14} />
               Copy
-              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+              <kbd className="ml-auto rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
                 ⌘C
               </kbd>
             </button>
@@ -511,7 +514,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
             >
               <ClipboardPaste size={14} />
               Paste
-              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+              <kbd className="ml-auto rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
                 ⌘V
               </kbd>
             </button>
@@ -528,7 +531,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
             >
               <WandSparkles size={14} />
               Format
-              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+              <kbd className="ml-auto rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
                 ⇧⌥F
               </kbd>
             </button>
@@ -558,7 +561,7 @@ export const SqlEditor = forwardRef<SqlEditorHandle, SqlEditorProps>(
             >
               <Play size={14} fill="currentColor" />
               Run
-              <kbd className="ml-auto rounded-[3px] border border-border bg-[rgba(0,0,0,.15)] px-1 py-px font-mono text-[8px] text-subtle">
+              <kbd className="ml-auto rounded-[3px] border border-border bg-black/15 px-1 py-px font-mono text-[8px] text-subtle">
                 ⌘↵
               </kbd>
             </button>

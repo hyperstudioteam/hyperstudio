@@ -72,13 +72,13 @@ interface EditTableModalProps {
 const iconButtonClass =
   "w-7 h-7 grid place-items-center p-0 border-0 rounded-[5px] text-muted bg-transparent cursor-pointer enabled:hover:text-text enabled:hover:bg-panel-soft disabled:cursor-default disabled:opacity-40";
 const modifyFormLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const modifyFormInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent";
 const modifyFormTextareaClass =
-  "w-full px-[9px] py-2 border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent resize-y min-h-16 font-inherit";
+  "w-full px-[9px] py-2 border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent resize-y min-h-16 font-inherit";
 const modifyCheckboxRowClass =
-  "flex flex-row items-center gap-2 text-[#b4bbc6] text-[11px] font-normal cursor-pointer";
+  "flex flex-row items-center gap-2 text-muted text-[11px] font-normal cursor-pointer";
 const modifyCheckboxInputClass =
   "w-3.5 h-3.5 m-0 shrink-0 accent-accent cursor-pointer";
 
@@ -592,8 +592,8 @@ export function EditTableModal({
       <button
         type="button"
         className={cn(
-          "w-full flex items-center gap-[7px] px-2.5 py-[7px] text-muted bg-[#171a20] border-0 text-[11px] border-b border-border text-left cursor-pointer hover:text-[#d8dde6] hover:bg-[#1d2129]",
-          selection?.section === section && "text-[#d8dde6] bg-[#1d2129]",
+          "w-full flex items-center gap-[7px] px-2.5 py-[7px] text-muted bg-panel-soft border-0 text-[11px] border-b border-border text-left cursor-pointer hover:text-text hover:bg-panel-soft",
+          selection?.section === section && "text-text bg-panel-soft",
         )}
         onClick={() => {
           const first =
@@ -614,7 +614,7 @@ export function EditTableModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && !busy && onClose()
       }
@@ -623,7 +623,7 @@ export function EditTableModal({
         className="w-[min(920px,100%)] max-h-[min(720px,100%)] flex flex-col border border-border-bright rounded-[10px] bg-surface shadow-[0_24px_70px_rgba(0,0,0,.5)] overflow-hidden"
         onSubmit={handleSubmit}
       >
-        <div className="flex items-center gap-2.5 px-2.5 py-2 border-b border-border bg-[#161920]">
+        <div className="flex items-center gap-2.5 px-2.5 py-2 border-b border-border bg-panel">
           <div className="flex gap-0.5">
             <button
               type="button"
@@ -662,7 +662,7 @@ export function EditTableModal({
               <ChevronDown size={15} />
             </button>
           </div>
-          <div className="flex-1 flex items-center gap-2 text-[#d8dde6] text-xs">
+          <div className="flex-1 flex items-center gap-2 text-text text-xs">
             <Table2 size={15} />
             <strong>Modify</strong>
             <em className="text-muted not-italic text-[11px]">
@@ -681,11 +681,11 @@ export function EditTableModal({
         </div>
 
         <div className="flex-1 min-h-[360px] grid grid-cols-[240px_1fr] overflow-hidden">
-          <aside className="border-r border-border bg-[#14171d] flex flex-col overflow-hidden">
-            <div className="flex items-center gap-[7px] px-2.5 py-2 border-b border-border text-[#c9d0db]">
+          <aside className="border-r border-border bg-surface-deep flex flex-col overflow-hidden">
+            <div className="flex items-center gap-[7px] px-2.5 py-2 border-b border-border text-text">
               <Table2 size={13} />
               <input
-                className="flex-1 h-[26px] px-1.5 border border-transparent rounded text-[#e0e4eb] bg-transparent text-xs font-semibold focus:border-accent focus:bg-surface-input"
+                className="flex-1 h-[26px] px-1.5 border border-transparent rounded text-text-bright bg-transparent text-xs font-semibold focus:border-accent focus:bg-surface-input"
                 value={tableName}
                 disabled={busy}
                 aria-label="Table name"
@@ -707,10 +707,10 @@ export function EditTableModal({
                     key={draft.id}
                     type="button"
                     className={cn(
-                      "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-[#c5ccd7] text-left cursor-pointer text-[11px] hover:bg-[rgba(255,255,255,.04)]",
+                      "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-muted text-left cursor-pointer text-[11px] hover:bg-panel-soft",
                       selection?.section === "columns" &&
                         selection.id === draft.id &&
-                        "bg-[rgba(108,122,224,.18)] text-[#e8ecf4]",
+                        "bg-accent-soft text-text-bright",
                     )}
                     onClick={() =>
                       setSelection({ section: "columns", id: draft.id })
@@ -718,10 +718,10 @@ export function EditTableModal({
                   >
                     <span
                       className={cn(
-                        "w-[18px] h-[18px] rounded-[3px] grid place-items-center text-[9px] font-bold shrink-0 bg-[#252a33] text-[#9aa3b2]",
-                        icon === "number" && "text-[#d7c9a8]",
-                        icon === "date" && "text-[#9fd0c2]",
-                        icon === "bool" && "text-[#ef9f6b]",
+                        "w-[18px] h-[18px] rounded-[3px] grid place-items-center text-[9px] font-bold shrink-0 bg-panel-raised text-muted",
+                        icon === "number" && "text-warn",
+                        icon === "date" && "text-green",
+                        icon === "bool" && "text-warn",
                       )}
                     >
                       {icon === "number" ? "#" : icon === "date" ? "◷" : "Aa"}
@@ -749,10 +749,10 @@ export function EditTableModal({
                   key={draft.id}
                   type="button"
                   className={cn(
-                    "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-[#c5ccd7] text-left cursor-pointer text-[11px] hover:bg-[rgba(255,255,255,.04)]",
+                    "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-muted text-left cursor-pointer text-[11px] hover:bg-panel-soft",
                     selection?.section === "keys" &&
                       selection.id === draft.id &&
-                      "bg-[rgba(108,122,224,.18)] text-[#e8ecf4]",
+                      "bg-accent-soft text-text-bright",
                   )}
                   onClick={() => setSelection({ section: "keys", id: draft.id })}
                 >
@@ -779,10 +779,10 @@ export function EditTableModal({
                   key={draft.id}
                   type="button"
                   className={cn(
-                    "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-[#c5ccd7] text-left cursor-pointer text-[11px] hover:bg-[rgba(255,255,255,.04)]",
+                    "w-full flex items-center gap-2 px-2.5 py-1.5 border-0 bg-transparent text-muted text-left cursor-pointer text-[11px] hover:bg-panel-soft",
                     selection?.section === "indexes" &&
                       selection.id === draft.id &&
-                      "bg-[rgba(108,122,224,.18)] text-[#e8ecf4]",
+                      "bg-accent-soft text-text-bright",
                   )}
                   onClick={() =>
                     setSelection({ section: "indexes", id: draft.id })
@@ -810,7 +810,7 @@ export function EditTableModal({
           <section className="flex flex-col overflow-auto px-4 py-3.5">
             {selectedColumn && (
               <>
-                <div className="flex items-center gap-2 mb-3.5 text-[#e0e4eb] text-[13px]">
+                <div className="flex items-center gap-2 mb-3.5 text-text-bright text-[13px]">
                   <Columns3 size={15} />
                   <strong>{selectedColumn.name || "Column"}</strong>
                 </div>
@@ -927,7 +927,7 @@ export function EditTableModal({
 
             {selectedKey && (
               <>
-                <div className="flex items-center gap-2 mb-3.5 text-[#e0e4eb] text-[13px]">
+                <div className="flex items-center gap-2 mb-3.5 text-text-bright text-[13px]">
                   <KeyRound size={15} />
                   <strong>{selectedKey.name || "Key"}</strong>
                 </div>
@@ -972,7 +972,7 @@ export function EditTableModal({
 
             {selectedIndex && (
               <>
-                <div className="flex items-center gap-2 mb-3.5 text-[#e0e4eb] text-[13px]">
+                <div className="flex items-center gap-2 mb-3.5 text-text-bright text-[13px]">
                   <ListTree size={15} />
                   <strong>{selectedIndex.name || "Index"}</strong>
                 </div>
@@ -1043,17 +1043,17 @@ export function EditTableModal({
           </section>
         </div>
 
-        <div className="border-t border-border bg-[#12151b]">
+        <div className="border-t border-border bg-grid-row">
           <button
             type="button"
-            className="w-full h-7 flex items-center gap-1.5 px-3 border-0 bg-transparent text-muted text-[11px] cursor-pointer hover:text-[#d2d7df]"
+            className="w-full h-7 flex items-center gap-1.5 px-3 border-0 bg-transparent text-muted text-[11px] cursor-pointer hover:text-text"
             onClick={() => setPreviewOpen((open) => !open)}
           >
             {previewOpen ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
             Preview
           </button>
           {previewOpen && (
-            <pre className="m-0 px-3.5 pb-3 max-h-[140px] overflow-auto text-[#d2d7df] font-mono text-[11px] leading-[1.55] whitespace-pre-wrap">
+            <pre className="m-0 px-3.5 pb-3 max-h-[140px] overflow-auto text-text font-mono text-[11px] leading-[1.55] whitespace-pre-wrap">
               {previewSql || "-- No changes"}
             </pre>
           )}
@@ -1078,7 +1078,7 @@ export function EditTableModal({
             </button>
             <button
               type="submit"
-              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40 disabled:cursor-default"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-accent text-white bg-accent hover:bg-accent-bright disabled:opacity-40 disabled:cursor-default"
               disabled={busy || !hasChanges || invalidStructure}
             >
               {busy ? "Saving…" : "OK"}
@@ -1100,14 +1100,14 @@ function ColumnPicker({
   onToggle: (column: string) => void;
 }) {
   return (
-    <fieldset className="m-0 p-2.5 px-[11px] border border-border rounded-md bg-[#14171d] flex flex-col gap-1 max-h-[180px] overflow-auto">
-      <legend className="px-1 text-[#9199a7] text-[10px] font-[540]">
+    <fieldset className="m-0 p-2.5 px-[11px] border border-border rounded-md bg-surface-deep flex flex-col gap-1 max-h-[180px] overflow-auto">
+      <legend className="px-1 text-muted text-[10px] font-[540]">
         Columns
       </legend>
       {columns.map((column) => (
         <label
           key={column}
-          className="flex flex-row items-center gap-2 py-[3px] px-0.5 rounded text-[#b4bbc6] text-[11px] font-normal cursor-pointer hover:bg-[rgba(255,255,255,.03)]"
+          className="flex flex-row items-center gap-2 py-[3px] px-0.5 rounded text-muted text-[11px] font-normal cursor-pointer hover:bg-panel-soft"
         >
           <input
             type="checkbox"

@@ -10,7 +10,7 @@ interface ImportConnectionsModalProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 
 export function ImportConnectionsModal({
   connectionCount,
@@ -27,7 +27,7 @@ export function ImportConnectionsModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -55,7 +55,7 @@ export function ImportConnectionsModal({
           </button>
         </div>
 
-        <p className="m-0 mb-3.5 text-[12px] leading-[1.45] text-[#aab1be]">
+        <p className="m-0 mb-3.5 text-[12px] leading-[1.45] text-muted">
           Found {connectionCount} connection
           {connectionCount === 1 ? "" : "s"}
           {keychainWithoutPassword > 0
@@ -65,10 +65,10 @@ export function ImportConnectionsModal({
         </p>
 
         <fieldset className={`${formLabelClass} mb-4 border-0 p-0 m-0`}>
-          <legend className="px-0 mb-[7px] text-[#9199a7] text-[10px] font-[540]">
+          <legend className="px-0 mb-[7px] text-muted text-[10px] font-[540]">
             How to import
           </legend>
-          <label className="flex items-start gap-2 mb-2 text-[12px] text-[#d2d7df] cursor-pointer">
+          <label className="flex items-start gap-2 mb-2 text-[12px] text-text cursor-pointer">
             <input
               type="radio"
               className="mt-[3px]"
@@ -80,12 +80,12 @@ export function ImportConnectionsModal({
               <strong className="font-[600] text-text-bright">
                 Add to existing
               </strong>
-              <span className="block text-[#9199a7] text-[11px] mt-0.5">
+              <span className="block text-muted text-[11px] mt-0.5">
                 Keep current connections and append the imported tree.
               </span>
             </span>
           </label>
-          <label className="flex items-start gap-2 text-[12px] text-[#d2d7df] cursor-pointer">
+          <label className="flex items-start gap-2 text-[12px] text-text cursor-pointer">
             <input
               type="radio"
               className="mt-[3px]"
@@ -97,7 +97,7 @@ export function ImportConnectionsModal({
               <strong className="font-[600] text-text-bright">
                 Replace all
               </strong>
-              <span className="block text-[#9199a7] text-[11px] mt-0.5">
+              <span className="block text-muted text-[11px] mt-0.5">
                 Remove current connections and folders, then import.
               </span>
             </span>
@@ -107,7 +107,7 @@ export function ImportConnectionsModal({
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            className="h-[32px] px-3 border border-border-bright rounded-[5px] text-[#c4cad4] bg-transparent text-[11px] cursor-pointer hover:text-text hover:bg-panel-soft"
+            className="h-[32px] px-3 border border-border-bright rounded-[5px] text-text bg-transparent text-[11px] cursor-pointer hover:text-text hover:bg-panel-soft"
             onClick={onClose}
           >
             Cancel

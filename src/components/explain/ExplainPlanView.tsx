@@ -54,13 +54,13 @@ export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-bg">
-      <div className="flex h-8 shrink-0 items-center gap-3 border-b border-border bg-[#14171b] px-3 text-[10px] text-subtle">
+      <div className="flex h-8 shrink-0 items-center gap-3 border-b border-border bg-surface-deep px-3 text-[10px] text-subtle">
         <span
           className={cn(
             "rounded-[3px] px-1.5 py-0.5 font-semibold uppercase tracking-wide",
             plan.analyzed
-              ? "bg-[rgba(73,201,137,.12)] text-green"
-              : "bg-accent-soft text-[#c9c2ff]",
+              ? "bg-green/15 text-green"
+              : "bg-accent-soft text-accent-bright",
           )}
         >
           {plan.analyzed ? "ANALYZE" : "EXPLAIN"}
@@ -71,14 +71,14 @@ export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
           <>
             <span>
               Execution{" "}
-              <span className="font-mono text-[#d5dae3]">
+              <span className="font-mono text-text-bright">
                 {formatNum(plan.executionMs ?? plan.root.actualTotalMs)} ms
               </span>
             </span>
             {plan.planningMs != null && (
               <span>
                 Planning{" "}
-                <span className="font-mono text-[#d5dae3]">
+                <span className="font-mono text-text-bright">
                   {formatNum(plan.planningMs)} ms
                 </span>
               </span>
@@ -87,14 +87,14 @@ export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
         ) : (
           <span>
             Total cost{" "}
-            <span className="font-mono text-[#d5dae3]">
+            <span className="font-mono text-text-bright">
               {formatNum(plan.root.totalCost)}
             </span>
           </span>
         )}
         <span>
           Est. rows{" "}
-          <span className="font-mono text-[#d5dae3]">
+          <span className="font-mono text-text-bright">
             {formatNum(plan.root.planRows, 0)}
           </span>
         </span>
@@ -102,7 +102,7 @@ export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
           type="button"
           className={cn(
             "ml-auto cursor-pointer rounded-[4px] border border-border bg-transparent px-2 py-0.5 text-[10px] text-muted hover:border-border-bright hover:text-text",
-            showRaw && "border-accent text-[#c9c2ff]",
+            showRaw && "border-accent text-accent-bright",
           )}
           onClick={() => setShowRaw((v) => !v)}
         >
@@ -149,7 +149,7 @@ export function ExplainPlanView({ plan }: ExplainPlanViewProps) {
             </Panel>
             <PanelResizeHandle />
             <Panel id="plan-detail" defaultSize="38%" minSize={180}>
-              <div className="flex h-full min-h-0 min-w-0 flex-col bg-[#13161b]">
+              <div className="flex h-full min-h-0 min-w-0 flex-col bg-activity">
                 <div className="shrink-0 border-b border-border px-3 py-1.5 text-[10px] font-semibold tracking-wide text-muted uppercase">
                   Node details
                 </div>

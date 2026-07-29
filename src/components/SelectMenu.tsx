@@ -86,7 +86,7 @@ export function SelectMenu({
       <button
         type="button"
         className={cn(
-          "flex h-[22px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-surface-input px-1.5 text-[10px] text-[#c4cad4] outline-none",
+          "flex h-[22px] cursor-pointer items-center gap-1 rounded-[5px] border border-border bg-surface-input px-1.5 text-[10px] text-text outline-none",
           "hover:border-border-bright hover:text-text",
           "focus-visible:border-accent",
           open && "border-accent",
@@ -135,9 +135,9 @@ export function SelectMenu({
                   aria-selected={isSelected}
                   disabled={option.disabled}
                   className={cn(
-                    "flex h-[28px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-[9px] text-left text-[11px] text-[#c5cad3]",
+                    "flex h-[28px] w-full cursor-pointer items-center gap-2 rounded-[5px] border-0 bg-transparent px-[9px] text-left text-[11px] text-text",
                     "hover:bg-panel-soft hover:text-white",
-                    isSelected && "bg-accent-soft text-[#c9c2ff]",
+                    isSelected && "bg-accent-soft text-accent-bright",
                     option.disabled && "cursor-default opacity-40",
                   )}
                   onClick={() => {

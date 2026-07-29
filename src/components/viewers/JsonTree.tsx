@@ -6,7 +6,7 @@ interface JsonTreeProps {
 
 export function JsonTree({ value }: JsonTreeProps) {
   return (
-    <div className="font-mono text-[12px] leading-normal text-[#d2d7df]">
+    <div className="font-mono text-[12px] leading-normal text-text">
       <JsonNode name={null} value={value} depth={0} defaultOpen />
     </div>
   );
@@ -70,9 +70,9 @@ function JsonNode({ name, value, depth, defaultOpen }: JsonNodeProps) {
 
 function scalarClass(value: unknown): string {
   if (value === null) return "text-subtle italic";
-  if (typeof value === "number") return "text-[#d7c9a8]";
-  if (typeof value === "boolean") return "text-[#ef9f6b]";
-  return "text-[#9fd0c2]";
+  if (typeof value === "number") return "text-warn";
+  if (typeof value === "boolean") return "text-warn";
+  return "text-green";
 }
 
 function scalarText(value: unknown): string {

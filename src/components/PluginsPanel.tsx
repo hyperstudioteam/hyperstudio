@@ -84,7 +84,7 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center bg-[rgba(5,7,10,0.72)] p-5 backdrop-blur-sm"
+      className="fixed inset-0 z-20 grid place-items-center bg-black/70 p-5 backdrop-blur-sm"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -117,7 +117,7 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
           <label className="flex flex-col gap-1.5 text-[11px] text-muted">
             Plugin path
             <input
-              className="h-[34px] w-full rounded-[5px] border border-border-bright bg-surface-input px-[9px] text-[11px] text-[#d2d7df] focus:border-accent"
+              className="h-[34px] w-full rounded-[5px] border border-border-bright bg-surface-input px-[9px] text-[11px] text-text focus:border-accent"
               value={sourcePath}
               placeholder="/path/to/plugin or plugin.zip"
               onChange={(event) => setSourcePath(event.target.value)}
@@ -126,7 +126,7 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
           </label>
           <button
             type="button"
-            className="inline-flex h-[31px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-[#7667e7] bg-[#6959da] px-[11px] text-[10px] font-[580] text-white hover:bg-[#7767e7] disabled:opacity-50"
+            className="inline-flex h-[31px] cursor-pointer items-center gap-1.5 rounded-[5px] border border-accent bg-accent px-[11px] text-[10px] font-[580] text-white hover:bg-accent-bright disabled:opacity-50"
             disabled={busy}
             onClick={() => void install()}
           >
@@ -165,7 +165,7 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
                   </code>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <label className="flex cursor-pointer items-center gap-2 text-[11px] text-[#b4bbc6]">
+                  <label className="flex cursor-pointer items-center gap-2 text-[11px] text-muted">
                     <input
                       type="checkbox"
                       className="m-0 h-3.5 w-3.5 shrink-0 cursor-pointer accent-accent"
@@ -191,7 +191,7 @@ export function PluginsPanel({ onClose, onDriversChanged }: PluginsPanelProps) {
         </div>
 
         {status && (
-          <div className="mt-3 rounded-[5px] bg-[rgba(239,107,115,0.08)] px-2.5 py-2 text-[10px] [overflow-wrap:anywhere] text-[#d18b91]">
+          <div className="mt-3 rounded-[5px] bg-red/10 px-2.5 py-2 text-[10px] [overflow-wrap:anywhere] text-danger">
             {status}
           </div>
         )}

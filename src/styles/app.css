@@ -5,38 +5,106 @@
     sans-serif;
   --font-mono: "SFMono-Regular", Consolas, ui-monospace, Menlo, monospace;
 
-  --color-bg: #111318;
-  --color-panel: #16191f;
-  --color-panel-raised: #1b1f27;
-  --color-panel-soft: #20242d;
-  --color-titlebar: #14171c;
-  --color-activity: #13161b;
-  --color-surface: #1a1d24;
-  --color-surface-deep: #15181e;
-  --color-surface-input: #111419;
-  --color-border: #292e38;
-  --color-border-bright: #363c48;
-  --color-text: #d8dee9;
-  --color-text-bright: #e0e4eb;
-  --color-muted: #818a9a;
-  --color-subtle: #606979;
-  --color-accent: #8b7cf6;
-  --color-accent-bright: #9d90ff;
-  --color-accent-soft: rgb(139 124 246 / 0.13);
-  --color-green: #49c989;
-  --color-red: #ef6b73;
-  --color-danger: #ef8a90;
-  --color-warn: #e0b35a;
-  --color-blue: #4c8dff;
-  --color-folder: #c9b27a;
-  --color-pk: #d4a84b;
-  --color-cell-select: #214283;
-  --color-grid-head: #1a1d24;
-  --color-grid-row: #12151a;
-  --color-grid-alt: #15181e;
-  --color-grid-hover: #1b1e26;
-  --color-grid-line: #252a33;
-  --color-row-num: #171a20;
+  --color-bg: var(--hs-bg);
+  --color-panel: var(--hs-panel);
+  --color-panel-raised: var(--hs-panel-raised);
+  --color-panel-soft: var(--hs-panel-soft);
+  --color-titlebar: var(--hs-titlebar);
+  --color-activity: var(--hs-activity);
+  --color-surface: var(--hs-surface);
+  --color-surface-deep: var(--hs-surface-deep);
+  --color-surface-input: var(--hs-surface-input);
+  --color-border: var(--hs-border);
+  --color-border-bright: var(--hs-border-bright);
+  --color-text: var(--hs-text);
+  --color-text-bright: var(--hs-text-bright);
+  --color-muted: var(--hs-muted);
+  --color-subtle: var(--hs-subtle);
+  --color-accent: var(--hs-accent);
+  --color-accent-bright: var(--hs-accent-bright);
+  --color-accent-soft: var(--hs-accent-soft);
+  --color-green: var(--hs-green);
+  --color-red: var(--hs-red);
+  --color-danger: var(--hs-danger);
+  --color-warn: var(--hs-warn);
+  --color-blue: var(--hs-blue);
+  --color-folder: var(--hs-folder);
+  --color-pk: var(--hs-pk);
+  --color-cell-select: var(--hs-cell-select);
+  --color-grid-head: var(--hs-grid-head);
+  --color-grid-row: var(--hs-grid-row);
+  --color-grid-alt: var(--hs-grid-alt);
+  --color-grid-hover: var(--hs-grid-hover);
+  --color-grid-line: var(--hs-grid-line);
+  --color-row-num: var(--hs-row-num);
+}
+
+/*
+ * Fallback tokens (= HyperStudio Dark) until JS applies the active theme.
+ * Themes are data (JSON); runtime sets these as inline CSS vars.
+ */
+:root {
+  color-scheme: dark;
+
+  --hs-bg: #111318;
+  --hs-panel: #16191f;
+  --hs-panel-raised: #1b1f27;
+  --hs-panel-soft: #20242d;
+  --hs-titlebar: #14171c;
+  --hs-activity: #13161b;
+  --hs-surface: #1a1d24;
+  --hs-surface-deep: #15181e;
+  --hs-surface-input: #111419;
+  --hs-border: #292e38;
+  --hs-border-bright: #363c48;
+  --hs-text: #d8dee9;
+  --hs-text-bright: #e0e4eb;
+  --hs-muted: #818a9a;
+  --hs-subtle: #606979;
+  --hs-accent: #8b7cf6;
+  --hs-accent-bright: #9d90ff;
+  --hs-accent-soft: rgb(139 124 246 / 0.13);
+  --hs-green: #49c989;
+  --hs-red: #ef6b73;
+  --hs-danger: #ef8a90;
+  --hs-warn: #e0b35a;
+  --hs-blue: #4c8dff;
+  --hs-folder: #c9b27a;
+  --hs-pk: #d4a84b;
+  --hs-cell-select: #214283;
+  --hs-grid-head: #1a1d24;
+  --hs-grid-row: #12151a;
+  --hs-grid-alt: #15181e;
+  --hs-grid-hover: #1b1e26;
+  --hs-grid-line: #252a33;
+  --hs-row-num: #171a20;
+  --hs-scrollbar: #3a4150;
+  --hs-scrollbar-hover: #525a6b;
+
+  --hs-syntax-fg: #d8dce5;
+  --hs-syntax-keyword: #c792ea;
+  --hs-syntax-operator: #89ddff;
+  --hs-syntax-string: #c3e88d;
+  --hs-syntax-number: #f78c6c;
+  --hs-syntax-comment: #5c6470;
+  --hs-syntax-type: #ffcb6b;
+  --hs-syntax-function: #82aaff;
+  --hs-syntax-property: #d8dce5;
+  --hs-syntax-punctuation: #8b93a1;
+  --hs-syntax-invalid: #ef6b73;
+  --hs-editor-caret: #9d90ff;
+  --hs-editor-selection: #2b3a55;
+  --hs-editor-selection-fg: #e0e4eb;
+  --hs-editor-gutter: #454d5a;
+  --hs-editor-gutter-active: #7d8694;
+  --hs-editor-gutter-border: #1d2129;
+  --hs-editor-active-line: rgb(139 124 246 / 0.05);
+  --hs-editor-match: rgb(139 124 246 / 0.22);
+  --hs-editor-tooltip-bg: #1c2028;
+  --hs-editor-tooltip-border: #363c48;
+  --hs-editor-tooltip-fg: #c4cad4;
+  --hs-editor-tooltip-selected: #2a3344;
+  --hs-editor-placeholder: #4a5260;
 }
 
 @layer base {
@@ -44,7 +112,6 @@
     font-family: var(--font-sans);
     color: var(--color-text);
     background: var(--color-bg);
-    color-scheme: dark;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
@@ -82,10 +149,9 @@
     outline-offset: -1px;
   }
 
-  /* Dark scrollbars for Windows / WebView2 (and Firefox via scrollbar-*). */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #3a4150 transparent;
+    scrollbar-color: var(--hs-scrollbar) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -98,24 +164,23 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: #3a4150;
+    background-color: var(--hs-scrollbar);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: #525a6b;
+    background-color: var(--hs-scrollbar-hover);
   }
 
   *::-webkit-scrollbar-corner {
     background: transparent;
   }
 
-  /* Native selects still appear in forms; color-scheme helps option chrome. */
   select,
   option {
-    color-scheme: dark;
+    color-scheme: inherit;
     background-color: var(--color-surface);
     color: var(--color-text);
   }
@@ -123,7 +188,7 @@
 
 @utility scrollbar-thin-app {
   scrollbar-width: thin;
-  scrollbar-color: #3a4150 transparent;
+  scrollbar-color: var(--hs-scrollbar) transparent;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -135,14 +200,14 @@
   }
 
   &::-webkit-scrollbar-thumb {
-    background-color: #3a4150;
+    background-color: var(--hs-scrollbar);
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background-color: #525a6b;
+    background-color: var(--hs-scrollbar-hover);
   }
 
   &::-webkit-scrollbar-corner {

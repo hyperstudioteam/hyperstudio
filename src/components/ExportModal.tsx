@@ -38,7 +38,7 @@ export function ExportModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-[rgba(0,0,0,.5)]"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/50"
       onClick={() => !busy && onClose()}
     >
       <div
@@ -73,7 +73,7 @@ export function ExportModal({
                   className={cn(
                     "flex-1 cursor-pointer rounded-[5px] border border-border bg-transparent px-2 py-1.5 text-[10px] text-muted hover:border-border-bright hover:text-text",
                     format === item.id &&
-                      "border-accent bg-accent-soft text-[#c9c2ff]",
+                      "border-accent bg-accent-soft text-accent-bright",
                   )}
                   disabled={busy}
                   onClick={() => setFormat(item.id)}
@@ -86,7 +86,7 @@ export function ExportModal({
 
           <label
             className={cn(
-              "flex cursor-pointer items-center gap-2 text-[11px] text-[#c9d0db]",
+              "flex cursor-pointer items-center gap-2 text-[11px] text-text",
               !supportsHeader && "cursor-default opacity-40",
             )}
           >
@@ -102,7 +102,7 @@ export function ExportModal({
 
           <label
             className={cn(
-              "flex cursor-pointer items-start gap-2 text-[11px] text-[#c9d0db]",
+              "flex cursor-pointer items-start gap-2 text-[11px] text-text",
               !canExportAll && "cursor-default opacity-40",
             )}
           >
@@ -152,7 +152,7 @@ export function ExportModal({
           </button>
           <button
             type="button"
-            className="flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-[rgba(139,124,246,.45)] bg-accent-soft px-3 py-1.5 text-[11px] font-semibold text-[#c9c2ff] hover:border-accent hover:text-white disabled:opacity-60"
+            className="flex cursor-pointer items-center gap-1.5 rounded-[5px] border border-accent/45 bg-accent-soft px-3 py-1.5 text-[11px] font-semibold text-accent-bright hover:border-accent hover:text-white disabled:opacity-60"
             disabled={busy}
             onClick={() => onExport({ format, includeHeader, allRows })}
           >

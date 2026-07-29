@@ -8,9 +8,9 @@ interface SaveQueryModalProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const formInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 
 export function SaveQueryModal({
   defaultName,
@@ -28,7 +28,7 @@ export function SaveQueryModal({
 
   return (
     <div
-      className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-20 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -82,7 +82,7 @@ export function SaveQueryModal({
             <button
               type="submit"
               disabled={!name.trim()}
-              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-accent text-white bg-accent hover:bg-accent-bright disabled:opacity-40"
             >
               Save
             </button>

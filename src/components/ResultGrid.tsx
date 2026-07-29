@@ -33,9 +33,9 @@ interface ResultGridProps {
 }
 
 const thClass =
-  "sticky top-0 z-[1] h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-[#aeb5c1] bg-grid-head";
+  "sticky top-0 z-[1] h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left font-semibold whitespace-nowrap overflow-hidden text-ellipsis text-muted bg-grid-head";
 const tdClass =
-  "h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left whitespace-nowrap overflow-hidden text-ellipsis text-[#b9c0cb] select-none cursor-cell";
+  "h-[29px] max-w-[300px] border-r border-b border-grid-line px-2.5 text-left whitespace-nowrap overflow-hidden text-ellipsis text-text select-none cursor-cell";
 
 export function ResultGrid({
   result,
@@ -194,10 +194,10 @@ export function ResultGrid({
 
   if (error) {
     return (
-      <div className="m-3 flex gap-[9px] rounded-md border border-[rgba(239,107,115,.22)] bg-[rgba(239,107,115,.06)] p-3 text-[11px] text-red">
+      <div className="m-3 flex gap-[9px] rounded-md border border-red/20 bg-red/5 p-3 text-[11px] text-red">
         <div>
           <strong className="text-[11px]">Query failed</strong>
-          <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-[#c79599]">
+          <p className="mt-[3px] mb-0 font-mono text-[10px] leading-normal whitespace-pre-wrap text-danger">
             {error}
           </p>
         </div>
@@ -215,7 +215,7 @@ export function ResultGrid({
 
   if (result.columns.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center gap-2 text-[11px] text-[#70c99b]">
+      <div className="flex flex-1 items-center justify-center gap-2 text-[11px] text-green">
         <Check size={18} /> Query completed. {result.affectedRows} rows
         affected.
       </div>
@@ -224,7 +224,7 @@ export function ResultGrid({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex h-7 shrink-0 items-center gap-2.5 border-b border-border bg-[#14171b] px-2">
+      <div className="flex h-7 shrink-0 items-center gap-2.5 border-b border-border bg-surface-deep px-2">
         <ExtractorToolbar
           activeExtractor={extractor}
           includeHeader={includeHeader}
@@ -237,10 +237,10 @@ export function ResultGrid({
           onCopy={() => void handleCopy()}
         />
         {copyFlash && (
-          <span className="text-[#72c99d]">{copyFlash}</span>
+          <span className="text-green">{copyFlash}</span>
         )}
         {copyError && <span className="text-red">{copyError}</span>}
-        <span className="ml-auto flex items-center gap-2.5 text-[10px] text-[#8b93a1]">
+        <span className="ml-auto flex items-center gap-2.5 text-[10px] text-muted">
           {filters.length > 0 && (
             <>
               <span className="text-warn">
@@ -304,7 +304,7 @@ export function ResultGrid({
                 <td
                   className={cn(
                     tdClass,
-                    "w-[42px] min-w-[42px] bg-row-num! text-right text-[#596272]",
+                    "w-[42px] min-w-[42px] bg-row-num! text-right text-subtle",
                   )}
                 >
                   {(view.sourceIndex[rowIndex] ?? rowIndex) + 1}
@@ -327,12 +327,12 @@ export function ResultGrid({
                         tdClass,
                         rowIndex % 2 === 1 ? "bg-grid-alt" : "bg-grid-row",
                         "group-hover:bg-grid-hover",
-                        value === null && "text-[#686f7c] italic",
+                        value === null && "text-subtle italic",
                         cell.className,
                         cell.align === "right" && "text-right",
                         cell.align === "center" && "text-center",
                         selected &&
-                          "bg-cell-select! text-[#e8eef8] shadow-[inset_0_0_0_1px_rgba(96,150,230,.55)]",
+                          "bg-cell-select! text-text-bright ring-1 ring-inset ring-blue/50",
                       )}
                       key={columnIndex}
                       title={cell.text}

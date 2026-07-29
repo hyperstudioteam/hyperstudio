@@ -59,12 +59,12 @@ export function QueryHistoryPanel({
 
   return (
     <aside className="flex h-full min-w-0 flex-col bg-panel">
-      <header className="flex h-9 shrink-0 items-center border-b border-border bg-[#14171b]">
+      <header className="flex h-9 shrink-0 items-center border-b border-border bg-surface-deep">
         <button
           type="button"
           className={cn(
             "flex h-full cursor-pointer items-center gap-1.5 border-0 border-b border-transparent bg-transparent px-3 text-[10px] text-muted",
-            tab === "history" && "border-accent text-[#d5dae3]",
+            tab === "history" && "border-accent text-text-bright",
           )}
           onClick={() => setTab("history")}
         >
@@ -75,7 +75,7 @@ export function QueryHistoryPanel({
           type="button"
           className={cn(
             "flex h-full cursor-pointer items-center gap-1.5 border-0 border-b border-transparent bg-transparent px-3 text-[10px] text-muted",
-            tab === "saved" && "border-accent text-[#d5dae3]",
+            tab === "saved" && "border-accent text-text-bright",
           )}
           onClick={() => setTab("saved")}
         >
@@ -215,8 +215,8 @@ function EntryRow({
       >
         <div
           className={cn(
-            "truncate font-mono text-[10px] text-[#c4cbd6]",
-            failed && "text-[#c79599]",
+            "truncate font-mono text-[10px] text-text",
+            failed && "text-danger",
           )}
         >
           {title}

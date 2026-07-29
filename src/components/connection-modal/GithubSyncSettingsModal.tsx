@@ -24,9 +24,9 @@ interface GithubSyncSettingsModalProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540]";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540]";
 const formInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 
 export function GithubSyncSettingsModal({
   onClose,
@@ -142,7 +142,7 @@ export function GithubSyncSettingsModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-20 grid place-items-center p-5 bg-[rgba(5,7,10,.72)] backdrop-blur-[4px]"
+        className="fixed inset-0 z-20 grid place-items-center p-5 bg-black/70 backdrop-blur-[4px]"
         onMouseDown={(event) =>
           event.target === event.currentTarget && onClose()
         }
@@ -170,14 +170,14 @@ export function GithubSyncSettingsModal({
             </button>
           </div>
 
-          <p className="m-0 mb-3.5 text-[12px] leading-[1.45] text-[#aab1be]">
+          <p className="m-0 mb-3.5 text-[12px] leading-[1.45] text-muted">
             Connect GitHub, pick a repository, and sync. Vault passwords sync as
             ciphertext; raw and keychain secrets stay local.
           </p>
 
           {!signedIn ? (
             <div className="mb-3.5 rounded-[7px] border border-border bg-panel-soft px-3 py-4 flex flex-col items-center gap-2.5">
-              <p className="m-0 text-[11px] text-[#8b93a1] text-center">
+              <p className="m-0 text-[11px] text-muted text-center">
                 Sign in to choose a repository.
               </p>
               <button
@@ -192,13 +192,13 @@ export function GithubSyncSettingsModal({
           ) : (
             <div className="mb-3.5 flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] text-[#aab1be]">
+                <span className="text-[11px] text-muted">
                   Signed in to GitHub
                 </span>
                 <button
                   type="button"
                   disabled={busy}
-                  className="h-[28px] px-2.5 border border-border-bright rounded-[5px] text-[10px] font-semibold cursor-pointer text-[#c4cad4] bg-transparent hover:text-text hover:bg-panel-soft disabled:opacity-40"
+                  className="h-[28px] px-2.5 border border-border-bright rounded-[5px] text-[10px] font-semibold cursor-pointer text-text bg-transparent hover:text-text hover:bg-panel-soft disabled:opacity-40"
                   onClick={() => void handleDisconnect()}
                 >
                   Sign out
@@ -242,9 +242,9 @@ export function GithubSyncSettingsModal({
               </label>
 
               {selectedFullName && (
-                <p className="m-0 text-[11px] text-[#8b93a1]">
+                <p className="m-0 text-[11px] text-muted">
                   Syncs to{" "}
-                  <code className="text-[#c5cad3]">{DEFAULT_SYNC_PATH}</code> on
+                  <code className="text-text">{DEFAULT_SYNC_PATH}</code> on
                   the default branch.
                 </p>
               )}
@@ -252,7 +252,7 @@ export function GithubSyncSettingsModal({
           )}
 
           {error && (
-            <div className="mb-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-[#d18b91] bg-[rgba(239,107,115,.08)]">
+            <div className="mb-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-danger bg-red/10">
               {error}
             </div>
           )}
@@ -260,7 +260,7 @@ export function GithubSyncSettingsModal({
           <div className="flex justify-end gap-2">
             <button
               type="button"
-              className="h-[32px] px-3 border border-border-bright rounded-[5px] text-[#c4cad4] bg-transparent text-[11px] cursor-pointer hover:text-text hover:bg-panel-soft"
+              className="h-[32px] px-3 border border-border-bright rounded-[5px] text-text bg-transparent text-[11px] cursor-pointer hover:text-text hover:bg-panel-soft"
               onClick={onClose}
             >
               Cancel

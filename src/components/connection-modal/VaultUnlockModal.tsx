@@ -10,9 +10,9 @@ interface VaultUnlockModalProps {
 }
 
 const formLabelClass =
-  "flex flex-col gap-[5px] text-[#9199a7] text-[10px] font-[540] col-span-full";
+  "flex flex-col gap-[5px] text-muted text-[10px] font-[540] col-span-full";
 const formInputClass =
-  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-[#d2d7df] bg-surface-input text-[11px] focus:border-accent placeholder:text-[#4e5663]";
+  "w-full h-[34px] px-[9px] border border-border-bright rounded-[5px] text-text bg-surface-input text-[11px] focus:border-accent placeholder:text-subtle";
 
 export function VaultUnlockModal({
   title = "Unlock password vault",
@@ -40,7 +40,7 @@ export function VaultUnlockModal({
 
   return (
     <div
-      className="fixed inset-0 z-30 grid place-items-center p-5 bg-[rgba(5,7,10,.55)] backdrop-blur-[4px]"
+      className="fixed inset-0 z-30 grid place-items-center p-5 bg-black/55 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -51,7 +51,7 @@ export function VaultUnlockModal({
       >
         <div className="flex items-center justify-between mb-[17px]">
           <div className="flex items-center gap-2.5">
-            <span className="w-[27px] h-[27px] shrink-0 rounded-md grid place-items-center text-[#8fb9e8] bg-[rgba(72,128,186,.16)]">
+            <span className="w-[27px] h-[27px] shrink-0 rounded-md grid place-items-center text-blue bg-blue/15">
               <LockKeyhole size={17} />
             </span>
             <h2 className="m-0 text-text-bright text-sm font-[630]">{title}</h2>
@@ -66,7 +66,7 @@ export function VaultUnlockModal({
           </button>
         </div>
 
-        <p className="m-0 mb-3.5 text-[#8b93a1] text-[11px] leading-[1.45]">
+        <p className="m-0 mb-3.5 text-muted text-[11px] leading-[1.45]">
           Enter your master password to decrypt saved connection passwords.
         </p>
 
@@ -85,7 +85,7 @@ export function VaultUnlockModal({
         </div>
 
         {error && (
-          <div className="mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-[#d18b91] bg-[rgba(239,107,115,.08)]">
+          <div className="mt-3 px-2.5 py-2 rounded-[5px] text-[10px] [overflow-wrap:anywhere] text-danger bg-red/10">
             {error}
           </div>
         )}
@@ -102,7 +102,7 @@ export function VaultUnlockModal({
             </button>
             <button
               type="submit"
-              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-[#7667e7] text-white bg-[#6959da] hover:bg-[#7767e7] disabled:opacity-40 disabled:cursor-default"
+              className="h-[31px] px-[11px] rounded-[5px] text-[10px] font-semibold cursor-pointer border border-accent text-white bg-accent hover:bg-accent-bright disabled:opacity-40 disabled:cursor-default"
               disabled={busy}
             >
               Unlock

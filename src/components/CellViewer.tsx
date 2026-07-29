@@ -61,7 +61,7 @@ export function CellViewer({
 
   return (
     <div
-      className="fixed inset-0 z-30 grid place-items-center bg-[rgba(5,7,10,.55)] p-5 backdrop-blur-[4px]"
+      className="fixed inset-0 z-30 grid place-items-center bg-black/55 p-5 backdrop-blur-[4px]"
       onMouseDown={(event) =>
         event.target === event.currentTarget && onClose()
       }
@@ -74,9 +74,9 @@ export function CellViewer({
                 key={viewer.id}
                 type="button"
                 className={cn(
-                  "h-[26px] cursor-pointer rounded-[5px] border border-border bg-[#15181e] px-2.5 text-[11px] text-muted hover:border-border-bright hover:text-text",
+                  "h-[26px] cursor-pointer rounded-[5px] border border-border bg-surface-deep px-2.5 text-[11px] text-muted hover:border-border-bright hover:text-text",
                   active?.id === viewer.id &&
-                    "border-[rgba(139,124,246,.6)] bg-accent-soft text-[#d5d0ff]",
+                    "border-accent/60 bg-accent-soft text-accent-bright",
                 )}
                 onClick={() => setActiveId(viewer.id)}
                 title={
@@ -93,9 +93,9 @@ export function CellViewer({
                 key={`${viewer.source}:${viewer.id}`}
                 type="button"
                 className={cn(
-                  "h-[26px] cursor-pointer rounded-[5px] border border-border bg-[#15181e] px-2.5 text-[11px] text-muted hover:border-border-bright hover:text-text",
+                  "h-[26px] cursor-pointer rounded-[5px] border border-border bg-surface-deep px-2.5 text-[11px] text-muted hover:border-border-bright hover:text-text",
                   active?.id === viewer.id &&
-                    "border-[rgba(139,124,246,.6)] bg-accent-soft text-[#d5d0ff]",
+                    "border-accent/60 bg-accent-soft text-accent-bright",
                 )}
                 onClick={() => setActiveId(viewer.id)}
                 title={`From extension: ${viewer.source}`}

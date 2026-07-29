@@ -1,0 +1,30 @@
+{
+  "id": "one-light",
+  "name": "One Light",
+  "family": "one",
+  "colorScheme": "light",
+  "description": "Atom / VS Code One Light palette.",
+  "background": "#fafafa",
+  "foreground": "#383a42",
+  "cursor": "#526fff",
+  "selectionBackground": "#e5e5e6",
+  "selectionForeground": "#383a42",
+  "palette": [
+    "#383a42",
+    "#e45649",
+    "#50a14f",
+    "#c18401",
+    "#4078f2",
+    "#a626a4",
+    "#0184bc",
+    "#a0a1a7",
+    "#696c77",
+    "#e45649",
+    "#50a14f",
+    "#c18401",
+    "#4078f2",
+    "#a626a4",
+    "#0184bc",
+    "#383a42"
+  ]
+}

@@ -23,7 +23,7 @@ export function EnumPreview({ value, labels }: EnumPreviewProps) {
           NULL
         </div>
       ) : !known ? (
-        <div className="rounded-[6px] border border-border bg-[#15181e] px-3 py-2 font-mono text-[12px] text-[#d2d7df]">
+        <div className="rounded-[6px] border border-border bg-surface-deep px-3 py-2 font-mono text-[12px] text-text">
           {current}
           <span className="ml-2 text-[11px] text-subtle">(not in enum)</span>
         </div>
@@ -35,9 +35,9 @@ export function EnumPreview({ value, labels }: EnumPreviewProps) {
             <li
               key={label}
               className={cn(
-                "rounded-[5px] px-2.5 py-1.5 font-mono text-[12px] text-[#b9c0cb]",
+                "rounded-[5px] px-2.5 py-1.5 font-mono text-[12px] text-text",
                 selected &&
-                  "bg-[rgba(201,162,39,.14)] text-[#e8d59a] ring-1 ring-[rgba(201,162,39,.35)]",
+                  "bg-pk/15 text-pk ring-1 ring-pk/35",
               )}
             >
               {label}
