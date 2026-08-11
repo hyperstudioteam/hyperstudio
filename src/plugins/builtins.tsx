@@ -97,12 +97,13 @@ export function registerBuiltinContributions() {
     matchPrefix: true,
     matchValue: (value) => typeof value === "boolean",
     align: "center",
-    format: (ctx) =>
-      ctx.value === null || ctx.value === undefined
-        ? "<null>"
-        : ctx.value
-          ? "true"
-          : "false",
+    format: (ctx) => {
+      if (ctx.value === null || ctx.value === undefined) return "<null>";
+      if (typeof ctx.value === "boolean") return ctx.value ? "true" : "false";
+      // MySQL TINYINT(1) may arrive as 0/1 before the driver maps it to bool.
+      if (ctx.value === 0 || ctx.value === 1) return ctx.value === 1 ? "true" : "false";
+      return String(ctx.value);
+    },
   });
 
   contributions.registerColumnType({
