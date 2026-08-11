@@ -1445,6 +1445,16 @@ export function TableDataEditor({
           >
             Duplicate row
           </button>
+          <button
+            type="button"
+            disabled={busy || !hasSelection}
+            onClick={() => {
+              deleteSelected();
+              setContextMenu(null);
+            }}
+          >
+            Delete selected rows
+          </button>
           {extensionMenu.length > 0 && <ContextMenuSeparator />}
           {extensionMenu.map((item) => (
             <button
