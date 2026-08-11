@@ -427,6 +427,21 @@ export function TableDataEditor({
 
       if (editing || isEditingField(event.target)) return;
 
+      if (mod && key === "a") {
+        if (event.altKey || event.shiftKey) return;
+        if (visibleRows.length === 0 || columns.length === 0) return;
+        event.preventDefault();
+        setSelected(new Set());
+        setCellRange({
+          anchor: { row: 0, col: 0 },
+          focus: {
+            row: visibleRows.length - 1,
+            col: columns.length - 1,
+          },
+        });
+        return;
+      }
+
       if (mod && key === "d") {
         if (!hasSelection) return;
         event.preventDefault();
@@ -1379,8 +1394,8 @@ export function TableDataEditor({
           </>
         ) : (
           <span>
-            Select cells · ⌘C copy · ⌘V paste · ⌘D duplicate ·{" "}
-            {shortcutLabel("R")} refresh
+            Select cells · {shortcutLabel("A")} all · ⌘C copy · ⌘V paste · ⌘D
+            duplicate · {shortcutLabel("R")} refresh
           </span>
         )}
       </div>

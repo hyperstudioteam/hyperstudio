@@ -28,6 +28,7 @@ import {
   safetyOf,
 } from "./lib/connectionGuard";
 import { errorMessage } from "./lib/format";
+import { isPrimaryModifier } from "./lib/platform";
 import { completionGroupsFor } from "./lib/completionSchema";
 import { hasSchemaCache, hydrateSchemaCache } from "./lib/schemaCache";
 import { onConnectionDeleted } from "./lib/storage";
@@ -168,6 +169,49 @@ function App() {
     };
     window.addEventListener("contextmenu", onContextMenu);
     return () => window.removeEventListener("contextmenu", onContextMenu);
+  }, []);
+
+  // Keep Cmd/Ctrl+A from selecting the whole app chrome. Editable fields keep
+  // native select-all; text opt-ins select their own contents; grids handle
+  // select-all in their own key handlers.
+  useEffect(() => {
+    const editableSelector =
+      'input, textarea, select, [contenteditable="true"], [contenteditable=""]';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "a" || !isPrimaryModifier(event)) return;
+      if (event.altKey || event.shiftKey || event.repeat) return;
+
+      const node =
+        event.target instanceof Element
+          ? event.target
+          : event.target instanceof Node
+            ? event.target.parentElement
+            : null;
+      if (!node) {
+        event.preventDefault();
+        return;
+      }
+
+      if (node.closest(editableSelector)) return;
+
+      const textRoot = node.closest("[data-allow-select-all]");
+      if (textRoot) {
+        event.preventDefault();
+        const selection = window.getSelection();
+        if (!selection) return;
+        const range = document.createRange();
+        range.selectNodeContents(textRoot);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return;
+      }
+
+      event.preventDefault();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
   const vaultRetry = useRef<(() => void) | null>(null);
   const completionPrefetched = useRef<string | null>(null);
