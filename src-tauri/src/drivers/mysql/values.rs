@@ -11,7 +11,11 @@ pub fn decode(row: &MySqlRow, index: usize) -> Value {
         return Value::Null;
     }
     let kind = row.column(index).type_info().name().to_ascii_uppercase();
-    let result = if kind.starts_with("TINYINT UNSIGNED") {
+    // sqlx names TINYINT(1) / BOOLEAN as "BOOLEAN" (not "TINYINT"), so handle
+    // that before the generic integer branches.
+    let result = if kind == "BOOLEAN" || kind == "BOOL" {
+        row.try_get::<bool, _>(index).map(Value::Bool)
+    } else if kind.starts_with("TINYINT UNSIGNED") {
         row.try_get::<u8, _>(index).map(|value| json!(value))
     } else if kind.starts_with("SMALLINT UNSIGNED") {
         row.try_get::<u16, _>(index).map(|value| json!(value))
