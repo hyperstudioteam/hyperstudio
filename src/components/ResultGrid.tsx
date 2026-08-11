@@ -12,6 +12,7 @@ import { CopyAsMenu, ExtractorToolbar, copySelection } from "./CopyAsMenu";
 import { ContextMenu, ContextMenuSeparator } from "./ContextMenu";
 import { CellViewer } from "./CellViewer";
 import { errorMessage } from "../lib/format";
+import { isPrimaryModifier } from "../lib/platform";
 import { presentCell } from "../plugins/contributions";
 import {
   CellRange,
@@ -144,8 +145,29 @@ export function ResultGrid({
       }
     }
 
+    function onKeyDown(event: KeyboardEvent) {
+      if (isEditingField(event.target)) return;
+      if (event.key.toLowerCase() !== "a" || !isPrimaryModifier(event)) return;
+      if (event.altKey || event.shiftKey || event.repeat) return;
+      if (!result || matrix.length === 0 || result.columns.length === 0) return;
+      // Skip when this results panel is kept-alive but hidden.
+      if (gridRef.current?.closest('[aria-hidden="true"]')) return;
+      event.preventDefault();
+      setCellRange({
+        anchor: { row: 0, col: 0 },
+        focus: {
+          row: matrix.length - 1,
+          col: result.columns.length - 1,
+        },
+      });
+    }
+
     window.addEventListener("copy", onCopy);
-    return () => window.removeEventListener("copy", onCopy);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [cellRange, extractor, includeHeader, result, matrix, driver]);
 
   function focusGrid() {

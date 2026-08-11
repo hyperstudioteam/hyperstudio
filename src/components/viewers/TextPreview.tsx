@@ -13,7 +13,10 @@ export function TextPreview({ text, nullValue }: TextPreviewProps) {
     return <div className={emptyClass}>Empty string</div>;
   }
   return (
-    <pre className="m-0 font-mono text-[12px] leading-[1.55] whitespace-pre-wrap break-words text-text">
+    <pre
+      data-allow-select-all
+      className="m-0 font-mono text-[12px] leading-[1.55] whitespace-pre-wrap break-words text-text"
+    >
       {text}
     </pre>
   );
